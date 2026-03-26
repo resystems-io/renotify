@@ -450,7 +450,7 @@ The NATS subject hierarchy encodes both levels (see R-API-07), and the Android U
 *(Goal: Establish the JSON contracts before writing code.)*
 
 - [x] **A-01a: Payload Enumeration:** Enumerate the complete set of required payloads mapping domain objects to system workflows.
-- [ ] **A-01b: Payload Definition:** Define the specific JSON properties and structures for all the enumerated messages.
+- [x] **A-01b: Payload Definition:** Define the specific JSON properties and structures for all the enumerated messages.
 - [ ] **A-02: Broker Provisioning & Routing Design:** Define and document the NATS subject hierarchy encompassing global namespace, users, workspaces, and sessions (e.g., `resystems.renotify.user.{username}.workspace.{workspace}.session.{session_id}.{event_type}`). Also document the WebSocket connection security (auth, wss:// TLS).
 - [ ] **A-03: Provisioning & Interjection Schemas:** Document the QR payload format and the asynchronous interjection command structure.
 - [ ] **A-04: Session State Schemas:** Document the `register` and `terminate` session payloads.
@@ -460,7 +460,10 @@ The NATS subject hierarchy encodes both levels (see R-API-07), and the Android U
 
 - [ ] **P-01: Root Build Orchestration:** Create a top-level `Makefile` with targets for `build-android`, `build-cli`, and `build-all`.
 - [ ] **C-01: CLI Scaffolding:** Set up Cobra/Viper commands (with XDG-compliant config management) for `daemon`, `post`, `ask`, `history`. Ensure `username` and `workspace` are configurable properties.
-- [ ] **M-01: App Scaffolding:** Initialise the Kotlin-based Android project with necessary permissions (Network, Notifications). *(Crucially, this allows a skeleton APK build for later Go embedding).*
+- [ ] **M-01: App Scaffolding:** Initialise the Kotlin-based Android project
+  with necessary permissions (Network, Notifications). *(Crucially, this allows
+  a skeleton APK build for later Go embedding).*
+- [ ] **V-03: Build Verification:** Verify that the CLI and Android applications can be built and run.
 
 ### Phase 3: Secure Transport & Provisioning
 *(Goal: The devices can discover, verify, and talk to each other securely over WebSockets).*
@@ -540,6 +543,471 @@ As per requirement R-API-03, all messaging payloads connecting the CLI, the daem
 | **ErrorResponse** | Any (contextual) | Daemon -> Caller | R-API-11, N-04 | W2, W3, W4, W5 | A generic error envelope returned when any request fails at the daemon or broker level (e.g., unroutable notification, query failure, rate-limit rejection). Contains a correlation ID, error code, human-readable message, and timestamp. |
 | **DecisionResource** | MCP Resource | Daemon -> Agent | R-CLI-10 | W3 | The MCP dynamic resource exposing a decision result (e.g., request ID, boolean/text outcome, timestamp) that agents read after receiving the `notifications/resources/updated` notification. |
 
+**A-01b: Payload Schema Definitions**
+
+The following subsections define the Go struct and JSON schema for each payload enumerated above. Conventions used throughout:
+
+* JSON field names use `snake_case`.
+* Timestamps are RFC 3339 strings (Go `time.Time`).
+* Optional fields carry the `omitempty` struct tag and are omitted from JSON when absent.
+* The `ProvisioningPayload` uses single-character keys to minimise QR code density per R-API-08.
+
+Shared enumeration types referenced by multiple payloads:
+
+```go
+// ResponseType indicates what kind of human feedback a notification expects.
+type ResponseType string
+
+const (
+	ResponseNone    ResponseType = "none"    // fire-and-forget, no response expected
+	ResponseBoolean ResponseType = "boolean" // binary yes/no decision
+	ResponseChoice  ResponseType = "choice"  // selection from a list of actions
+	ResponseText    ResponseType = "text"    // free-form text input
+)
+
+// Priority controls how prominently the Android app renders the notification.
+type Priority string
+
+const (
+	PriorityLow    Priority = "low"
+	PriorityNormal Priority = "normal"
+	PriorityHigh   Priority = "high"
+)
+
+// SessionStatus represents the current lifecycle state of a pipeline session.
+type SessionStatus string
+
+const (
+	SessionActive    SessionStatus = "active"
+	SessionCompleted SessionStatus = "completed"
+	SessionFailed    SessionStatus = "failed"
+)
+
+// InterjectionAction is the type of proactive control signal from the mobile client.
+type InterjectionAction string
+
+const (
+	InterjectionStop  InterjectionAction = "stop"
+	InterjectionPause InterjectionAction = "pause"
+	InterjectionNote  InterjectionAction = "note"
+)
+```
+
+---
+
+**NotificationRequest**
+
+The core domain payload representing an interrupt or alert sent from a CLI command or AI agent to the Android app. For fire-and-forget notifications (`response_type: "none"`), the `actions` and `timeout_sec` fields are omitted. For blocking prompts, `actions` lists the available choices and `timeout_sec` sets the server-side deadline.
+
+```go
+type NotificationRequest struct {
+	ID           string       `json:"id"`
+	Workspace    string       `json:"workspace"`
+	SessionID    string       `json:"session_id"`
+	Title        string       `json:"title"`
+	Body         string       `json:"body,omitempty"`
+	ResponseType ResponseType `json:"response_type"`
+	Priority     Priority     `json:"priority"`
+	Source       string       `json:"source"`
+	Actions      []string     `json:"actions,omitempty"`
+	TimeoutSec   int          `json:"timeout_sec,omitempty"`
+	Timestamp    time.Time    `json:"timestamp"`
+}
+```
+
+Fire-and-forget notification (via `renotify post`):
+
+```json
+{
+  "id": "ntf_a1b2c3d4",
+  "workspace": "renotify",
+  "session_id": "ses_build_7f3a",
+  "title": "Build complete",
+  "body": "All 42 tests passed in 3m12s.",
+  "response_type": "none",
+  "priority": "normal",
+  "source": "ci/build-pipeline",
+  "timestamp": "2026-03-27T10:15:00Z"
+}
+```
+
+Blocking interactive prompt (via `renotify ask`):
+
+```json
+{
+  "id": "ntf_e5f6g7h8",
+  "workspace": "renotify",
+  "session_id": "ses_deploy_9c2b",
+  "title": "Deploy to production?",
+  "body": "Image sha256:ab12cd34 is ready. 3 migrations pending.",
+  "response_type": "choice",
+  "priority": "high",
+  "source": "cd/deploy-pipeline",
+  "actions": ["Approve", "Reject", "Defer"],
+  "timeout_sec": 300,
+  "timestamp": "2026-03-27T14:30:00Z"
+}
+```
+
+---
+
+**NotificationResponse**
+
+The human decision returned from the Android app, correlated to a `NotificationRequest` by `request_id`. For choice and boolean responses, `action` carries the selected option. For free-form text responses, `text` carries the input. Both may be present if the UI allows a comment alongside a choice.
+
+```go
+type NotificationResponse struct {
+	RequestID string    `json:"request_id"`
+	Action    string    `json:"action,omitempty"`
+	Text      string    `json:"text,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+}
+```
+
+Choice selection:
+
+```json
+{
+  "request_id": "ntf_e5f6g7h8",
+  "action": "Approve",
+  "timestamp": "2026-03-27T14:32:15Z"
+}
+```
+
+Free-form text response:
+
+```json
+{
+  "request_id": "ntf_e5f6g7h8",
+  "text": "Hold off until the hotfix lands on main.",
+  "timestamp": "2026-03-27T14:33:42Z"
+}
+```
+
+---
+
+**SessionLifecycleEvent**
+
+A structured event marking the start or end of a pipeline session. Published by the CLI or MCP agent when a session begins (`active`) and when it terminates (`completed` or `failed`). The daemon consumes these to maintain the active session registry (R-CLI-14). The optional `label` provides a human-readable name for display on the Android dashboard, and `metadata` carries arbitrary key-value context.
+
+```go
+type SessionLifecycleEvent struct {
+	SessionID string            `json:"session_id"`
+	Workspace string            `json:"workspace"`
+	Status    SessionStatus     `json:"status"`
+	Label     string            `json:"label,omitempty"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
+	Timestamp time.Time         `json:"timestamp"`
+}
+```
+
+Session registration:
+
+```json
+{
+  "session_id": "ses_deploy_9c2b",
+  "workspace": "renotify",
+  "status": "active",
+  "label": "Production Deploy",
+  "metadata": {
+    "branch": "main",
+    "commit": "e2e2c55"
+  },
+  "timestamp": "2026-03-27T14:00:00Z"
+}
+```
+
+Session completion:
+
+```json
+{
+  "session_id": "ses_deploy_9c2b",
+  "workspace": "renotify",
+  "status": "completed",
+  "timestamp": "2026-03-27T14:45:00Z"
+}
+```
+
+---
+
+**ProvisioningPayload**
+
+The secure handshake payload encoded as minified JSON inside a QR code during `renotify pair`. Field names are single characters to minimise QR density (R-API-08). The `c` field carries the hex-encoded SHA-256 fingerprint of the daemon's self-signed TLS certificate, which the Android app pins for all subsequent connections.
+
+```go
+type ProvisioningPayload struct {
+	Host    string `json:"h"`
+	Port    int    `json:"p"`
+	Token   string `json:"t"`
+	CertSHA string `json:"c"`
+}
+```
+
+```json
+{"h":"192.168.1.42","p":4222,"t":"rn_tk_8a3b5c7d9e","c":"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"}
+```
+
+---
+
+**InterjectionCommand**
+
+An asynchronous, unprompted control signal emitted by the developer from the Android app targeting a specific session within a workspace (R-API-09). A `stop` action requests graceful termination, `pause` requests the pipeline to suspend, and `note` delivers free-form context via the `context` field without altering execution.
+
+```go
+type InterjectionCommand struct {
+	Workspace string             `json:"workspace"`
+	SessionID string             `json:"session_id"`
+	Action    InterjectionAction `json:"action"`
+	Context   string             `json:"context,omitempty"`
+	Timestamp time.Time          `json:"timestamp"`
+}
+```
+
+Stop command:
+
+```json
+{
+  "workspace": "renotify",
+  "session_id": "ses_deploy_9c2b",
+  "action": "stop",
+  "timestamp": "2026-03-27T14:35:00Z"
+}
+```
+
+Free-form note:
+
+```json
+{
+  "workspace": "renotify",
+  "session_id": "ses_deploy_9c2b",
+  "action": "note",
+  "context": "Check the connection pool config before proceeding.",
+  "timestamp": "2026-03-27T14:36:00Z"
+}
+```
+
+---
+
+**ActiveSessionsQuery**
+
+A Core NATS Request-Reply query sent by the Android app to the daemon to list currently active sessions (R-CLI-14, R-MOB-09). An optional `workspace` filter narrows results to a single workspace; when omitted, all active sessions across all workspaces are returned.
+
+```go
+type ActiveSessionsQuery struct {
+	Workspace string `json:"workspace,omitempty"`
+}
+```
+
+Unfiltered (all workspaces):
+
+```json
+{}
+```
+
+Filtered to one workspace:
+
+```json
+{
+  "workspace": "renotify"
+}
+```
+
+---
+
+**ActiveSessionsResult**
+
+The daemon's reply to an `ActiveSessionsQuery`, containing an array of `SessionLifecycleEvent` records representing currently active sessions. An empty `sessions` array indicates no active work.
+
+```go
+type ActiveSessionsResult struct {
+	Sessions []SessionLifecycleEvent `json:"sessions"`
+}
+```
+
+```json
+{
+  "sessions": [
+    {
+      "session_id": "ses_deploy_9c2b",
+      "workspace": "renotify",
+      "status": "active",
+      "label": "Production Deploy",
+      "timestamp": "2026-03-27T14:00:00Z"
+    },
+    {
+      "session_id": "ses_lint_4d1e",
+      "workspace": "gethos-api",
+      "status": "active",
+      "label": "Lint & Vet",
+      "metadata": {
+        "branch": "feature/auth"
+      },
+      "timestamp": "2026-03-27T14:10:00Z"
+    }
+  ]
+}
+```
+
+---
+
+**HistoryQueryRequest**
+
+A Core NATS Request-Reply query sent by the Android app to retrieve historical notification records from the daemon's SQLite ledger (R-CLI-13, R-MOB-07). All fields are optional filters; when all are omitted the daemon returns the most recent records up to its configured default limit.
+
+```go
+type HistoryQueryRequest struct {
+	Workspace string     `json:"workspace,omitempty"`
+	SessionID string     `json:"session_id,omitempty"`
+	Since     *time.Time `json:"since,omitempty"`
+	Until     *time.Time `json:"until,omitempty"`
+	Limit     int        `json:"limit,omitempty"`
+}
+```
+
+```json
+{
+  "workspace": "renotify",
+  "limit": 25
+}
+```
+
+---
+
+**HistoryQueryResult**
+
+The daemon's reply to a `HistoryQueryRequest`, wrapping an array of `HistoryRecord` entries. Each record pairs the original `NotificationRequest` with its `NotificationResponse` (if one was received). The `total` field reports the full count of matching records, allowing the client to detect when results have been truncated by the `limit`.
+
+```go
+type HistoryRecord struct {
+	Request  NotificationRequest   `json:"request"`
+	Response *NotificationResponse `json:"response,omitempty"`
+}
+
+type HistoryQueryResult struct {
+	Records []HistoryRecord `json:"records"`
+	Total   int             `json:"total"`
+}
+```
+
+```json
+{
+  "records": [
+    {
+      "request": {
+        "id": "ntf_e5f6g7h8",
+        "workspace": "renotify",
+        "session_id": "ses_deploy_9c2b",
+        "title": "Deploy to production?",
+        "response_type": "choice",
+        "priority": "high",
+        "source": "cd/deploy-pipeline",
+        "actions": ["Approve", "Reject", "Defer"],
+        "timeout_sec": 300,
+        "timestamp": "2026-03-27T14:30:00Z"
+      },
+      "response": {
+        "request_id": "ntf_e5f6g7h8",
+        "action": "Approve",
+        "timestamp": "2026-03-27T14:32:15Z"
+      }
+    },
+    {
+      "request": {
+        "id": "ntf_x9y0z1w2",
+        "workspace": "renotify",
+        "session_id": "ses_build_7f3a",
+        "title": "Build complete",
+        "response_type": "none",
+        "priority": "normal",
+        "source": "ci/build-pipeline",
+        "timestamp": "2026-03-27T10:15:00Z"
+      }
+    }
+  ],
+  "total": 2
+}
+```
+
+---
+
+**ErrorResponse**
+
+A generic error envelope returned when any request fails at the daemon level (R-API-11). The `correlation_id` matches the `id` of the originating request (or is empty for unsolicited errors). The `code` field uses a fixed set of string codes to enable programmatic error handling:
+
+* `timeout` — blocking request expired without a human response.
+* `rate_limited` — per-session notification rate limit exceeded (R-CLI-16).
+* `not_found` — referenced session or notification does not exist.
+* `unroutable` — no mobile client connected to receive the notification.
+* `internal` — unexpected daemon-side failure.
+
+```go
+type ErrorResponse struct {
+	CorrelationID string    `json:"correlation_id,omitempty"`
+	Code          string    `json:"code"`
+	Message       string    `json:"message"`
+	Timestamp     time.Time `json:"timestamp"`
+}
+```
+
+Timeout error:
+
+```json
+{
+  "correlation_id": "ntf_e5f6g7h8",
+  "code": "timeout",
+  "message": "No response received within 300s.",
+  "timestamp": "2026-03-27T14:35:00Z"
+}
+```
+
+Rate-limit rejection:
+
+```json
+{
+  "correlation_id": "ntf_r4s5t6u7",
+  "code": "rate_limited",
+  "message": "Session ses_flood_0001 exceeded 60 notifications/min.",
+  "timestamp": "2026-03-27T15:00:01Z"
+}
+```
+
+---
+
+**DecisionResource**
+
+The MCP dynamic resource that agents read after receiving a `notifications/resources/updated` notification (R-CLI-10). This is not a NATS message; it is served by the daemon's MCP server as a resource. The `decided` flag indicates whether a human response has been received. While `decided` is `false`, the `action` and `text` fields are absent. Once decided, the resource is immutable.
+
+```go
+type DecisionResource struct {
+	RequestID string    `json:"request_id"`
+	Decided   bool      `json:"decided"`
+	Action    string    `json:"action,omitempty"`
+	Text      string    `json:"text,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+}
+```
+
+Pending (not yet decided):
+
+```json
+{
+  "request_id": "ntf_e5f6g7h8",
+  "decided": false,
+  "timestamp": "2026-03-27T14:30:00Z"
+}
+```
+
+Decided:
+
+```json
+{
+  "request_id": "ntf_e5f6g7h8",
+  "decided": true,
+  "action": "Approve",
+  "timestamp": "2026-03-27T14:32:15Z"
+}
+```
+
 ## 5. Change Log
 
 Record completed items here with the date.
@@ -549,6 +1017,7 @@ Record completed items here with the date.
 | 2026-03-26 | A-01a | Draft | Enumerated payload schemas across all workflows and revised R-API-08 for minified JSON QR codes. |
 | 2026-03-26 | Review | Draft | Document-wide refinement: added Section 1.5 (Key Definitions), Section 2.5 (Security Lifecycle), Section 2.6 (MVP Performance Envelope); new requirements R-API-11, R-CLI-16/17/18, R-MOB-10, R-SEC-01/02/03, R-SYS-01; revised R-API-04, R-API-07, R-CLI-12; added V-00 integration checkpoint, C-12 token revocation; structural fixes. |
 | 2026-03-26 | A-01a | Draft | Split payload table "Direction / Transport" into separate Transport and Direction columns with a closed taxonomy of transport labels. |
+| 2026-03-27 | A-01b | Draft | Defined Go structs and JSON exemplars for all 11 payload schemas with shared enumeration types. |
 
 ## 6. References
 
