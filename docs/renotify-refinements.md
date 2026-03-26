@@ -62,6 +62,44 @@ The architecture deliberately relies on the NATS subject namespace to multiplex 
 1. **Shared Broker Level:** A single centralised NATS broker (in an enterprise setting) can support multiple distinct `renotify` daemons running for different users concurrently.
 2. **Daemon Level:** A single local `renotify daemon` acts as a multiplexer for any number of concurrent automation pipelines, active AI agent sessions, or local file workspaces. It intelligently routes all of these isolated context streams securely up to the user's single authenticated Android remote app.
 
+**High-Level Architecture**
+
+The diagram below shows the major system components and the transport boundaries between them. On the developer's workstation, shell scripts and AI agents are the originating callers. Scripts invoke the `renotify` CLI which connects to the daemon over native NATS TCP; AI agents connect directly to the daemon's embedded MCP server. The daemon orchestrates all routing, timeout management, and persistent audit logging through its SQLite ledger. It bridges outbound messages to the Android mobile client over a NATS WebSocket (WSS) connection secured via TLS certificate pinning established during the QR pairing flow.
+
+```mermaid
+flowchart TB
+    subgraph host["Developer Workstation"]
+        direction TB
+
+        scripts["Shell Scripts<br/>CI Pipelines"]
+        agents["AI Agents"]
+        cli["renotify CLI<br/>(post, ask, pair,<br/>revoke, history)"]
+
+        subgraph daemon["renotify Daemon"]
+            direction TB
+            mcp["MCP Server"]
+            nats["Embedded NATS Broker<br/>(JetStream, memory-backed)"]
+            sqlite[("SQLite Ledger<br/>(history + sessions)")]
+
+            mcp --> nats
+            nats <--> sqlite
+        end
+
+        scripts --> cli
+        agents -- "MCP" --> mcp
+        cli -- "NATS TCP" --> nats
+    end
+
+    subgraph mobile["Android Device"]
+        app["Renotify App<br/>(Dashboard, Notifications,<br/>Interjections, History)"]
+    end
+
+    nats <-- "NATS WebSocket (WSS)" --> app
+    cli -. "QR Code (offline pairing)" .-> app
+```
+
+The embedded NATS broker and MCP server are independently toggleable (R-CLI-02, R-CLI-03). When the embedded broker is disabled, the daemon connects to an external centralised NATS broker instead, supporting shared enterprise deployments while keeping the same component topology.
+
 ### 1.5 Key Definitions
 
 The following terms have precise meanings throughout this document and the implementation:
