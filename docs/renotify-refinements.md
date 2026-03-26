@@ -136,8 +136,8 @@ The architecture deliberately relies on the NATS subject namespace to multiplex 
 * **V&V Method (A2):** Demonstration
 
 #### R-API-08: Provisioning Schema
-**Statement:** Define the URI or JSON payload structure to be encoded in the pairing QR code (e.g., `renotify://pair?ip=...&port=...&token=...&cert_fingerprint=...`).
-* **Rationale (A1):** Standardises the secure handshake protocol required for mobile connection bootstrapping.
+**Statement:** Define the minified JSON payload structure to be encoded in the pairing QR code (containing target IP, port, token, and certificate fingerprints).
+* **Rationale (A1):** A minified JSON payload is more robust over time and easier to expand with complex cryptographic parameters than a standard URI format. Standardises the secure handshake protocol required for mobile connection bootstrapping.
 * **Trace to Parent (A4):** N-01
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Inspection
@@ -335,7 +335,8 @@ The architecture deliberately relies on the NATS subject namespace to multiplex 
 ### Phase 1: Architecture & Schemas
 *(Goal: Establish the JSON contracts before writing code.)*
 
-- [ ] **A-01: Payload Schemas:** Define the specific Request and Response message structures to be serialised as JSON.
+- [x] **A-01a: Payload Enumeration:** Enumerate the complete set of required payloads mapping domain objects to system workflows.
+- [ ] **A-01b: Payload Definition:** Define the specific JSON properties and structures for all the enumerated messages.
 - [ ] **A-02: Broker Provisioning & Routing Design:** Define and document the NATS subject hierarchy encompassing global namespace, users, and workspaces (e.g., `resystems.renotify.user.{username}.workspace.{workspace_name}.{event_type}`). Also document the WebSocket connection security (auth, wss:// TLS).
 - [ ] **A-03: Provisioning & Interjection Schemas:** Document the QR payload format and the asynchronous interjection command structure.
 - [ ] **A-04: Session State Schemas:** Document the `register` and `terminate` session payloads.
@@ -399,7 +400,21 @@ align with the implementation plan.
 
 ### 4.1 Phase 1: Architecture & Schemas
 
-TODO
+**A-01a: Payload Schemas Enumeration**
+
+As per requirement R-API-03, all messaging payloads connecting the CLI, the daemon, and the Android App must be encoded in JSON. Furthermore, per the revised R-API-08, the provisioning handshake is specifically formatted as a minified JSON structure. The following table enumerates the distinct message types required to fulfil the system workflows.
+
+| Payload Name | Direction / Transport | Requirement Cross-Ref | ConOps Workflow | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **NotificationRequest** | CLI/Agent -> Broker -> App | R-API-01, N-01 | W2, W3 | The core domain model representing an interrupt or alert. Contains the title, body, priority, source pipeline, and the type of response required (e.g. none, boolean, freeform). |
+| **NotificationResponse**| App -> Broker -> CLI/Agent | R-API-02, N-03 | W3 | The human decision. Correlates to a `NotificationRequest` ID, capturing the selected action or free-form text input alongside the decision timestamp. |
+| **SessionLifecycleEvent**| CLI/Agent -> Broker | R-API-10, N-04 | W3, W5 | A structured event indicating the birth or death of a distinct pipeline session or agent run. Used by the daemon to maintain the active registry. |
+| **ProvisioningPayload** | CLI -> Terminal (QR) -> App | R-API-08, N-01 | W1 | The secure handshake payload containing the target IP, port, auth token, and required TLS certificate fingerprints in a minified JSON map. |
+| **InterjectionCommand** | App -> Broker -> Daemon/Agent | R-API-09, N-05 | W5 | An asynchronous, unprompted control signal emitted by the user (e.g. "Stop", "Pause", or free-form context) destined for a specific active workspace or session. |
+| **ActiveSessionsQuery** | App -> Daemon (Request) | R-CLI-14, R-MOB-09 | W5 | Core NATS query sent by the Android app to list all currently running pipelines/agents across the host. |
+| **ActiveSessionsResult**| Daemon -> App (Reply) | R-CLI-14, R-MOB-09 | W5 | The daemon's reply containing the array of currently active `SessionLifecycleEvent` contexts. |
+| **HistoryQueryRequest** | App -> Daemon (Request) | R-CLI-13, R-MOB-07 | W4 | Core NATS query sent by the Android app requesting the historical ledger of past notifications and decisions. |
+| **HistoryQueryResult** | Daemon -> App (Reply) | R-CLI-13, R-MOB-07 | W4 | The daemon's structured payload wrapping the requested SQLite history records to be rendered native on the device. |
 
 ## 5. Change Log
 
@@ -407,7 +422,7 @@ Record completed items here with the date.
 
 | Date | Item | Notes |
 |------|------|-------|
-| | | |
+| 2026-03-26 | A-01a | Enumerated payload schemas across all workflows and revised R-API-08 for minified JSON QR codes. |
 
 ## 6. References
 
