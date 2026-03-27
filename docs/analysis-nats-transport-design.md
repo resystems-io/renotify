@@ -168,8 +168,10 @@ the LAN or WAN. Port 4223 is adjacent to the standard NATS port 4222 for
 discoverability. Plaintext WebSocket (`ws://`) is never permitted.
 
 ```go
-// EmbeddedBrokerConfig holds the listener configuration for the in-process
-// NATS server. Both listeners are independently configurable.
+// EmbeddedBrokerConfig holds the listener configuration for the
+// in-process NATS server. This is a subset of the unified Config
+// struct; see Configuration Schema (analysis-configuration-schema.md)
+// Section 2.2 for the full definition with defaults and validation.
 type EmbeddedBrokerConfig struct {
 	TCPHost  string `json:"tcp_host"`  // default: "127.0.0.1"
 	TCPPort  int    `json:"tcp_port"`  // default: 4222

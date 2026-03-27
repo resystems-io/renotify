@@ -750,7 +750,7 @@ and a maximum individual payload size of 64 KB.
   flow registry, and flow lifecycle event storage. Must support the
   `HistoryQueryRequest` filter fields (`workspace_id`, `flow_id`,
   `since`, `until`, `limit`) and the stale reaping query pattern.
-- [ ] **A-06: Configuration Schema:** Define the unified
+- [x] **A-06: Configuration Schema:** Define the unified
   `settings.json` structure under `$XDG_CONFIG_HOME/renotify/`,
   consolidating all configurable parameters (embedded broker
   toggles, listener addresses, JetStream limits, rate limits, grace
@@ -926,6 +926,7 @@ specifications.
 | D-18 | QR generation: `mdp/qrterminal/v3`, EC level L, half-block terminal rendering; scanning: Google ML Kit Barcode | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
 | D-19 | Flow lifecycle: CLI implicit (one flow per command) vs MCP explicit (`register_flow`/`refresh_flow`/`terminate_flow` tools); activity-based reaping timer reset | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
 | D-20 | SQLite ledger: 4 tables (notification_requests, notification_responses, flow_lifecycle_events, active_flows); PRAGMA user_version migration; `INSERT OR IGNORE` dedup; `last_activity_timestamp` for reaping | [SQLite Ledger](analysis-sqlite-ledger.md) | 2026-03-27 |
+| D-21 | Configuration: unified `settings.json` under XDG config; Cobra/Viper binding with `RENOTIFY_` env prefix; compiled defaults (no auto-created config file); default ask timeout 5m | [Configuration Schema](analysis-configuration-schema.md) | 2026-03-27 |
 
 ---
 
@@ -945,6 +946,7 @@ Record completed items here with the date.
 | 2026-03-27 | A-04 | Draft | Flow lifecycle management documented. Defined two paths: CLI implicit (one flow per command) and MCP explicit (agent-managed via `register_flow`/`refresh_flow`/`terminate_flow` tools). Added MCP tool input/output schemas with Go structs, JSON exemplars, and error conditions. Activity-based reaping timer reset on any tool call referencing a flow. `refresh_flow` enables progress updates on long-running MCP flows. Future `status` field noted for transient progress messages. |
 | 2026-03-27 | Gap analysis | — | Phase 1 gap analysis identified 15 items. Added A-05 (SQLite ledger schema), A-06 (configuration schema), and A-07 through A-15 covering notification ID format, CLI contracts, shared broker path, MCP post/ask tools, interjection delivery, timeout enforcement, workspace discovery, history pagination, and payload versioning. |
 | 2026-03-27 | A-05 | Draft | SQLite ledger schema defined in standalone analysis document. Four tables: notification_requests, notification_responses (1:0..1 join), flow_lifecycle_events (append-only audit), active_flows (hot working set with last_activity_timestamp). PRAGMA user_version migration strategy with idempotent DDL. Query patterns for history, active flows, stale reaping, rate limiting, and deduplication. Complete V1 migration script. |
+| 2026-03-27 | A-06 | Draft | Unified configuration schema in standalone analysis document. XDG directory layout (config vs state), Go struct definitions with JSON tags and defaults, two example settings.json (embedded and shared broker), Viper binding model with RENOTIFY_ env prefix and CLI flag mapping, validation rules per parameter. Default ask timeout set to 5 minutes. Cobra and Viper added to references. |
 
 ## 6. References
 
@@ -976,6 +978,11 @@ Record completed items here with the date.
 11. [jnats][jnats] — Official NATS Java client library. Candidate
     for Android NATS WebSocket connectivity (supports `wss://` and
     custom `SSLContext`).
+12. [Cobra][cobra] — Go CLI framework for command-line argument
+    parsing and subcommand management.
+13. [Viper][viper] — Go configuration library supporting JSON files,
+    environment variables, and CLI flag binding with layered
+    precedence.
 
 [qrterminal]: https://github.com/mdp/qrterminal
 [mlkit-barcode]: https://developers.google.com/ml-kit/vision/barcode-scanning
@@ -986,3 +993,5 @@ Record completed items here with the date.
 [rfc9562]: https://www.rfc-editor.org/rfc/rfc9562
 [iso18004]: https://www.iso.org/standard/62021.html
 [jnats]: https://github.com/nats-io/nats.java
+[cobra]: https://github.com/spf13/cobra
+[viper]: https://github.com/spf13/viper
