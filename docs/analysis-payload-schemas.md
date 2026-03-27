@@ -295,6 +295,265 @@ Flow completion:
 }
 ```
 
+### Flow Lifecycle Management
+
+Flow state changes are communicated via `FlowLifecycleEvent` messages
+on the NATS lifecycle subject (see [NATS Transport
+Design](analysis-nats-transport-design.md) Section 1). Two distinct
+paths exist for managing flow lifecycle, depending on the caller:
+
+**CLI path (implicit).** Each CLI command manages its own flow
+automatically. `renotify post` and `renotify ask` generate a
+`flow_id`, publish a `FlowLifecycleEvent` with `status: active`,
+perform their operation, and publish `completed` or `failed` on
+exit. One flow per command invocation. The flow is an internal
+implementation detail — the user does not interact with flow
+management directly. See [NATS Transport
+Design](analysis-nats-transport-design.md) Section 8.6 for the
+full CLI connection sequence.
+
+**MCP path (explicit).** An AI agent manages flow lifecycle via
+dedicated MCP tool calls. This allows a long-lived flow spanning
+multiple `post` and `ask` operations within a single agent
+conversation. The agent calls `register_flow` to begin, performs
+its work, and calls `terminate_flow` to end. The daemon generates
+the `flow_id` and publishes the underlying `FlowLifecycleEvent`
+on the agent's behalf.
+
+| Operation | CLI Path | MCP Path |
+| :--- | :--- | :--- |
+| Start a flow | Implicit: CLI generates `flow_id` and publishes `FlowLifecycleEvent` (`active`) | Explicit: agent calls `register_flow` tool; daemon generates `flow_id` and publishes event |
+| Send notification | `renotify post` or `renotify ask` (flow_id set internally) | Agent calls `post` or `ask` tool with the `flow_id` returned by `register_flow` |
+| Signal progress | N/A (CLI flows are short-lived) | Agent calls `refresh_flow` with optional label/metadata update; resets reaping timer |
+| End a flow | Implicit: CLI publishes `FlowLifecycleEvent` (`completed` or `failed`) on exit | Explicit: agent calls `terminate_flow` tool; daemon publishes event |
+| Stale reaping | Daemon detects CLI process termination (5-min grace, R-CLI-18) | Daemon detects absence of any tool call referencing the flow (5-min grace, R-CLI-18) |
+
+#### `register_flow` MCP Tool
+
+Called by an AI agent to begin a new flow. The daemon generates
+the `flow_id`, publishes a `FlowLifecycleEvent` with
+`status: active`, adds the flow to the active registry, and
+returns the generated identifier to the agent.
+
+**Input parameters:**
+
+```go
+type RegisterFlowRequest struct {
+	WorkspaceID string            `json:"workspace_id"`
+	Label       string            `json:"label,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+}
+```
+
+- `workspace_id` (required) — the workspace this flow belongs to.
+  Must match a workspace known to the daemon (present in the
+  daemon's heartbeat). The daemon rejects unknown workspace IDs
+  with error code `not_found`.
+- `label` (optional) — human-readable name for the flow displayed
+  on the Android dashboard (e.g., "Code Review", "Deploy Pipeline").
+- `metadata` (optional) — arbitrary key-value context attached to
+  the `FlowLifecycleEvent` (e.g., branch, commit, agent name).
+
+**Output:**
+
+```go
+type RegisterFlowResult struct {
+	FlowID    string    `json:"flow_id"`
+	Timestamp time.Time `json:"timestamp"`
+}
+```
+
+The daemon generates the `flow_id` (UUIDv7, Crockford Base32
+with `fl_` prefix) and returns it. The agent must use this
+`flow_id` in all subsequent `post`, `ask`, and `terminate_flow`
+calls within this flow.
+
+**Exemplar — request:**
+
+```json
+{
+  "workspace_id": "ws_5MBJR1HXNP3KQ8DW",
+  "label": "Production Deploy",
+  "metadata": {
+    "branch": "main",
+    "commit": "e2e2c55"
+  }
+}
+```
+
+**Exemplar — result:**
+
+```json
+{
+  "flow_id": "fl_0R3FABM7TP2XE89YWCGKN4QJ5V",
+  "timestamp": "2026-03-27T14:00:00Z"
+}
+```
+
+**Error conditions:**
+
+| Error Code | Condition |
+| :--- | :--- |
+| `not_found` | The `workspace_id` does not match any workspace known to the daemon. |
+| `rate_limited` | The agent has exceeded the maximum number of concurrent active flows (R-SYS-01: 20). |
+| `internal` | Unexpected daemon-side failure during flow registration. |
+
+Errors are returned as MCP tool error responses. The daemon does
+not publish a `FlowLifecycleEvent` when registration fails.
+
+#### `terminate_flow` MCP Tool
+
+Called by an AI agent to end a flow. The daemon publishes a
+`FlowLifecycleEvent` with the specified status, removes the flow
+from the active registry, and confirms termination to the agent.
+
+**Input parameters:**
+
+```go
+type TerminateFlowRequest struct {
+	FlowID string     `json:"flow_id"`
+	Status FlowStatus `json:"status"`
+}
+```
+
+- `flow_id` (required) — the flow to terminate. Must be an active
+  flow registered by this agent.
+- `status` (required) — the terminal state: `"completed"` for
+  successful conclusion or `"failed"` for abnormal termination.
+  The value `"active"` is rejected as invalid.
+
+**Output:**
+
+```go
+type TerminateFlowResult struct {
+	FlowID    string    `json:"flow_id"`
+	Status    string    `json:"status"`
+	Timestamp time.Time `json:"timestamp"`
+}
+```
+
+**Exemplar — request (successful completion):**
+
+```json
+{
+  "flow_id": "fl_0R3FABM7TP2XE89YWCGKN4QJ5V",
+  "status": "completed"
+}
+```
+
+**Exemplar — result:**
+
+```json
+{
+  "flow_id": "fl_0R3FABM7TP2XE89YWCGKN4QJ5V",
+  "status": "completed",
+  "timestamp": "2026-03-27T14:45:00Z"
+}
+```
+
+**Error conditions:**
+
+| Error Code | Condition |
+| :--- | :--- |
+| `not_found` | The `flow_id` is not in the active flow registry (already terminated, reaped, or never registered). |
+| `internal` | Unexpected daemon-side failure during termination. |
+
+#### `refresh_flow` MCP Tool
+
+Called by an AI agent to signal continued activity on a
+long-running flow. Resets the stale reaping timer and optionally
+updates the flow's display label and metadata on the mobile
+dashboard. The daemon publishes a `FlowLifecycleEvent` with
+`status: active` and the updated fields. Agents should call this
+between major work steps during tasks that may exceed the
+5-minute reaping grace period.
+
+**Input parameters:**
+
+```go
+type RefreshFlowRequest struct {
+	FlowID   string            `json:"flow_id"`
+	Label    string            `json:"label,omitempty"`
+	Metadata map[string]string `json:"metadata,omitempty"`
+}
+```
+
+- `flow_id` (required) — the active flow to refresh.
+- `label` (optional) — updated display name for the mobile
+  dashboard (e.g., "Running tests 14/42"). Overwrites the
+  prior label.
+- `metadata` (optional) — updated key-value context. Merged
+  with existing metadata: new keys are added, existing keys
+  are overwritten, keys absent from the update are retained.
+
+**Output:**
+
+```go
+type RefreshFlowResult struct {
+	FlowID    string    `json:"flow_id"`
+	Timestamp time.Time `json:"timestamp"`
+}
+```
+
+**Exemplar — request:**
+
+```json
+{
+  "flow_id": "fl_0R3FABM7TP2XE89YWCGKN4QJ5V",
+  "label": "Analysing 12 files..."
+}
+```
+
+**Exemplar — result:**
+
+```json
+{
+  "flow_id": "fl_0R3FABM7TP2XE89YWCGKN4QJ5V",
+  "timestamp": "2026-03-27T14:20:00Z"
+}
+```
+
+**Error conditions:**
+
+| Error Code | Condition |
+| :--- | :--- |
+| `not_found` | The `flow_id` is not in the active flow registry. |
+| `internal` | Unexpected daemon-side failure. |
+
+A typical MCP agent workflow using `refresh_flow`:
+
+```
+register_flow  → post "Starting code review"  → [work] →
+refresh_flow "Analysing 12 files..."           → [work] →
+ask "Found 3 issues, proceed?"                 → [wait] →
+refresh_flow "Applying fixes..."               → [work] →
+terminate_flow completed
+```
+
+**Future consideration:** A free-form `status` field (distinct
+from `label`) may be added to `RefreshFlowRequest` and
+`FlowLifecycleEvent` to carry a transient progress message
+(e.g., "Compiling module 3 of 7") separately from the
+human-readable flow name. This would allow the mobile dashboard
+to display both a stable title and a changing status line. This
+is deferred to avoid adding fields before their UI rendering is
+designed.
+
+#### Stale Flow Reaping
+
+The daemon resets the stale reaping timer whenever any MCP tool
+call references a flow (`post`, `ask`, `refresh_flow`,
+`terminate_flow`). This means an agent that is actively sending
+notifications does not need to call `refresh_flow` explicitly —
+any interaction with the flow keeps it alive.
+
+If no tool call references the flow for the configurable grace
+period (default: 5 minutes, R-CLI-18), the daemon marks the
+flow as `failed` and publishes a `FlowLifecycleEvent` with
+`status: failed`. The same mechanism applies to CLI flows whose
+originating process has terminated. The mobile app and history
+ledger observe this event via their normal subscriptions.
+
 ### ProvisioningPayload
 
 The secure handshake payload encoded as minified JSON inside a QR code during
