@@ -55,12 +55,13 @@ Derived from CONOPS-01:
 * **N-05 [Proactive Interjection]:** The system must allow the human receiver to emit asynchronous, unprompted control signals or feedback upstream to terminate, pause, or alter the trajectory of active pipelines.
 
 ### 1.4 Architectural Considerations
-To connect the CLI and the Android app, a reliable transport layer is necessary. This system will exclusively use NATS as the central message broker, deliberately excluding alternatives like MQTT or gRPC. This refinement plan focuses on defining the interfaces, components, and integration points for the MVP built around NATS.
+To connect the CLI and the Android app, a reliable transport layer is necessary. This system will exclusively use NATS as the central message broker, deliberately excluding alternatives like MQTT or gRPC. NATS serves as the transport layer across all deployment models, from a solo developer running an embedded broker at home to a shared enterprise broker serving an entire team.
 
 **Multiplexing & Multi-tenancy**
-The architecture deliberately relies on the NATS subject namespace to multiplex traffic across multiple operational dimensions:
-1. **Shared Broker Level:** A single centralised NATS broker (in an enterprise setting) can support multiple distinct `renotify` daemons running for different users concurrently.
-2. **Daemon Level:** A single local `renotify daemon` acts as a multiplexer for any number of concurrent automation pipelines, active AI agent sessions, or local file workspaces. It intelligently routes all of these isolated context streams securely up to the user's single authenticated Android remote app.
+The architecture relies on the NATS subject namespace to multiplex traffic. Globally unique flow identifiers allow a flat subject hierarchy (`{username}.flow.{flow_id}.{event_type}`) while structural context (daemon, workspace) is carried as payload metadata and daemon heartbeats:
+1. **Shared Broker Level:** A single centralised NATS broker can support multiple users, each with their own daemons, concurrently. NATS auth scopes each user to their own subject prefix.
+2. **Daemon Level:** A single user may run daemons on multiple machines. Each daemon is distinguished by a persistent `daemon_id` and manages its own set of workspaces and flows. The mobile app discovers daemons via periodic heartbeat messages.
+3. **Flow Level:** Each automation pipeline or agent conversation creates a globally unique `flow_id`. Messages are routed by flow_id without encoding workspace or daemon in the subject, eliminating namespace collisions.
 
 **High-Level Architecture**
 
@@ -79,7 +80,7 @@ flowchart TB
             direction TB
             mcp["MCP Server"]
             nats["Embedded NATS Broker<br/>(JetStream, memory-backed)"]
-            sqlite[("SQLite Ledger<br/>(history + sessions)")]
+            sqlite[("SQLite Ledger<br/>(history + flows)")]
 
             mcp --> nats
             nats <--> sqlite
@@ -98,16 +99,17 @@ flowchart TB
     cli -. "QR Code (offline pairing)" .-> app
 ```
 
-The embedded NATS broker and MCP server are independently toggleable (R-CLI-02, R-CLI-03). When the embedded broker is disabled, the daemon connects to an external centralised NATS broker instead, supporting shared enterprise deployments while keeping the same component topology.
+The embedded NATS broker and MCP server are independently toggleable (R-CLI-02, R-CLI-03). The embedded broker is a first-class deployment model suited to solo developers working independently or disconnected from enterprise infrastructure. When the embedded broker is disabled, the daemon connects to an external shared NATS broker instead. Both models use the same protocol, subject namespace, and provisioning flow — the mobile app behaves identically regardless of broker topology.
 
 ### 1.5 Key Definitions
 
-The following terms have precise meanings throughout this document and the implementation:
+The following terms have precise meanings throughout this document and the implementation. For the complete identifier design, encoding rationale, and uniqueness analysis, see the [Naming & Addressing Analysis](analysis-naming-and-addressing.md). All generated identifiers use Crockford Base32 encoding.
 
-* **Workspace** — A named local project directory or working tree from which one or more automation pipelines originate. Workspaces are long-lived and map to a developer's active projects (e.g., `~/projects/renotify`). A single daemon may manage traffic for many workspaces concurrently.
-* **Session** — A single, time-bounded execution of a pipeline or agent conversation within a workspace. Sessions are ephemeral: they begin when a pipeline registers (via `register_session`) and end when it terminates, completes, or is reaped for staleness. A workspace may host many concurrent sessions.
+* **Daemon Instance** — A running `renotify daemon` process, identified by a persistent `daemon_id` (`dn_` + 13 Base32 characters, 65 bits from UUIDv4). Generated on first startup and persisted in the XDG state directory. A user may operate daemons on multiple machines; each has a distinct daemon_id.
+* **Workspace** — A project directory from which automation pipelines originate. Identified by a deterministic `workspace_id` (`ws_` + 16 Base32 characters, 80 bits from SHA-256 of daemon_id + absolute path). The human-readable display name (directory basename, e.g., `renotify`) is NOT unique and is used for UI display only.
+* **Flow** — A single, time-bounded execution of a pipeline or agent conversation within a workspace. Identified by a globally unique `flow_id` (`fl_` + 26 Base32 characters, full 128-bit UUIDv7). Flows are ephemeral: they begin when a pipeline registers (via `register_flow`) and end when it terminates, completes, or is reaped for staleness. A workspace may host many concurrent flows. The term "flow" is used instead of "session" to avoid ambiguity with MCP protocol sessions, AI agent conversation sessions, and HTTP sessions.
 
-The NATS subject hierarchy encodes both levels (see R-API-07), and the Android UI groups notifications first by workspace, then by session within that workspace.
+The NATS subject hierarchy uses `{username}` and `{flow_id}` for routing (see R-API-07). Structural context (daemon, workspace) is carried within payloads and daemon heartbeats, not encoded in the subject. The Android UI groups notifications by workspace using data from heartbeat messages.
 
 ---
 
@@ -169,15 +171,15 @@ The NATS subject hierarchy encodes both levels (see R-API-07), and the Android U
 * **V&V Method (A2):** Inspection
 
 #### R-API-06: Multi-User Support
-**Statement:** The subject hierarchy must explicitly route at the `user` level (e.g., `...user.<username>.>`).
-* **Rationale (A1):** Allows multiple developers to share a broker without receiving each other's notifications.
+**Statement:** The subject hierarchy must route at the username level (e.g., `resystems.renotify.{username}.>`).
+* **Rationale (A1):** Allows multiple developers to share a broker without receiving each other's notifications. NATS auth scopes each user to their own prefix.
 * **Trace to Parent (A4):** N-01
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Demonstration
 
-#### R-API-07: Multi-Workspace & Session Routing
-**Statement:** Routing subject names must explicitly include both a `workspace` identifier and a `session` identifier to separate notifications at two distinct levels: by originating project directory and by individual pipeline run (e.g., `...workspace.{workspace}.session.{session_id}.{event_type}`).
-* **Rationale (A1):** A single local daemon must seamlessly multiplex traffic from many concurrent workspaces and sessions without cross-contaminating the context presented on the developer's Android application. The two-level hierarchy enables the mobile UI to group by project and filter by pipeline run.
+#### R-API-07: Flow-Based Subject Routing
+**Statement:** Routing subject names must use the globally unique `flow_id` as the primary routing key (e.g., `resystems.renotify.{username}.flow.{flow_id}.{event_type}`). Workspace and daemon context must be carried as payload metadata and daemon heartbeats, not encoded in the subject hierarchy.
+* **Rationale (A1):** Globally unique flow IDs eliminate namespace collisions that would arise from embedding workspace names (which collide across users and machines) in subjects. The flat hierarchy simplifies NATS ACLs and subscription patterns while the mobile UI derives its grouping structure from heartbeat data. See the [Naming & Addressing Analysis](analysis-naming-and-addressing.md) Section 4 for the full namespace design.
 * **Trace to Parent (A4):** N-01
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Demonstration
@@ -190,15 +192,15 @@ The NATS subject hierarchy encodes both levels (see R-API-07), and the Android U
 * **V&V Method (A2):** Inspection
 
 #### R-API-09: Interjection Payload
-**Statement:** Define the message structure for an asynchronous control signal originating from the Android client representing a dynamic human interjection (e.g., Workspace, SessionID, Action: "Stop" | "Note", Context).
+**Statement:** Define the message structure for an asynchronous control signal originating from the Android client representing a dynamic human interjection (e.g., FlowID, Action: "Stop" | "Pause" | "Note", Context).
 * **Rationale (A1):** Required to structure proactive steering or termination directives.
 * **Trace to Parent (A4):** N-05
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Inspection
 
-#### R-API-10: Session Lifecycle Payload
-**Statement:** Define the payload schema for explicitly registering the start and termination of a distinct pipeline session (e.g., `SessionID`, `Workspace`, `Status: active|completed|failed`, `Metadata`).
-* **Rationale (A1):** Establishes a formal boundary for a workflow, allowing the Android UI to easily group and filter notifications by active sessions.
+#### R-API-10: Flow Lifecycle Payload
+**Statement:** Define the payload schema for explicitly registering the start and termination of a distinct pipeline flow (e.g., `FlowID`, `DaemonID`, `WorkspaceID`, `Status: active|completed|failed`, `Metadata`).
+* **Rationale (A1):** Establishes a formal boundary for a workflow, allowing the Android UI to easily group and filter notifications by active flows.
 * **Trace to Parent (A4):** N-04
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Inspection
@@ -262,7 +264,7 @@ The NATS subject hierarchy encodes both levels (see R-API-07), and the Android U
 * **V&V Method (A2):** Demonstration
 
 #### R-CLI-08: MCP Server Mode
-**Statement:** Implement the Model Context Protocol (MCP), allowing autonomous agents to invoke `post`, `ask`, `register_session`, and `terminate_session` natively.
+**Statement:** Implement the Model Context Protocol (MCP), allowing autonomous agents to invoke `post`, `ask`, `register_flow`, and `terminate_flow` natively.
 * **Rationale (A1):** Standardises agent integration without relying solely on shell execution.
 * **Trace to Parent (A4):** N-01, N-03
 * **Allocation (A8):** Go CLI Application
@@ -303,22 +305,22 @@ The NATS subject hierarchy encodes both levels (see R-API-07), and the Android U
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
-#### R-CLI-14: Active Session Registry & Expiry
-**Statement:** The daemon must maintain an active registry of ongoing sessions in SQLite. This registry must support manual termination signals, as well as an automatic expiry mechanism (marking a session as idle/stale automatically). The daemon must expose a Core NATS endpoint to serve the active list.
-* **Rationale (A1):** Offloads complex tracking logic from the Android app, providing a single remote source of truth for "what is currently running."
+#### R-CLI-14: Active Flow Registry & Expiry
+**Statement:** The daemon must maintain an active registry of ongoing flows in SQLite. This registry must support manual termination signals, as well as an automatic expiry mechanism (marking a flow as idle/stale automatically). The daemon must expose a Core NATS endpoint to serve the active list and publish periodic heartbeats containing the structural context (daemon identity, workspaces, active flow IDs).
+* **Rationale (A1):** Offloads complex tracking logic from the Android app, providing a single remote source of truth for "what is currently running." Heartbeats enable the mobile dashboard to discover daemons and group flows by workspace without encoding the hierarchy in NATS subjects.
 * **Trace to Parent (A4):** N-04
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Demonstration
 
 #### R-CLI-15: Ephemeral Agent State (Negative Constraint)
 **Statement:** The daemon's MCP Server must explicitly *not* expose a tool for AI agents to fetch or query the notification history ledger. Agents must treat their interactions with the daemon as strictly ephemeral.
-* **Rationale (A1):** Prevents the architectural complexity of agent session recovery tracking after unexpected crashes, maintaining a resilient, stateless boundary for clients.
+* **Rationale (A1):** Prevents the architectural complexity of agent recovery tracking after unexpected crashes, maintaining a resilient, stateless boundary for clients.
 * **Trace to Parent (A4):** N-04
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Inspection
 
 #### R-CLI-16: Notification Rate Limiting
-**Statement:** The daemon must enforce a configurable per-session notification rate limit (default: 60 notifications per minute). Notifications exceeding the limit must be rejected with an ErrorResponse (`R-API-11`).
+**Statement:** The daemon must enforce a configurable per-flow notification rate limit (default: 60 notifications per minute). Notifications exceeding the limit must be rejected with an ErrorResponse (`R-API-11`).
 * **Rationale (A1):** Prevents runaway scripts or misconfigured agents from overwhelming the mobile client and broker with unbounded notification volume.
 * **Trace to Parent (A4):** N-04
 * **Allocation (A8):** Go CLI Application
@@ -331,9 +333,9 @@ The NATS subject hierarchy encodes both levels (see R-API-07), and the Android U
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
-#### R-CLI-18: Stale Session Reaping
-**Statement:** The daemon must detect sessions whose originating CLI process has terminated (e.g., via heartbeat absence) and automatically mark them as `failed` in the session registry within a configurable grace period (default: 5 minutes).
-* **Rationale (A1):** Prevents the Android dashboard from displaying phantom sessions after unexpected pipeline crashes.
+#### R-CLI-18: Stale Flow Reaping
+**Statement:** The daemon must detect flows whose originating CLI process has terminated (e.g., via heartbeat absence) and automatically mark them as `failed` in the flow registry within a configurable grace period (default: 5 minutes).
+* **Rationale (A1):** Prevents the Android dashboard from displaying phantom flows after unexpected pipeline crashes.
 * **Trace to Parent (A4):** N-04
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
@@ -390,15 +392,15 @@ The NATS subject hierarchy encodes both levels (see R-API-07), and the Android U
 * **V&V Method (A2):** Demonstration
 
 #### R-MOB-08: Proactive Interjection Interface
-**Statement:** Provide an active "Workspace View" UI allowing the human receiver to actively emit proactive "Stop," "Pause," or free-form context signals targeting a specific session within a workspace.
+**Statement:** Provide an active "Workspace View" UI allowing the human receiver to actively emit proactive "Stop," "Pause," or free-form context signals targeting a specific flow.
 * **Rationale (A1):** Completes the unprompted loop required for asynchronous pipeline tracking and alteration.
 * **Trace to Parent (A4):** N-05
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Demonstration
 
 #### R-MOB-09: Active Workspaces Dashboard
-**Statement:** Provide a primary Dashboard UI that lists all currently active workspaces and their constituent sessions, querying the daemon's active session registry natively over Core NATS Request-Reply.
-* **Rationale (A1):** Provides the critical "birds-eye view" of ongoing work, grouped by workspace, across the host daemon.
+**Statement:** Provide a primary Dashboard UI that lists all currently active workspaces and their constituent flows, querying the daemon's active flow registry natively over Core NATS Request-Reply and daemon heartbeats.
+* **Rationale (A1):** Provides the critical "birds-eye view" of ongoing work, grouped by workspace, across all connected daemons.
 * **Trace to Parent (A4):** N-02
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Demonstration
@@ -436,7 +438,7 @@ The NATS subject hierarchy encodes both levels (see R-API-07), and the Android U
 ### 2.6 MVP Performance Envelope
 
 #### R-SYS-01: MVP Scale Bounds
-**Statement:** The system must support at minimum: 20 concurrent active sessions, 10 notifications per second aggregate throughput, 10,000 history ledger records, and a maximum individual payload size of 64 KB.
+**Statement:** The system must support at minimum: 20 concurrent active flows, 10 notifications per second aggregate throughput, 10,000 history ledger records, and a maximum individual payload size of 64 KB.
 * **Rationale (A1):** Provides testable lower bounds for MVP validation without constraining future scaling. These figures reflect a single-developer workstation with moderate automation activity.
 * **Trace to Parent (A4):** N-01, N-04
 * **Allocation (A8):** System-wide
@@ -451,9 +453,9 @@ The NATS subject hierarchy encodes both levels (see R-API-07), and the Android U
 
 - [x] **A-01a: Payload Enumeration:** Enumerate the complete set of required payloads mapping domain objects to system workflows.
 - [x] **A-01b: Payload Definition:** Define the specific JSON properties and structures for all the enumerated messages.
-- [ ] **A-02: Broker Provisioning & Routing Design:** Define and document the NATS subject hierarchy encompassing global namespace, users, workspaces, and sessions (e.g., `resystems.renotify.user.{username}.workspace.{workspace}.session.{session_id}.{event_type}`). Also document the WebSocket connection security (auth, wss:// TLS).
+- [ ] **A-02: Broker Provisioning & Routing Design:** Define and document the NATS subject hierarchy using globally unique flow IDs (e.g., `resystems.renotify.{username}.flow.{flow_id}.{event_type}`). Also document the WebSocket connection security (auth, wss:// TLS) and the daemon heartbeat subject pattern.
 - [ ] **A-03: Provisioning & Interjection Schemas:** Document the QR payload format and the asynchronous interjection command structure.
-- [ ] **A-04: Session State Schemas:** Document the `register` and `terminate` session payloads.
+- [ ] **A-04: Flow State Schemas:** Document the `register_flow` and `terminate_flow` payloads.
 
 ### Phase 2: Foundation & Scaffolding
 *(Goal: Establish the repositories and environments so cross-compilation targets exist.)*
@@ -474,6 +476,7 @@ The NATS subject hierarchy encodes both levels (see R-API-07), and the Android U
 - [ ] **M-06: Secure Pairing Scanner:** Integrate QR code scanning and TLS cert pinning for secure connection bootstrapping.
 - [ ] **M-02: NATS Client Service:** Integrate the NATS client into a background service to listen for incoming events configured to the pinned user profile.
 - [ ] **C-12: Token Revocation:** Implement `renotify revoke` to invalidate the active pairing token and disconnect the mobile client. Ensure `renotify pair` invokes revocation when a prior token exists.
+- [ ] **C-13: Daemon Heartbeat Publisher:** Implement periodic (30s) DaemonHeartbeat publishing on the daemon's heartbeat subject, with immediate on-change triggers for flow and workspace state changes.
 
 ### Phase 4: Core Operational Workflows
 *(Goal: Scripts can successfully execute blocking prompts and wait for human responses).*
@@ -488,10 +491,10 @@ The NATS subject hierarchy encodes both levels (see R-API-07), and the Android U
 ### Phase 5: Agent Layer & State Tracking
 *(Goal: Native AI Agent integration and real-time asynchronous workspace monitoring).*
 
-- [ ] **C-10: Active Registry Service:** Implement the SQLite-backed session tracker, stale sweeper, and the Core NATS registry presentation endpoint.
+- [ ] **C-10: Active Registry Service:** Implement the SQLite-backed flow tracker, stale sweeper, and the Core NATS registry presentation endpoint.
 - [ ] **C-06: MCP Server:** Implement the MCP protocol layer to expose capabilities natively to AI agents.
-- [ ] **C-11: MCP Session Tools:** Wire up the `register_session` and `terminate_session` tools on the MCP server.
-- [ ] **M-09: Dashboard Rendering:** Implement the Android landing screen capable of fetching and displaying the active session registry list dynamically.
+- [ ] **C-11: MCP Flow Tools:** Wire up the `register_flow` and `terminate_flow` tools on the MCP server.
+- [ ] **M-09: Dashboard Rendering:** Implement the Android landing screen capable of fetching and displaying the active flow registry list dynamically, grouped by workspace using daemon heartbeat data.
 - [ ] **M-08: Active Workspace UI:** Add the active screen providing proactive workspace interruption ("Stop", "Note").
 
 ### Phase 6: Auditing & Polish
@@ -511,502 +514,23 @@ The NATS subject hierarchy encodes both levels (see R-API-07), and the Android U
 
 ---
 
-## 4. Design Decisions
+## 4. Design Decision Register
 
-Below are key design decisions that were made during the development of the
-system. This are not exhaustive, but the order and content are intended to
-align with the implementation plan.
+The following register records key design decisions with links to the analysis documents containing the full rationale, alternatives considered, and detailed specifications.
 
-### 4.1 Phase 1: Architecture & Schemas
-
-**A-01a: Payload Schemas Enumeration**
-
-As per requirement R-API-03, all messaging payloads connecting the CLI, the daemon, and the Android App must be encoded in JSON. Furthermore, per the revised R-API-08, the provisioning handshake is specifically formatted as a minified JSON structure. The following table enumerates the distinct message types required to fulfil the system workflows. Each payload's **Transport** identifies the delivery mechanism and its **Direction** identifies the logical actor-to-actor flow:
-
-* **NATS JetStream** — pub/sub with ephemeral in-memory buffering.
-* **NATS Request-Reply** — synchronous Core NATS query/response.
-* **MCP Resource** — Model Context Protocol dynamic resource read.
-* **Offline (QR)** — out-of-band provisioning via terminal QR code.
-* **Any (contextual)** — transport depends on the originating request.
-
-| Payload Name | Transport | Direction | Requirement Cross-Ref | ConOps Workflow | Description |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **NotificationRequest** | NATS JetStream | CLI/Agent -> App | R-API-01, N-01 | W2, W3 | The core domain model representing an interrupt or alert. Contains the title, body, priority, source pipeline, and the type of response required (e.g. none, boolean, freeform). |
-| **NotificationResponse** | NATS JetStream | App -> CLI/Agent | R-API-02, N-03 | W3 | The human decision. Correlates to a `NotificationRequest` ID, capturing the selected action or free-form text input alongside the decision timestamp. |
-| **SessionLifecycleEvent** | NATS JetStream | CLI/Agent -> Daemon | R-API-10, N-04 | W3, W5 | A structured event indicating the birth or death of a distinct pipeline session or agent run. Used by the daemon to maintain the active registry. |
-| **ProvisioningPayload** | Offline (QR) | CLI -> App | R-API-08, N-01 | W1 | The secure handshake payload containing the target IP, port, auth token, and required TLS certificate fingerprints in a minified JSON map. |
-| **InterjectionCommand** | NATS JetStream | App -> Daemon/Agent | R-API-09, N-05 | W5 | An asynchronous, unprompted control signal emitted by the user (e.g. "Stop", "Pause", or free-form context) targeting a specific session within a workspace. |
-| **ActiveSessionsQuery** | NATS Request-Reply | App -> Daemon | R-CLI-14, R-MOB-09 | W5 | Core NATS query sent by the Android app to list all currently running pipelines/agents across the host. |
-| **ActiveSessionsResult** | NATS Request-Reply | Daemon -> App | R-CLI-14, R-MOB-09 | W5 | The daemon's reply containing the array of currently active `SessionLifecycleEvent` contexts. |
-| **HistoryQueryRequest** | NATS Request-Reply | App -> Daemon | R-CLI-13, R-MOB-07 | W4 | Core NATS query sent by the Android app requesting the historical ledger of past notifications and decisions. |
-| **HistoryQueryResult** | NATS Request-Reply | Daemon -> App | R-CLI-13, R-MOB-07 | W4 | The daemon's structured payload wrapping the requested SQLite history records to be rendered native on the device. |
-| **ErrorResponse** | Any (contextual) | Daemon -> Caller | R-API-11, N-04 | W2, W3, W4, W5 | A generic error envelope returned when any request fails at the daemon or broker level (e.g., unroutable notification, query failure, rate-limit rejection). Contains a correlation ID, error code, human-readable message, and timestamp. |
-| **DecisionResource** | MCP Resource | Daemon -> Agent | R-CLI-10 | W3 | The MCP dynamic resource exposing a decision result (e.g., request ID, boolean/text outcome, timestamp) that agents read after receiving the `notifications/resources/updated` notification. |
-
-**A-01b: Payload Schema Definitions**
-
-The following subsections define the Go struct and JSON schema for each payload enumerated above. Conventions used throughout:
-
-* JSON field names use `snake_case`.
-* Timestamps are RFC 3339 strings (Go `time.Time`).
-* Optional fields carry the `omitempty` struct tag and are omitted from JSON when absent.
-* The `ProvisioningPayload` uses single-character keys to minimise QR code density per R-API-08.
-
-Shared enumeration types referenced by multiple payloads:
-
-```go
-// ResponseType indicates what kind of human feedback a notification expects.
-type ResponseType string
-
-const (
-	ResponseNone    ResponseType = "none"    // fire-and-forget, no response expected
-	ResponseBoolean ResponseType = "boolean" // binary yes/no decision
-	ResponseChoice  ResponseType = "choice"  // selection from a list of actions
-	ResponseText    ResponseType = "text"    // free-form text input
-)
-
-// Priority controls how prominently the Android app renders the notification.
-type Priority string
-
-const (
-	PriorityLow    Priority = "low"
-	PriorityNormal Priority = "normal"
-	PriorityHigh   Priority = "high"
-)
-
-// SessionStatus represents the current lifecycle state of a pipeline session.
-type SessionStatus string
-
-const (
-	SessionActive    SessionStatus = "active"
-	SessionCompleted SessionStatus = "completed"
-	SessionFailed    SessionStatus = "failed"
-)
-
-// InterjectionAction is the type of proactive control signal from the mobile client.
-type InterjectionAction string
-
-const (
-	InterjectionStop  InterjectionAction = "stop"
-	InterjectionPause InterjectionAction = "pause"
-	InterjectionNote  InterjectionAction = "note"
-)
-```
+| ID | Decision Summary | Analysis Document | Date |
+|----|-----------------|-------------------|------|
+| D-01 | Payload encoding: JSON with snake_case fields, RFC 3339 timestamps, omitempty for optional fields | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
+| D-02 | Payload enumeration: 12 message types across 6 transport mechanisms (JetStream, Pub/Sub, Request-Reply, MCP Resource, Offline QR, contextual) | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
+| D-03 | System element hierarchy: 5-level topology (broker, user, daemon, workspace, flow) with strict containment | [Naming & Addressing](analysis-naming-and-addressing.md) | 2026-03-27 |
+| D-04 | Identifier encoding: Crockford Base32 with per-element truncation (flow 128-bit, workspace 80-bit, daemon/device 65-bit) | [Naming & Addressing](analysis-naming-and-addressing.md) | 2026-03-27 |
+| D-05 | NATS namespace: flat `{username}.flow.{flow_id}.{event_type}` subjects; structural context in payloads and heartbeats | [Naming & Addressing](analysis-naming-and-addressing.md) | 2026-03-27 |
+| D-06 | Terminology: "flow" replaces "session" to avoid ambiguity with MCP, agent, and HTTP sessions | [Naming & Addressing](analysis-naming-and-addressing.md) | 2026-03-27 |
+| D-07 | Broker deployment: embedded and shared NATS brokers are equal first-class models; provisioning payload is identical | [Naming & Addressing](analysis-naming-and-addressing.md) | 2026-03-27 |
+| D-08 | Payload denormalisation: daemon_id and workspace_id included in every flow payload for self-contained records | [Naming & Addressing](analysis-naming-and-addressing.md) | 2026-03-27 |
+| D-09 | Daemon heartbeat: 30s periodic interval with immediate on-change triggers for structural context delivery | [Naming & Addressing](analysis-naming-and-addressing.md) | 2026-03-27 |
 
 ---
-
-**NotificationRequest**
-
-The core domain payload representing an interrupt or alert sent from a CLI command or AI agent to the Android app. For fire-and-forget notifications (`response_type: "none"`), the `actions` and `timeout_sec` fields are omitted. For blocking prompts, `actions` lists the available choices and `timeout_sec` sets the server-side deadline.
-
-```go
-type NotificationRequest struct {
-	ID           string       `json:"id"`
-	Workspace    string       `json:"workspace"`
-	SessionID    string       `json:"session_id"`
-	Title        string       `json:"title"`
-	Body         string       `json:"body,omitempty"`
-	ResponseType ResponseType `json:"response_type"`
-	Priority     Priority     `json:"priority"`
-	Source       string       `json:"source"`
-	Actions      []string     `json:"actions,omitempty"`
-	TimeoutSec   int          `json:"timeout_sec,omitempty"`
-	Timestamp    time.Time    `json:"timestamp"`
-}
-```
-
-Fire-and-forget notification (via `renotify post`):
-
-```json
-{
-  "id": "ntf_a1b2c3d4",
-  "workspace": "renotify",
-  "session_id": "ses_build_7f3a",
-  "title": "Build complete",
-  "body": "All 42 tests passed in 3m12s.",
-  "response_type": "none",
-  "priority": "normal",
-  "source": "ci/build-pipeline",
-  "timestamp": "2026-03-27T10:15:00Z"
-}
-```
-
-Blocking interactive prompt (via `renotify ask`):
-
-```json
-{
-  "id": "ntf_e5f6g7h8",
-  "workspace": "renotify",
-  "session_id": "ses_deploy_9c2b",
-  "title": "Deploy to production?",
-  "body": "Image sha256:ab12cd34 is ready. 3 migrations pending.",
-  "response_type": "choice",
-  "priority": "high",
-  "source": "cd/deploy-pipeline",
-  "actions": ["Approve", "Reject", "Defer"],
-  "timeout_sec": 300,
-  "timestamp": "2026-03-27T14:30:00Z"
-}
-```
-
----
-
-**NotificationResponse**
-
-The human decision returned from the Android app, correlated to a `NotificationRequest` by `request_id`. For choice and boolean responses, `action` carries the selected option. For free-form text responses, `text` carries the input. Both may be present if the UI allows a comment alongside a choice.
-
-```go
-type NotificationResponse struct {
-	RequestID string    `json:"request_id"`
-	Action    string    `json:"action,omitempty"`
-	Text      string    `json:"text,omitempty"`
-	Timestamp time.Time `json:"timestamp"`
-}
-```
-
-Choice selection:
-
-```json
-{
-  "request_id": "ntf_e5f6g7h8",
-  "action": "Approve",
-  "timestamp": "2026-03-27T14:32:15Z"
-}
-```
-
-Free-form text response:
-
-```json
-{
-  "request_id": "ntf_e5f6g7h8",
-  "text": "Hold off until the hotfix lands on main.",
-  "timestamp": "2026-03-27T14:33:42Z"
-}
-```
-
----
-
-**SessionLifecycleEvent**
-
-A structured event marking the start or end of a pipeline session. Published by the CLI or MCP agent when a session begins (`active`) and when it terminates (`completed` or `failed`). The daemon consumes these to maintain the active session registry (R-CLI-14). The optional `label` provides a human-readable name for display on the Android dashboard, and `metadata` carries arbitrary key-value context.
-
-```go
-type SessionLifecycleEvent struct {
-	SessionID string            `json:"session_id"`
-	Workspace string            `json:"workspace"`
-	Status    SessionStatus     `json:"status"`
-	Label     string            `json:"label,omitempty"`
-	Metadata  map[string]string `json:"metadata,omitempty"`
-	Timestamp time.Time         `json:"timestamp"`
-}
-```
-
-Session registration:
-
-```json
-{
-  "session_id": "ses_deploy_9c2b",
-  "workspace": "renotify",
-  "status": "active",
-  "label": "Production Deploy",
-  "metadata": {
-    "branch": "main",
-    "commit": "e2e2c55"
-  },
-  "timestamp": "2026-03-27T14:00:00Z"
-}
-```
-
-Session completion:
-
-```json
-{
-  "session_id": "ses_deploy_9c2b",
-  "workspace": "renotify",
-  "status": "completed",
-  "timestamp": "2026-03-27T14:45:00Z"
-}
-```
-
----
-
-**ProvisioningPayload**
-
-The secure handshake payload encoded as minified JSON inside a QR code during `renotify pair`. Field names are single characters to minimise QR density (R-API-08). The `c` field carries the hex-encoded SHA-256 fingerprint of the daemon's self-signed TLS certificate, which the Android app pins for all subsequent connections.
-
-```go
-type ProvisioningPayload struct {
-	Host    string `json:"h"`
-	Port    int    `json:"p"`
-	Token   string `json:"t"`
-	CertSHA string `json:"c"`
-}
-```
-
-```json
-{"h":"192.168.1.42","p":4222,"t":"rn_tk_8a3b5c7d9e","c":"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"}
-```
-
----
-
-**InterjectionCommand**
-
-An asynchronous, unprompted control signal emitted by the developer from the Android app targeting a specific session within a workspace (R-API-09). A `stop` action requests graceful termination, `pause` requests the pipeline to suspend, and `note` delivers free-form context via the `context` field without altering execution.
-
-```go
-type InterjectionCommand struct {
-	Workspace string             `json:"workspace"`
-	SessionID string             `json:"session_id"`
-	Action    InterjectionAction `json:"action"`
-	Context   string             `json:"context,omitempty"`
-	Timestamp time.Time          `json:"timestamp"`
-}
-```
-
-Stop command:
-
-```json
-{
-  "workspace": "renotify",
-  "session_id": "ses_deploy_9c2b",
-  "action": "stop",
-  "timestamp": "2026-03-27T14:35:00Z"
-}
-```
-
-Free-form note:
-
-```json
-{
-  "workspace": "renotify",
-  "session_id": "ses_deploy_9c2b",
-  "action": "note",
-  "context": "Check the connection pool config before proceeding.",
-  "timestamp": "2026-03-27T14:36:00Z"
-}
-```
-
----
-
-**ActiveSessionsQuery**
-
-A Core NATS Request-Reply query sent by the Android app to the daemon to list currently active sessions (R-CLI-14, R-MOB-09). An optional `workspace` filter narrows results to a single workspace; when omitted, all active sessions across all workspaces are returned.
-
-```go
-type ActiveSessionsQuery struct {
-	Workspace string `json:"workspace,omitempty"`
-}
-```
-
-Unfiltered (all workspaces):
-
-```json
-{}
-```
-
-Filtered to one workspace:
-
-```json
-{
-  "workspace": "renotify"
-}
-```
-
----
-
-**ActiveSessionsResult**
-
-The daemon's reply to an `ActiveSessionsQuery`, containing an array of `SessionLifecycleEvent` records representing currently active sessions. An empty `sessions` array indicates no active work.
-
-```go
-type ActiveSessionsResult struct {
-	Sessions []SessionLifecycleEvent `json:"sessions"`
-}
-```
-
-```json
-{
-  "sessions": [
-    {
-      "session_id": "ses_deploy_9c2b",
-      "workspace": "renotify",
-      "status": "active",
-      "label": "Production Deploy",
-      "timestamp": "2026-03-27T14:00:00Z"
-    },
-    {
-      "session_id": "ses_lint_4d1e",
-      "workspace": "gethos-api",
-      "status": "active",
-      "label": "Lint & Vet",
-      "metadata": {
-        "branch": "feature/auth"
-      },
-      "timestamp": "2026-03-27T14:10:00Z"
-    }
-  ]
-}
-```
-
----
-
-**HistoryQueryRequest**
-
-A Core NATS Request-Reply query sent by the Android app to retrieve historical notification records from the daemon's SQLite ledger (R-CLI-13, R-MOB-07). All fields are optional filters; when all are omitted the daemon returns the most recent records up to its configured default limit.
-
-```go
-type HistoryQueryRequest struct {
-	Workspace string     `json:"workspace,omitempty"`
-	SessionID string     `json:"session_id,omitempty"`
-	Since     *time.Time `json:"since,omitempty"`
-	Until     *time.Time `json:"until,omitempty"`
-	Limit     int        `json:"limit,omitempty"`
-}
-```
-
-```json
-{
-  "workspace": "renotify",
-  "limit": 25
-}
-```
-
----
-
-**HistoryQueryResult**
-
-The daemon's reply to a `HistoryQueryRequest`, wrapping an array of `HistoryRecord` entries. Each record pairs the original `NotificationRequest` with its `NotificationResponse` (if one was received). The `total` field reports the full count of matching records, allowing the client to detect when results have been truncated by the `limit`.
-
-```go
-type HistoryRecord struct {
-	Request  NotificationRequest   `json:"request"`
-	Response *NotificationResponse `json:"response,omitempty"`
-}
-
-type HistoryQueryResult struct {
-	Records []HistoryRecord `json:"records"`
-	Total   int             `json:"total"`
-}
-```
-
-```json
-{
-  "records": [
-    {
-      "request": {
-        "id": "ntf_e5f6g7h8",
-        "workspace": "renotify",
-        "session_id": "ses_deploy_9c2b",
-        "title": "Deploy to production?",
-        "response_type": "choice",
-        "priority": "high",
-        "source": "cd/deploy-pipeline",
-        "actions": ["Approve", "Reject", "Defer"],
-        "timeout_sec": 300,
-        "timestamp": "2026-03-27T14:30:00Z"
-      },
-      "response": {
-        "request_id": "ntf_e5f6g7h8",
-        "action": "Approve",
-        "timestamp": "2026-03-27T14:32:15Z"
-      }
-    },
-    {
-      "request": {
-        "id": "ntf_x9y0z1w2",
-        "workspace": "renotify",
-        "session_id": "ses_build_7f3a",
-        "title": "Build complete",
-        "response_type": "none",
-        "priority": "normal",
-        "source": "ci/build-pipeline",
-        "timestamp": "2026-03-27T10:15:00Z"
-      }
-    }
-  ],
-  "total": 2
-}
-```
-
----
-
-**ErrorResponse**
-
-A generic error envelope returned when any request fails at the daemon level (R-API-11). The `correlation_id` matches the `id` of the originating request (or is empty for unsolicited errors). The `code` field uses a fixed set of string codes to enable programmatic error handling:
-
-* `timeout` — blocking request expired without a human response.
-* `rate_limited` — per-session notification rate limit exceeded (R-CLI-16).
-* `not_found` — referenced session or notification does not exist.
-* `unroutable` — no mobile client connected to receive the notification.
-* `internal` — unexpected daemon-side failure.
-
-```go
-type ErrorResponse struct {
-	CorrelationID string    `json:"correlation_id,omitempty"`
-	Code          string    `json:"code"`
-	Message       string    `json:"message"`
-	Timestamp     time.Time `json:"timestamp"`
-}
-```
-
-Timeout error:
-
-```json
-{
-  "correlation_id": "ntf_e5f6g7h8",
-  "code": "timeout",
-  "message": "No response received within 300s.",
-  "timestamp": "2026-03-27T14:35:00Z"
-}
-```
-
-Rate-limit rejection:
-
-```json
-{
-  "correlation_id": "ntf_r4s5t6u7",
-  "code": "rate_limited",
-  "message": "Session ses_flood_0001 exceeded 60 notifications/min.",
-  "timestamp": "2026-03-27T15:00:01Z"
-}
-```
-
----
-
-**DecisionResource**
-
-The MCP dynamic resource that agents read after receiving a `notifications/resources/updated` notification (R-CLI-10). This is not a NATS message; it is served by the daemon's MCP server as a resource. The `decided` flag indicates whether a human response has been received. While `decided` is `false`, the `action` and `text` fields are absent. Once decided, the resource is immutable.
-
-```go
-type DecisionResource struct {
-	RequestID string    `json:"request_id"`
-	Decided   bool      `json:"decided"`
-	Action    string    `json:"action,omitempty"`
-	Text      string    `json:"text,omitempty"`
-	Timestamp time.Time `json:"timestamp"`
-}
-```
-
-Pending (not yet decided):
-
-```json
-{
-  "request_id": "ntf_e5f6g7h8",
-  "decided": false,
-  "timestamp": "2026-03-27T14:30:00Z"
-}
-```
-
-Decided:
-
-```json
-{
-  "request_id": "ntf_e5f6g7h8",
-  "decided": true,
-  "action": "Approve",
-  "timestamp": "2026-03-27T14:32:15Z"
-}
-```
 
 ## 5. Change Log
 
@@ -1018,6 +542,7 @@ Record completed items here with the date.
 | 2026-03-26 | Review | Draft | Document-wide refinement: added Section 1.5 (Key Definitions), Section 2.5 (Security Lifecycle), Section 2.6 (MVP Performance Envelope); new requirements R-API-11, R-CLI-16/17/18, R-MOB-10, R-SEC-01/02/03, R-SYS-01; revised R-API-04, R-API-07, R-CLI-12; added V-00 integration checkpoint, C-12 token revocation; structural fixes. |
 | 2026-03-26 | A-01a | Draft | Split payload table "Direction / Transport" into separate Transport and Direction columns with a closed taxonomy of transport labels. |
 | 2026-03-27 | A-01b | Draft | Defined Go structs and JSON exemplars for all 11 payload schemas with shared enumeration types. |
+| 2026-03-27 | Harmonisation | Draft | Renamed "session" to "flow" throughout. Introduced daemon_id, workspace_id, and Crockford Base32 identifiers per naming analysis. Simplified NATS namespace to flat flow-based subjects. Added DaemonHeartbeat payload. Extracted payload schemas into standalone analysis document. Restructured Section 4 as Design Decision Register. |
 
 ## 6. References
 
