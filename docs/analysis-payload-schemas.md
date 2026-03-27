@@ -5,8 +5,8 @@ Renotify system. It serves as the authoritative reference for Go struct
 definitions and JSON wire formats.
 
 For the system element hierarchy, identifier design, and NATS namespace that
-these payloads operate within, see the
-[Naming & Addressing Analysis](analysis-naming-and-addressing.md).
+these payloads operate within, see the [Naming & Addressing
+Analysis](analysis-naming-and-addressing.md).
 
 ## Conventions
 
@@ -102,27 +102,30 @@ const (
 ### NotificationRequest
 
 The core domain payload representing an interrupt or alert sent from a CLI
-command or AI agent to the Android app. For fire-and-forget notifications
-(`response_type: "none"`), the `actions` and `timeout_sec` fields are omitted.
-For blocking prompts, `actions` lists the available choices and `timeout_sec`
-sets the server-side deadline. The `daemon_id` and `workspace_id` fields are
-denormalised from the heartbeat so that each notification record is
-self-contained.
+command or AI agent to the Android app. The `response_types` field is an array
+of `ResponseType` values indicating which kinds of feedback the notification
+accepts. For fire-and-forget notifications (`response_types: ["none"]`), the
+`actions` and `timeout_sec` fields are omitted. For blocking prompts, `actions`
+lists the available choices (when `"choice"` is present) and `timeout_sec` sets
+the server-side deadline. Multi-modal requests (e.g., `["boolean", "text"]`)
+allow the user to provide more than one form of feedback simultaneously. The
+`daemon_id` and `workspace_id` fields are denormalised from the heartbeat so
+that each notification record is self-contained.
 
 ```go
 type NotificationRequest struct {
-	ID           string       `json:"id"`
-	FlowID       string       `json:"flow_id"`
-	DaemonID     string       `json:"daemon_id"`
-	WorkspaceID  string       `json:"workspace_id"`
-	Title        string       `json:"title"`
-	Body         string       `json:"body,omitempty"`
-	ResponseType ResponseType `json:"response_type"`
-	Priority     Priority     `json:"priority"`
-	Source       string       `json:"source"`
-	Actions      []string     `json:"actions,omitempty"`
-	TimeoutSec   int          `json:"timeout_sec,omitempty"`
-	Timestamp    time.Time    `json:"timestamp"`
+	ID            string         `json:"id"`
+	FlowID        string         `json:"flow_id"`
+	DaemonID      string         `json:"daemon_id"`
+	WorkspaceID   string         `json:"workspace_id"`
+	Title         string         `json:"title"`
+	Body          string         `json:"body,omitempty"`
+	ResponseTypes []ResponseType `json:"response_types"`
+	Priority      Priority       `json:"priority"`
+	Source        string         `json:"source"`
+	Actions       []string       `json:"actions,omitempty"`
+	TimeoutSec    int            `json:"timeout_sec,omitempty"`
+	Timestamp     time.Time      `json:"timestamp"`
 }
 ```
 
@@ -136,14 +139,14 @@ Fire-and-forget notification (via `renotify post`):
   "workspace_id": "ws_5MBJR1HXNP3KQ8DW",
   "title": "Build complete",
   "body": "All 42 tests passed in 3m12s.",
-  "response_type": "none",
+  "response_types": ["none"],
   "priority": "normal",
   "source": "ci/build-pipeline",
   "timestamp": "2026-03-27T10:15:00Z"
 }
 ```
 
-Blocking interactive prompt (via `renotify ask`):
+Blocking choice prompt (via `renotify ask`):
 
 ```json
 {
@@ -153,7 +156,7 @@ Blocking interactive prompt (via `renotify ask`):
   "workspace_id": "ws_5MBJR1HXNP3KQ8DW",
   "title": "Deploy to production?",
   "body": "Image sha256:ab12cd34 is ready. 3 migrations pending.",
-  "response_type": "choice",
+  "response_types": ["choice"],
   "priority": "high",
   "source": "cd/deploy-pipeline",
   "actions": ["Approve", "Reject", "Defer"],
@@ -162,20 +165,62 @@ Blocking interactive prompt (via `renotify ask`):
 }
 ```
 
+Multi-modal prompt (boolean with optional text explanation):
+
+```json
+{
+  "id": "ntf_j9k0m1n2",
+  "flow_id": "fl_0R3FABM7TP2XE89YWCGKN4QJ5V",
+  "daemon_id": "dn_3G2K7V9WNFQ4J",
+  "workspace_id": "ws_5MBJR1HXNP3KQ8DW",
+  "title": "Proceed with database migration?",
+  "body": "3 pending migrations on prod. Rollback requires manual intervention.",
+  "response_types": ["boolean", "text"],
+  "priority": "high",
+  "source": "cd/deploy-pipeline",
+  "timeout_sec": 600,
+  "timestamp": "2026-03-27T14:30:00Z"
+}
+```
+
 ### NotificationResponse
 
 The human decision returned from the Android app, correlated to a
-`NotificationRequest` by `request_id`. For choice and boolean responses,
-`action` carries the selected option. For free-form text responses, `text`
-carries the input. Both may be present if the UI allows a comment alongside a
-choice.
+`NotificationRequest` by `request_id`. The three response fields are orthogonal
+and all optional (`omitempty`): `accepted` carries the boolean decision,
+`action` carries the selected choice, and `text` carries free-form input. For
+multi-modal requests, more than one field may be populated simultaneously (e.g.,
+`accepted: false` with an explanatory `text`). The caller inspects whichever
+fields are present.
 
 ```go
 type NotificationResponse struct {
 	RequestID string    `json:"request_id"`
+	Accepted  *bool     `json:"accepted,omitempty"`
 	Action    string    `json:"action,omitempty"`
 	Text      string    `json:"text,omitempty"`
 	Timestamp time.Time `json:"timestamp"`
+}
+```
+
+Boolean approval:
+
+```json
+{
+  "request_id": "ntf_j9k0m1n2",
+  "accepted": true,
+  "timestamp": "2026-03-27T14:32:15Z"
+}
+```
+
+Boolean rejection with explanation (multi-modal response):
+
+```json
+{
+  "request_id": "ntf_j9k0m1n2",
+  "accepted": false,
+  "text": "Wait for the security audit to close.",
+  "timestamp": "2026-03-27T14:33:42Z"
 }
 ```
 
@@ -201,8 +246,8 @@ Free-form text response:
 
 ### FlowLifecycleEvent
 
-A structured event marking the start or end of a pipeline flow. Published by
-the CLI or MCP agent when a flow begins (`active`) and when it terminates
+A structured event marking the start or end of a pipeline flow. Published by the
+CLI or MCP agent when a flow begins (`active`) and when it terminates
 (`completed` or `failed`). The daemon consumes these to maintain the active flow
 registry (R-CLI-14). The `daemon_id` and `workspace_id` fields link the flow to
 its structural context. The optional `label` provides a human-readable name for
@@ -258,16 +303,15 @@ The secure handshake payload encoded as minified JSON inside a QR code during
 - The `h` field carries the connection target as an IP address or hostname
 (e.g., `192.168.1.42` for an embedded broker, or a DNS name for a shared
 broker).
-- The `p` field carries the WSS port (default 4223 for the embedded
-broker).
+- The `p` field carries the WSS port (default 4223 for the embedded broker).
 - The `t` field carries the NATS authentication token (`rn_tk_` prefix + 52
-Crockford Base32 characters, 256-bit entropy). See
-[NATS Transport Design](analysis-nats-transport-design.md) Section 6.
+Crockford Base32 characters, 256-bit entropy). See [NATS Transport
+Design](analysis-nats-transport-design.md) Section 6.
 - The `c` field carries the hex-encoded SHA-256 fingerprint of the TLS
 certificate used by the connection target (whether that is an embedded daemon or
 a shared broker), which the Android app pins for all subsequent connections via
-a custom `X509TrustManager` (see [NATS Transport Design](analysis-nats-transport-design.md)
-Section 5.5).
+a custom `X509TrustManager` (see [NATS Transport
+Design](analysis-nats-transport-design.md) Section 5.5).
 
 ```go
 type ProvisioningPayload struct {
@@ -328,8 +372,8 @@ mobile app's dashboard. The heartbeat carries the daemon's identity, hostname,
 and a snapshot of its workspaces with their active flow IDs. Published every 30
 seconds as a staleness backstop, and immediately on significant state changes
 (flow started/ended, workspace added/removed). Transported over plain NATS
-Pub/Sub (not JetStream) because heartbeats are ephemeral — a missed heartbeat
-is superseded by the next one.
+Pub/Sub (not JetStream) because heartbeats are ephemeral — a missed heartbeat is
+superseded by the next one.
 
 ```go
 type WorkspaceInfo struct {
@@ -490,7 +534,7 @@ type HistoryQueryResult struct {
         "daemon_id": "dn_3G2K7V9WNFQ4J",
         "workspace_id": "ws_5MBJR1HXNP3KQ8DW",
         "title": "Deploy to production?",
-        "response_type": "choice",
+        "response_types": ["choice"],
         "priority": "high",
         "source": "cd/deploy-pipeline",
         "actions": ["Approve", "Reject", "Defer"],
@@ -510,7 +554,7 @@ type HistoryQueryResult struct {
         "daemon_id": "dn_3G2K7V9WNFQ4J",
         "workspace_id": "ws_5MBJR1HXNP3KQ8DW",
         "title": "Build complete",
-        "response_type": "none",
+        "response_types": ["none"],
         "priority": "normal",
         "source": "ci/build-pipeline",
         "timestamp": "2026-03-27T10:15:00Z"
@@ -524,9 +568,9 @@ type HistoryQueryResult struct {
 ### ErrorResponse
 
 A generic error envelope returned when any request fails at the daemon level
-(R-API-11). The `correlation_id` matches the `id` of the originating request
-(or is empty for unsolicited errors). The `code` field uses a fixed set of
-string codes to enable programmatic error handling:
+(R-API-11). The `correlation_id` matches the `id` of the originating request (or
+is empty for unsolicited errors). The `code` field uses a fixed set of string
+codes to enable programmatic error handling:
 
 * `timeout` — blocking request expired without a human response.
 * `rate_limited` — per-flow notification rate limit exceeded (R-CLI-16).
@@ -571,13 +615,16 @@ The MCP dynamic resource that agents read after receiving a
 `notifications/resources/updated` notification (R-CLI-10). This is not a NATS
 message; it is served by the daemon's MCP server as a resource. The `decided`
 flag indicates whether a human response has been received. While `decided` is
-`false`, the `action` and `text` fields are absent. Once decided, the resource
-is immutable.
+`false`, the `accepted`, `action`, and `text` fields are absent. Once decided,
+the resource is immutable. The response fields mirror `NotificationResponse`:
+`accepted` for boolean decisions, `action` for choice selections, and `text` for
+free-form input.
 
 ```go
 type DecisionResource struct {
 	RequestID string    `json:"request_id"`
 	Decided   bool      `json:"decided"`
+	Accepted  *bool     `json:"accepted,omitempty"`
 	Action    string    `json:"action,omitempty"`
 	Text      string    `json:"text,omitempty"`
 	Timestamp time.Time `json:"timestamp"`

@@ -3,10 +3,10 @@
 This document defines the NATS subject catalogue, JetStream configuration,
 transport security, authentication model, and connection lifecycles for
 Renotify. It is the authoritative reference for how the NATS infrastructure is
-configured, secured, and operated to carry the payloads defined in the
-[Payload Schema Analysis](analysis-payload-schemas.md) across the system
-element hierarchy established in the
-[Naming & Addressing Analysis](analysis-naming-and-addressing.md).
+configured, secured, and operated to carry the payloads defined in the [Payload
+Schema Analysis](analysis-payload-schemas.md) across the system element
+hierarchy established in the [Naming & Addressing
+Analysis](analysis-naming-and-addressing.md).
 
 This document addresses refinement item **A-02** (Broker Provisioning & Routing
 Design). The pairing implementation belongs to Phase 3 (C-07, M-06); this
@@ -85,8 +85,8 @@ type JetStreamConfig struct {
 
 ### 2.2 Consumer Definitions
 
-Four consumers operate against the `RENOTIFY` stream. Consumer names include
-the username or flow ID to scope their state.
+Four consumers operate against the `RENOTIFY` stream. Consumer names include the
+username or flow ID to scope their state.
 
 | Consumer Name | Type | Filter Subject | Ack Policy | Max Deliver | Max Ack Pending | Deliver Policy | Inactive Threshold | Purpose |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -194,8 +194,8 @@ Renotify to function:
 * The broker must enforce per-user NATS auth scoped to
   `resystems.renotify.{username}.>` (see Section 7).
 * The broker must have JetStream enabled with a stream configuration compatible
-  with the parameters in Section 2 (or the daemon must have permission to
-  create the stream).
+  with the parameters in Section 2 (or the daemon must have permission to create
+  the stream).
 
 ### 4.3 `ProvisioningPayload` Port
 
@@ -324,10 +324,10 @@ because:
 
 The `network_security_config.xml` mechanism requires certificate files as
 build-time resources (`res/raw/*.pem`). It cannot reference runtime-provisioned
-certificates. The `<certificates>` element accepts only `"system"`, `"user"`,
-or a raw resource ID. Since the daemon's certificate is generated
-per-installation by `renotify pair`, it does not exist at APK build time. Not
-viable for Renotify's deployment model.
+certificates. The `<certificates>` element accepts only `"system"`, `"user"`, or
+a raw resource ID. Since the daemon's certificate is generated per-installation
+by `renotify pair`, it does not exist at APK build time. Not viable for
+Renotify's deployment model.
 
 **Approach D: Disable TLS validation — Not viable**
 
@@ -371,8 +371,8 @@ separate internal token that is never exposed outside the loopback interface
 
 The `rn_tk_` prefix makes tokens grep-friendly in logs, consistent with the
 project's identifier prefix convention (`dn_`, `ws_`, `fl_`, `mb_`). Crockford
-Base32 encoding is case-insensitive and safe in NATS auth fields, CLI
-arguments, QR codes, and log output.
+Base32 encoding is case-insensitive and safe in NATS auth fields, CLI arguments,
+QR codes, and log output.
 
 ### 6.2 Generation
 
@@ -395,8 +395,8 @@ The embedded NATS server is configured with a two-account model:
   startup, never exposed externally) for the daemon's own NATS connection and
   co-located CLI processes connecting via the loopback TCP listener. Full
   publish/subscribe permissions (see Section 7).
-* **Mobile account:** Uses the pairing token (`rn_tk_...`) for the mobile
-  app connecting via WSS. Scoped publish/subscribe permissions (see Section 7).
+* **Mobile account:** Uses the pairing token (`rn_tk_...`) for the mobile app
+  connecting via WSS. Scoped publish/subscribe permissions (see Section 7).
 
 The embedded NATS server API supports runtime auth reconfiguration. When
 `renotify pair` or `renotify revoke` is executed while the daemon is running,
@@ -436,12 +436,12 @@ pairing model:
   no authenticated return channel exists at pairing time.
 * **TLS already secures the channel.** The WSS connection uses certificate
   pinning (Section 5.5), so the token is never transmitted in the clear. The
-  risk that NKeys mitigate — credential interception on an unencrypted
-  channel — does not apply here.
+  risk that NKeys mitigate — credential interception on an unencrypted channel —
+  does not apply here.
 * **Simpler revocation.** Token revocation is a single-step operation: remove
-  the token from the NATS auth config and disconnect the client (R-SEC-01).
-  NKey revocation is functionally identical (remove the public key) but adds
-  key-pair management overhead on the mobile side.
+  the token from the NATS auth config and disconnect the client (R-SEC-01). NKey
+  revocation is functionally identical (remove the public key) but adds key-pair
+  management overhead on the mobile side.
 * **Shared broker compatibility.** Token auth is supported by every NATS auth
   backend. NKey support depends on the operator's auth configuration, which
   Renotify does not control.
@@ -515,20 +515,18 @@ The following are explicitly deferred per R-SEC-03:
 1. Load daemon configuration from `$XDG_CONFIG_HOME/renotify/settings.json`.
 2. Load `daemon_id` from `$XDG_STATE_HOME/renotify/daemon_id` (or generate on
    first run).
-3. Load TLS certificate and private key from
-   `$XDG_STATE_HOME/renotify/tls/`. If missing, log a warning and skip the WSS
-   listener (TCP-only mode; mobile connectivity unavailable until
-   `renotify pair`).
-4. Load pairing token from `$XDG_STATE_HOME/renotify/pairing/token`. If
-   missing, start without a mobile account.
-5. Configure embedded NATS server:
-   a. TCP listener on `127.0.0.1:4222` (no TLS).
-   b. WSS listener on `0.0.0.0:4223` with TLS cert/key (if available).
-   c. Auth accounts: daemon internal + mobile (if token exists).
+3. Load TLS certificate and private key from `$XDG_STATE_HOME/renotify/tls/`. If
+   missing, log a warning and skip the WSS listener (TCP-only mode; mobile
+   connectivity unavailable until `renotify pair`).
+4. Load pairing token from `$XDG_STATE_HOME/renotify/pairing/token`. If missing,
+   start without a mobile account.
+5. Configure embedded NATS server: a. TCP listener on `127.0.0.1:4222` (no TLS).
+   b. WSS listener on `0.0.0.0:4223` with TLS cert/key (if available). c. Auth
+   accounts: daemon internal + mobile (if token exists).
 6. Start embedded NATS server.
 7. Enable JetStream with memory storage.
-8. Create or verify the `RENOTIFY` stream with the configured subject filter
-   and limits.
+8. Create or verify the `RENOTIFY` stream with the configured subject filter and
+   limits.
 9. Create or verify durable consumers (`mobile-{username}`,
    `daemon-lifecycle-{username}`, `daemon-interject-{username}`).
 10. Subscribe to lifecycle, interjection, and service subjects.
@@ -557,8 +555,8 @@ The following are explicitly deferred per R-SEC-03:
 2. Check for an existing TLS certificate. If none exists, generate an ECDSA
    P-256 self-signed certificate with SANs for all discovered non-loopback IPs
    + `127.0.0.1` + `localhost`. Store in XDG state.
-3. Discover the local IP address. Prefer non-loopback, non-link-local
-   addresses. Allow `--ip` flag override.
+3. Discover the local IP address. Prefer non-loopback, non-link-local addresses.
+   Allow `--ip` flag override.
 4. Generate a new auth token: 32 bytes from `crypto/rand`, Crockford Base32
    encoded, prepended with `rn_tk_`.
 5. Store the token in XDG state.
@@ -575,8 +573,8 @@ The following are explicitly deferred per R-SEC-03:
    port, auth token, and certificate fingerprint.
 2. Store provisioning data in the app's encrypted local storage.
 3. Initiate a WSS connection to `wss://{host}:{port}`.
-4. During the TLS handshake, the NATS server presents its full certificate.
-   The app's custom `X509TrustManager` computes the SHA-256 fingerprint of the
+4. During the TLS handshake, the NATS server presents its full certificate. The
+   app's custom `X509TrustManager` computes the SHA-256 fingerprint of the
    received certificate and compares it against the stored value.
 5. If the fingerprint does not match: abort the connection, display an error.
 6. If the fingerprint matches: the TLS handshake completes.
@@ -592,8 +590,8 @@ The following are explicitly deferred per R-SEC-03:
 3. Begin exponential backoff reconnection: 1s, 2s, 4s, 8s, 16s, 30s (capped).
 4. On each attempt: repeat the TLS handshake with fingerprint verification and
    token authentication.
-5. On successful reconnection: resume the durable JetStream consumer. The
-   broker redelivers unacked messages from within the TTL window.
+5. On successful reconnection: resume the durable JetStream consumer. The broker
+   redelivers unacked messages from within the TTL window.
 6. The app processes buffered messages. In-flight blocking requests that have
    not yet timed out server-side are re-presented to the user (R-MOB-10).
 7. The app deduplicates on notification `id` as a safety net against
@@ -609,15 +607,15 @@ The following are explicitly deferred per R-SEC-03:
 3. Generate a `flow_id` (UUIDv7, Crockford Base32 encoded with `fl_` prefix).
 4. Publish a `FlowLifecycleEvent` (`status: active`) to
    `resystems.renotify.{username}.flow.{flow_id}.lifecycle`.
-5. Create an ephemeral JetStream consumer `cli-response-{flow_id}` filtering
-   on `resystems.renotify.{username}.flow.{flow_id}.response` with
+5. Create an ephemeral JetStream consumer `cli-response-{flow_id}` filtering on
+   `resystems.renotify.{username}.flow.{flow_id}.response` with
    DeliverPolicy=New.
 6. Publish the `NotificationRequest` to
    `resystems.renotify.{username}.flow.{flow_id}.request`.
 7. Wait for a response on the ephemeral consumer, subject to the configured
    timeout (R-CLI-06, R-CLI-17).
-8. On response: print the result, publish a `FlowLifecycleEvent`
-   (`status: completed`), disconnect.
+8. On response: print the result, publish a `FlowLifecycleEvent` (`status:
+   completed`), disconnect.
 9. On timeout: print the error (non-zero exit code), publish a
    `FlowLifecycleEvent` (`status: failed`), disconnect.
 
@@ -656,6 +654,6 @@ The following are explicitly deferred per R-SEC-03:
 | **Multi-daemon** | N/A (one embedded broker per daemon) | Multiple daemons connect as clients; mobile discovers them via heartbeats |
 
 The mobile app's behaviour is identical in both models. It connects to whatever
-`host:port` was provisioned, authenticates with the token, and subscribes to
-its user's namespace. The heartbeat messages from connected daemons provide
-the structural context for the dashboard regardless of broker topology.
+`host:port` was provisioned, authenticates with the token, and subscribes to its
+user's namespace. The heartbeat messages from connected daemons provide the
+structural context for the dashboard regardless of broker topology.
