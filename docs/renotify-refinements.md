@@ -743,6 +743,55 @@ and a maximum individual payload size of 64 KB.
   format and the asynchronous interjection command structure.
 - [x] **A-04: Flow State Schemas:** Document the `register_flow` and
   `terminate_flow` payloads.
+- [ ] **A-05: SQLite Ledger Schema:** Define the table structure,
+  columns, indices, and record lifecycle for the daemon's persistent
+  SQLite database. Covers the notification history ledger (pairing
+  `NotificationRequest` with `NotificationResponse`), the active
+  flow registry, and flow lifecycle event storage. Must support the
+  `HistoryQueryRequest` filter fields (`workspace_id`, `flow_id`,
+  `since`, `until`, `limit`) and the stale reaping query pattern.
+- [ ] **A-06: Configuration Schema:** Define the unified
+  `settings.json` structure under `$XDG_CONFIG_HOME/renotify/`,
+  consolidating all configurable parameters (embedded broker
+  toggles, listener addresses, JetStream limits, rate limits, grace
+  periods, shared broker URL/credentials, heartbeat interval,
+  default timeout, log path). Specify defaults, validation rules,
+  and the Cobra/Viper binding model.
+- [ ] **A-07: Notification ID Format:** Specify the `ntf_` identifier
+  format, encoding, entropy, generation algorithm, and generator
+  location. Add to the identifier summary table in the naming
+  analysis.
+- [ ] **A-08: CLI Contract (Exit Codes & Output Format):** Define the
+  exit code mapping from error conditions to numeric codes, and the
+  stdout/stderr output format for each CLI command (`post`, `ask`,
+  `history`, `pair`, `revoke`). Specify whether output is JSON,
+  human-readable, or configurable.
+- [ ] **A-09: Shared Broker CLI Path:** Document how CLI commands
+  connect and authenticate when the daemon uses a shared broker
+  instead of the embedded broker. Clarify the internal token
+  distribution mechanism for co-located CLI processes.
+- [ ] **A-10: MCP `post` and `ask` Tool Schemas:** Define the MCP
+  tool input/output schemas for `post` and `ask`, including the
+  `flow_id` parameter, blocking vs non-blocking semantics for `ask`,
+  and the relationship to `DecisionResource` polling.
+- [ ] **A-11: Interjection Delivery Path:** Document how interjection
+  commands reach the originating process (CLI subscription to
+  `.interject` subject, MCP interjection notification, "pause"
+  operational semantics).
+- [ ] **A-12: Timeout Enforcement & Delivery:** Clarify the
+  authoritative timeout enforcer (daemon vs CLI), how the CLI learns
+  about server-side timeout expiry, and whether `ErrorResponse` is
+  published on the response subject.
+- [ ] **A-13: Workspace Discovery:** Document how CLI commands derive
+  `workspace_id` from the current working directory, how the daemon
+  learns about new workspaces, and fallback behaviour when the CLI
+  runs outside a project directory.
+- [ ] **A-14: History Pagination:** Add `offset` or cursor-based
+  pagination to `HistoryQueryRequest` and `HistoryQueryResult`
+  schemas.
+- [ ] **A-15: Payload Version Field:** Add a `"v": 1` version field
+  to `ProvisioningPayload` and optionally to other payloads for
+  forward-compatible parsing.
 
 ### Phase 2: Foundation & Scaffolding
 *(Goal: Establish the repositories and environments so cross-compilation targets
@@ -893,6 +942,7 @@ Record completed items here with the date.
 | 2026-03-27 | A-02 | Draft | NATS transport and subject design analysis. Subject catalogue (7 subjects), JetStream stream and consumer configuration, delivery guarantees and idempotency analysis, listener configuration (TCP 4222 + WSS 4223), TLS certificate spec (ECDSA P-256) with Android trust bootstrap analysis (TOFU fingerprint pinning), auth token design (256-bit Crockford Base32), two-account ACL model, connection lifecycle sequences, deployment model comparison. Updated ProvisioningPayload example (port 4223, full-length token). |
 | 2026-03-27 | A-03 | Draft | Provisioning and interjection schemas confirmed complete. Added QR encoding parameters (mdp/qrterminal/v3, EC level L, half-block rendering, capacity analysis). Added ML Kit recommendation for Android QR scanning. Updated C-07 and M-06 with library references. Multi-modal response types and boolean accepted field added to NotificationResponse and DecisionResource. |
 | 2026-03-27 | A-04 | Draft | Flow lifecycle management documented. Defined two paths: CLI implicit (one flow per command) and MCP explicit (agent-managed via `register_flow`/`refresh_flow`/`terminate_flow` tools). Added MCP tool input/output schemas with Go structs, JSON exemplars, and error conditions. Activity-based reaping timer reset on any tool call referencing a flow. `refresh_flow` enables progress updates on long-running MCP flows. Future `status` field noted for transient progress messages. |
+| 2026-03-27 | Gap analysis | — | Phase 1 gap analysis identified 15 items. Added A-05 (SQLite ledger schema), A-06 (configuration schema), and A-07 through A-15 covering notification ID format, CLI contracts, shared broker path, MCP post/ask tools, interjection delivery, timeout enforcement, workspace discovery, history pagination, and payload versioning. |
 
 ## 6. References
 
