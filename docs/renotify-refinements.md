@@ -453,7 +453,7 @@ The NATS subject hierarchy uses `{username}` and `{flow_id}` for routing (see R-
 
 - [x] **A-01a: Payload Enumeration:** Enumerate the complete set of required payloads mapping domain objects to system workflows.
 - [x] **A-01b: Payload Definition:** Define the specific JSON properties and structures for all the enumerated messages.
-- [ ] **A-02: Broker Provisioning & Routing Design:** Define and document the NATS subject hierarchy using globally unique flow IDs (e.g., `resystems.renotify.{username}.flow.{flow_id}.{event_type}`). Also document the WebSocket connection security (auth, wss:// TLS) and the daemon heartbeat subject pattern.
+- [x] **A-02: Broker Provisioning & Routing Design:** Define and document the NATS subject hierarchy using globally unique flow IDs (e.g., `resystems.renotify.{username}.flow.{flow_id}.{event_type}`). Also document the WebSocket connection security (auth, wss:// TLS) and the daemon heartbeat subject pattern.
 - [ ] **A-03: Provisioning & Interjection Schemas:** Document the QR payload format and the asynchronous interjection command structure.
 - [ ] **A-04: Flow State Schemas:** Document the `register_flow` and `terminate_flow` payloads.
 
@@ -529,6 +529,14 @@ The following register records key design decisions with links to the analysis d
 | D-07 | Broker deployment: embedded and shared NATS brokers are equal first-class models; provisioning payload is identical | [Naming & Addressing](analysis-naming-and-addressing.md) | 2026-03-27 |
 | D-08 | Payload denormalisation: daemon_id and workspace_id included in every flow payload for self-contained records | [Naming & Addressing](analysis-naming-and-addressing.md) | 2026-03-27 |
 | D-09 | Daemon heartbeat: 30s periodic interval with immediate on-change triggers for structural context delivery | [Naming & Addressing](analysis-naming-and-addressing.md) | 2026-03-27 |
+| D-10 | JetStream: single `RENOTIFY` stream, memory storage, 30-min MaxAge, 128 MB MaxBytes, Limits retention, Old discard | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
+| D-11 | Consumers: 3 durable (mobile, daemon-lifecycle, daemon-interject) + 1 ephemeral (cli-response); AckExplicit | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
+| D-12 | Listeners: TCP `127.0.0.1:4222` (no TLS, loopback), WSS `0.0.0.0:4223` (TLS required, all interfaces) | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
+| D-13 | TLS: ECDSA P-256, self-signed, 3-year validity, SHA-256 fingerprint, TOFU pinning via QR | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
+| D-14 | Android TLS trust: custom `X509TrustManager` with QR-provisioned fingerprint pinning (TOFU model) | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
+| D-15 | Auth token: `rn_tk_` prefix + 52 Crockford Base32 chars (256-bit entropy); two-account NATS model | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
+| D-16 | ACL: mobile client scoped to response/interject/svc publish only; cannot publish to request/lifecycle/heartbeat | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
+| D-17 | Delivery: JetStream at-least-once within TTL; Core NATS at-most-once; mobile deduplicates on notification `id` | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
 
 ---
 
@@ -543,6 +551,7 @@ Record completed items here with the date.
 | 2026-03-26 | A-01a | Draft | Split payload table "Direction / Transport" into separate Transport and Direction columns with a closed taxonomy of transport labels. |
 | 2026-03-27 | A-01b | Draft | Defined Go structs and JSON exemplars for all 11 payload schemas with shared enumeration types. |
 | 2026-03-27 | Harmonisation | Draft | Renamed "session" to "flow" throughout. Introduced daemon_id, workspace_id, and Crockford Base32 identifiers per naming analysis. Simplified NATS namespace to flat flow-based subjects. Added DaemonHeartbeat payload. Extracted payload schemas into standalone analysis document. Restructured Section 4 as Design Decision Register. |
+| 2026-03-27 | A-02 | Draft | NATS transport and subject design analysis. Subject catalogue (7 subjects), JetStream stream and consumer configuration, delivery guarantees and idempotency analysis, listener configuration (TCP 4222 + WSS 4223), TLS certificate spec (ECDSA P-256) with Android trust bootstrap analysis (TOFU fingerprint pinning), auth token design (256-bit Crockford Base32), two-account ACL model, connection lifecycle sequences, deployment model comparison. Updated ProvisioningPayload example (port 4223, full-length token). |
 
 ## 6. References
 
