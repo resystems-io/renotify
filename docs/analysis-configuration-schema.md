@@ -94,7 +94,8 @@ type Config struct {
 	RateLimit    RateLimitConfig    `json:"rate_limit"`
 	Reaping      ReapingConfig      `json:"reaping"`
 	Timeout      TimeoutConfig      `json:"timeout"`
-	Heartbeat    HeartbeatConfig    `json:"heartbeat"`
+	Heartbeat    HeartbeatConfig     `json:"heartbeat"`
+	Interjection InterjectionConfig `json:"interjection"`
 	Daemon       DaemonConfig       `json:"daemon"`
 }
 ```
@@ -241,6 +242,18 @@ type TimeoutConfig struct {
 type HeartbeatConfig struct {
 	Interval Duration `json:"interval"` // default: "30s"
 }
+
+// InterjectionConfig controls interjection processing.
+// InterjectionCommand is the only non-idempotent payload in the
+// system: a duplicate "stop" from a rapid double-tap would trigger
+// redundant termination logic without debouncing. The stop handler
+// includes a no-op guard (ignores stop on already-terminated flows),
+// but the debounce window prevents the duplicate from reaching the
+// handler at all, avoiding unnecessary FlowLifecycleEvent
+// publications and log noise.
+type InterjectionConfig struct {
+	DebounceWindow Duration `json:"debounce_window"` // default: "5s"
+}
 ```
 
 | Field | Default | R-CLI | Notes |
@@ -249,6 +262,7 @@ type HeartbeatConfig struct {
 | `reaping.grace_period` | `"5m"` | R-CLI-18 | Inactivity before flow is marked failed |
 | `timeout.default_ask_timeout` | `"5m"` | R-CLI-06 | Overridable per-invocation via `--timeout` flag |
 | `heartbeat.interval` | `"30s"` | R-CLI-14 | Periodic `DaemonHeartbeat`; also triggers on state changes |
+| `interjection.debounce_window` | `"5s"` | R-API-09 | `InterjectionCommand` is not idempotent — a duplicate `stop` from a rapid double-tap would trigger redundant termination. This window drops identical flow_id + action pairs within the period. The stop handler also has a no-op guard as defence in depth. |
 
 ### 2.7 Daemon Runtime
 
@@ -355,6 +369,7 @@ automatically.
 | `reaping.grace_period` | `RENOTIFY_REAPING_GRACE_PERIOD` |
 | `timeout.default_ask_timeout` | `RENOTIFY_TIMEOUT_DEFAULT_ASK_TIMEOUT` |
 | `heartbeat.interval` | `RENOTIFY_HEARTBEAT_INTERVAL` |
+| `interjection.debounce_window` | `RENOTIFY_INTERJECTION_DEBOUNCE_WINDOW` |
 | `daemon.foreground` | `RENOTIFY_DAEMON_FOREGROUND` |
 | `daemon.db_path` | `RENOTIFY_DAEMON_DB_PATH` |
 
@@ -419,6 +434,7 @@ to stderr.
 | `reaping.grace_period` | duration | ≥ 1m | "grace_period must be at least 1 minute" |
 | `timeout.default_ask_timeout` | duration | > 0 | "default_ask_timeout must be positive" |
 | `heartbeat.interval` | duration | ≥ 5s | "heartbeat.interval must be at least 5 seconds" |
+| `interjection.debounce_window` | duration | ≥ 1s | "debounce_window must be at least 1 second" |
 | `daemon.log_file` | filepath | Parent directory must exist (checked at startup in background mode) | "log directory does not exist" |
 | `daemon.db_path` | filepath | Parent directory must exist (checked at startup) | "database directory does not exist" |
 
@@ -467,6 +483,7 @@ environment variable, or CLI flag provides an override.
 | `reaping.grace_period` | `"5m"` | duration |
 | `timeout.default_ask_timeout` | `"5m"` | duration |
 | `heartbeat.interval` | `"30s"` | duration |
+| `interjection.debounce_window` | `"5s"` | duration |
 | `daemon.foreground` | `false` | bool |
 | `daemon.log_file` | `"$XDG_STATE_HOME/renotify/daemon.log"` | filepath |
 | `daemon.db_path` | `"$XDG_STATE_HOME/renotify/renotify.db"` | filepath |

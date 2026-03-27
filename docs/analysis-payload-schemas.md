@@ -60,6 +60,7 @@ Each payload's **Transport** identifies the delivery mechanism and its
 | [**HistoryQueryResult**](#historyqueryresult) | NATS Request-Reply | Daemon -> App | R-CLI-13, R-MOB-07 | W4 | The daemon's structured payload wrapping the requested SQLite history records to be rendered native on the device. |
 | [**ErrorResponse**](#errorresponse) | Any (contextual) | Daemon -> Caller | R-API-11, N-04 | W2, W3, W4, W5 | A generic error envelope returned when any request fails at the daemon or broker level. Contains a correlation ID, error code, human-readable message, and timestamp. |
 | [**DecisionResource**](#decisionresource) | MCP Resource | Daemon -> Agent | R-CLI-10 | W3 | The MCP dynamic resource exposing a decision result that agents read after receiving the `notifications/resources/updated` notification. |
+| [**InterjectionResource**](#interjectionresource) | MCP Resource | Daemon -> Agent | R-API-09, R-CLI-10 | W5 | The MCP dynamic resource exposing the most recent interjection for a flow, enabling agents to react to out-of-band stop/note signals from the mobile user. |
 
 ---
 
@@ -1177,6 +1178,51 @@ Decided:
   "decided": true,
   "action": "Approve",
   "timestamp": "2026-03-27T14:32:15Z"
+}
+```
+
+### InterjectionResource
+
+The MCP dynamic resource that agents read after receiving a
+`notifications/resources/updated` notification referencing an
+interjection. Served at
+`renotify://interjections/{flow_id}`. Contains the most recent
+interjection for the flow. The daemon updates this resource each
+time a new `InterjectionCommand` arrives for the flow.
+
+This mirrors the `DecisionResource` pattern: the daemon emits
+the MCP notification, and the agent reads the resource to obtain
+the details. See [NATS Transport
+Design](analysis-nats-transport-design.md) Section 8.8 for the
+full interjection delivery path.
+
+```go
+type InterjectionResource struct {
+	FlowID    string             `json:"flow_id"`
+	Action    InterjectionAction `json:"action"`
+	Context   string             `json:"context,omitempty"`
+	Timestamp time.Time          `json:"timestamp"`
+}
+```
+
+Stop interjection:
+
+```json
+{
+  "flow_id": "fl_0R3FABM7TP2XE89YWCGKN4QJ5V",
+  "action": "stop",
+  "timestamp": "2026-03-27T14:35:00Z"
+}
+```
+
+Note with context:
+
+```json
+{
+  "flow_id": "fl_0R3FABM7TP2XE89YWCGKN4QJ5V",
+  "action": "note",
+  "context": "Check the connection pool config before proceeding.",
+  "timestamp": "2026-03-27T14:36:00Z"
 }
 ```
 

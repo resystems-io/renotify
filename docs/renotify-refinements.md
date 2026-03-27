@@ -774,7 +774,7 @@ and a maximum individual payload size of 64 KB.
   tool input/output schemas for `post` and `ask`, including the
   `flow_id` parameter, blocking vs non-blocking semantics for `ask`,
   and the relationship to `DecisionResource` polling.
-- [ ] **A-11: Interjection Delivery Path:** Document how interjection
+- [x] **A-11: Interjection Delivery Path:** Document how interjection
   commands reach the originating process (CLI subscription to
   `.interject` subject, MCP interjection notification, "pause"
   operational semantics).
@@ -931,6 +931,7 @@ specifications.
 | D-23 | CLI exit codes: 0 success, 1 general, 2 usage, 3 timeout, 4 rate limited, 5 unroutable, 6 not found; `--format json\|text` flag; stdout=data, stderr=diagnostics | [CLI Contract](analysis-cli-contract.md) | 2026-03-27 |
 | D-24 | Shared broker CLI path: CLI reads `broker.enabled` from config and branches — embedded uses loopback + internal token, shared uses `shared_broker.url` + configured credentials. Internal token persisted to XDG state (0600). | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
 | D-25 | MCP `post`: fire-and-forget, returns `notification_id`. MCP `ask`: non-blocking, returns `notification_id` + `resource_uri`; agent reads `DecisionResource` asynchronously via `notifications/resources/updated` (R-CLI-10). Daemon fills system fields from flow context. | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
+| D-26 | Interjection delivery: CLI dual-subscribes to `.response` + `.interject`; MCP via `InterjectionResource` at `renotify://interjections/{flow_id}`. `stop` terminates flow (failed). `note` forwarded without state change. `pause` deferred to post-MVP. Debounce 5s per flow+action. | [NATS Transport](analysis-nats-transport-design.md), [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
 
 ---
 
@@ -955,6 +956,7 @@ Record completed items here with the date.
 | 2026-03-27 | A-08 | Draft | CLI output contract in standalone analysis document. Exit codes 0-6 mapped to ErrorResponse codes. Output routing: stdout=data, stderr=diagnostics. Per-command output specs with JSON exemplars for ask, history, post, pair, revoke. `--format json|text` flag with per-command defaults. Shell script integration examples. |
 | 2026-03-27 | A-09 | Draft | Shared broker CLI path documented. CLI branches on `broker.enabled`: embedded mode uses loopback TCP + internal token from XDG state, shared mode uses `shared_broker.url` + configured credentials. Internal token persisted to `$XDG_STATE_HOME/renotify/internal_token` (0600), generated once on first daemon startup. Section 8.6 split into embedded/shared subsections. Deployment comparison table updated with CLI connection rows. |
 | 2026-03-27 | A-10 | Draft | MCP `post` and `ask` tool schemas defined. `post` is fire-and-forget, returns notification_id. `ask` is non-blocking, returns notification_id + resource_uri; agent reads DecisionResource asynchronously via notifications/resources/updated (R-CLI-10). Daemon fills system fields (id, daemon_id, workspace_id, timestamp) from flow context. Timeout detection via DecisionResource with decided:true but absent response fields. Operations comparison table updated. |
+| 2026-03-27 | A-11 | Draft | Interjection delivery path fully specified. CLI dual-subscribes to `.response` + `.interject` during `ask` wait. Daemon processes interjections: `stop` terminates flow (publishes FlowLifecycleEvent failed), `note` forwards context without state change, `pause` deferred to post-MVP (treated as note). MCP delivery via new `InterjectionResource` at `renotify://interjections/{flow_id}`. Debounce: 5s per flow+action, configurable via `interjection.debounce_window`. New `interjections` SQLite table added to V1 migration. |
 
 ## 6. References
 

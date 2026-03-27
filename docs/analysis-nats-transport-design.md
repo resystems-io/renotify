@@ -644,7 +644,7 @@ target and credential differ.
 3. Connect to the shared broker URL using the configured
    credentials.
 
-**Steps 3-9 (common to both modes):**
+**Steps 3-11 (common to both modes):**
 
 3. Generate a `flow_id` (UUIDv7, Crockford Base32 encoded with
    `fl_` prefix).
@@ -654,18 +654,28 @@ target and credential differ.
    `cli-response-{flow_id}` filtering on
    `resystems.renotify.{username}.flow.{flow_id}.response` with
    DeliverPolicy=New.
-6. Publish the `NotificationRequest` to
+6. Subscribe to
+   `resystems.renotify.{username}.flow.{flow_id}.interject`
+   via a second ephemeral consumer `cli-interject-{flow_id}`
+   with DeliverPolicy=New.
+7. Publish the `NotificationRequest` to
    `resystems.renotify.{username}.flow.{flow_id}.request`.
-7. Wait for a response on the ephemeral consumer, subject to
-   the configured timeout (R-CLI-06, R-CLI-17).
-8. On response: print the result, publish a `FlowLifecycleEvent`
-   (`status: completed`), disconnect.
-9. On timeout: print the error (non-zero exit code), publish a
-   `FlowLifecycleEvent` (`status: failed`), disconnect.
+8. Wait concurrently on both consumers (`.response` and
+   `.interject`), subject to the configured timeout
+   (R-CLI-06, R-CLI-17). See Section 8.8 for interjection
+   handling during this wait.
+9. On response: print the result, publish a
+   `FlowLifecycleEvent` (`status: completed`), disconnect.
+10. On timeout: print the error (non-zero exit code), publish a
+    `FlowLifecycleEvent` (`status: failed`), disconnect.
+11. On `stop` interjection: print "Flow stopped by user" to
+    stderr, publish a `FlowLifecycleEvent` (`status: failed`),
+    exit with code 1.
 
-The same branching logic applies to `renotify post` (steps 3-6
-only, no response wait) and `renotify history` (connects, sends
-a Core NATS request to `svc.history`, prints result, disconnects).
+The same branching logic applies to `renotify post` (steps 3-7
+only, no response wait or interjection subscription) and
+`renotify history` (connects, sends a Core NATS request to
+`svc.history`, prints result, disconnects).
 
 ### 8.7 Token Revocation (`renotify revoke`)
 
@@ -681,6 +691,94 @@ a Core NATS request to `svc.history`, prints result, disconnects).
    - (The daemon cannot reconfigure shared broker auth.)
 4. Delete the stored token file from XDG state.
 5. Confirm revocation to the user via terminal output.
+
+### 8.8 Interjection Delivery
+
+Interjections are out-of-band signals from the mobile user to
+the originating process (CLI or MCP agent). The mobile app
+publishes an `InterjectionCommand` to the `.interject` subject;
+the system delivers it to the process that owns the targeted
+flow.
+
+**Daemon processing.** The daemon's `daemon-interject-{username}`
+consumer receives all interjections for the user's flows. For
+each interjection the daemon:
+
+1. Checks the debounce window. `InterjectionCommand` is the only
+   non-idempotent payload in the system — a duplicate `stop` from
+   a rapid double-tap would trigger redundant termination logic.
+   If the same `flow_id` + `action` combination was processed
+   within the last 5 seconds (default, configurable via
+   `interjection.debounce_window`), acknowledge the message to
+   JetStream but do not process it. Different actions on the
+   same flow within the window are not
+   deduplicated.
+2. Inserts the interjection into the `interjections` table in
+   SQLite (see [SQLite Ledger](analysis-sqlite-ledger.md)).
+3. Dispatches based on the action (see below).
+
+**`stop` — Graceful termination request:**
+
+The daemon treats `stop` as an authoritative termination signal:
+
+1. Publish a `FlowLifecycleEvent` with `status: failed` to
+   `resystems.renotify.{username}.flow.{flow_id}.lifecycle`.
+2. Delete the flow from the `active_flows` table.
+3. For MCP flows: update the `InterjectionResource` and emit
+   `notifications/resources/updated` (see [Payload
+   Schemas](analysis-payload-schemas.md) `InterjectionResource`).
+4. For CLI flows: the CLI receives the `stop` directly via its
+   own `.interject` subscription (Section 8.6, step 11) and
+   exits independently. The daemon's lifecycle event publication
+   (step 1) ensures the flow registry is updated regardless of
+   whether the CLI process exits cleanly.
+
+If the flow has already terminated (`completed` or `failed`),
+the `stop` is a no-op: the daemon acknowledges the message but
+takes no further action.
+
+**`note` — Informational context:**
+
+The daemon forwards the note without altering flow state:
+
+1. Store the note in the `interjections` table (persisted for
+   audit).
+2. For MCP flows: update the `InterjectionResource` and emit
+   `notifications/resources/updated`.
+3. For CLI flows: the CLI receives the `note` directly via its
+   `.interject` subscription and prints the `context` field to
+   stderr. The CLI continues waiting for `.response`.
+
+**`pause` — Deferred to post-MVP:**
+
+The `pause` action requires a corresponding `resume` mechanism
+that does not exist in the current architecture. For MVP, the
+daemon treats `pause` as a `note` with context "Pause requested"
+and logs a warning. The `InterjectionAction` enum value is
+retained for forward compatibility.
+
+**CLI interjection handling.** The CLI `ask` command subscribes
+to both `.response` and `.interject` for its flow (Section 8.6,
+steps 5-6). It waits concurrently on both consumers:
+
+| Event | CLI Behaviour |
+| :--- | :--- |
+| `.response` arrives | Normal exit: print response, publish `FlowLifecycleEvent` (`completed`), exit 0 |
+| `.interject` with `stop` arrives | Print "Flow stopped by user" to stderr, publish `FlowLifecycleEvent` (`failed`), exit 1 |
+| `.interject` with `note` arrives | Print context to stderr, continue waiting |
+| Timeout expires | Print timeout error to stderr, publish `FlowLifecycleEvent` (`failed`), exit 3 |
+
+The CLI `post` command does not subscribe to `.interject` because
+it exits immediately after publishing (no blocking wait).
+
+**MCP interjection handling.** The daemon mediates interjection
+delivery to MCP agents via the `InterjectionResource` MCP
+resource. The agent receives a `notifications/resources/updated`
+event and reads the resource at
+`renotify://interjections/{flow_id}` to obtain the interjection
+details. This mirrors the `DecisionResource` pattern used for
+`ask` responses. The agent decides how to act on the interjection
+based on its own logic.
 
 ---
 
