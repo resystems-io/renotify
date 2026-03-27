@@ -460,8 +460,9 @@ SQLite or file-based log.
 * **V&V Method (A2):** Demonstration
 
 #### R-CLI-08: MCP Server Mode
-**Statement:** Implement the Model Context Protocol (MCP), allowing autonomous
-agents to invoke `post`, `ask`, `register_flow`, and `terminate_flow` natively.
+**Statement:** Implement the Model Context Protocol (MCP), allowing
+autonomous agents to invoke `post`, `ask`, `register_flow`,
+`refresh_flow`, and `terminate_flow` natively.
 * **Rationale (A1):** Standardises agent integration without relying solely on
   shell execution.
 * **Trace to Parent (A4):** N-01, N-03
@@ -740,7 +741,7 @@ and a maximum individual payload size of 64 KB.
   subject pattern.
 - [x] **A-03: Provisioning & Interjection Schemas:** Document the QR payload
   format and the asynchronous interjection command structure.
-- [ ] **A-04: Flow State Schemas:** Document the `register_flow` and
+- [x] **A-04: Flow State Schemas:** Document the `register_flow` and
   `terminate_flow` payloads.
 
 ### Phase 2: Foundation & Scaffolding
@@ -814,8 +815,8 @@ monitoring).*
   tracker, stale sweeper, and the Core NATS registry presentation endpoint.
 - [ ] **C-06: MCP Server:** Implement the MCP protocol layer to expose
   capabilities natively to AI agents.
-- [ ] **C-11: MCP Flow Tools:** Wire up the `register_flow` and `terminate_flow`
-  tools on the MCP server.
+- [ ] **C-11: MCP Flow Tools:** Wire up the `register_flow`,
+  `refresh_flow`, and `terminate_flow` tools on the MCP server.
 - [ ] **M-09: Dashboard Rendering:** Implement the Android landing screen
   capable of fetching and displaying the active flow registry list dynamically,
   grouped by workspace using daemon heartbeat data.
@@ -874,6 +875,7 @@ specifications.
 | D-16 | ACL: mobile client scoped to response/interject/svc publish only; cannot publish to request/lifecycle/heartbeat | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
 | D-17 | Delivery: JetStream at-least-once within TTL; Core NATS at-most-once; mobile deduplicates on notification `id` | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
 | D-18 | QR generation: `mdp/qrterminal/v3`, EC level L, half-block terminal rendering; scanning: Google ML Kit Barcode | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
+| D-19 | Flow lifecycle: CLI implicit (one flow per command) vs MCP explicit (`register_flow`/`refresh_flow`/`terminate_flow` tools); activity-based reaping timer reset | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
 
 ---
 
@@ -890,6 +892,7 @@ Record completed items here with the date.
 | 2026-03-27 | Harmonisation | Draft | Renamed "session" to "flow" throughout. Introduced daemon_id, workspace_id, and Crockford Base32 identifiers per naming analysis. Simplified NATS namespace to flat flow-based subjects. Added DaemonHeartbeat payload. Extracted payload schemas into standalone analysis document. Restructured Section 4 as Design Decision Register. |
 | 2026-03-27 | A-02 | Draft | NATS transport and subject design analysis. Subject catalogue (7 subjects), JetStream stream and consumer configuration, delivery guarantees and idempotency analysis, listener configuration (TCP 4222 + WSS 4223), TLS certificate spec (ECDSA P-256) with Android trust bootstrap analysis (TOFU fingerprint pinning), auth token design (256-bit Crockford Base32), two-account ACL model, connection lifecycle sequences, deployment model comparison. Updated ProvisioningPayload example (port 4223, full-length token). |
 | 2026-03-27 | A-03 | Draft | Provisioning and interjection schemas confirmed complete. Added QR encoding parameters (mdp/qrterminal/v3, EC level L, half-block rendering, capacity analysis). Added ML Kit recommendation for Android QR scanning. Updated C-07 and M-06 with library references. Multi-modal response types and boolean accepted field added to NotificationResponse and DecisionResource. |
+| 2026-03-27 | A-04 | Draft | Flow lifecycle management documented. Defined two paths: CLI implicit (one flow per command) and MCP explicit (agent-managed via `register_flow`/`refresh_flow`/`terminate_flow` tools). Added MCP tool input/output schemas with Go structs, JSON exemplars, and error conditions. Activity-based reaping timer reset on any tool call referencing a flow. `refresh_flow` enables progress updates on long-running MCP flows. Future `status` field noted for transient progress messages. |
 
 ## 6. References
 
