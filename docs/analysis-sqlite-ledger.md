@@ -80,16 +80,17 @@ is a safe no-op.
 
 ## 2. Table Definitions
 
-The schema consists of four tables serving two distinct purposes:
+The schema consists of five tables serving two distinct purposes:
 
 * **Hot working set:** `active_flows` holds the currently running
   flows. Rows are inserted on flow registration and deleted on
   termination or stale reaping. This table is small (bounded by
   R-SYS-01: 20 concurrent flows) and queried frequently.
 * **Cold audit log:** `notification_requests`,
-  `notification_responses`, and `flow_lifecycle_events` are
-  append-only history tables. They grow over time and serve the
-  history API (C-09) and mobile history viewer (M-07).
+  `notification_responses`, `flow_lifecycle_events`, and
+  `interjections` are append-only history tables. They grow over
+  time and serve the history API (C-09) and mobile history
+  viewer (M-07).
 
 ### 2.1 `notification_requests`
 
@@ -182,6 +183,25 @@ Unlike `flow_lifecycle_events`, this table does not store a `status`
 column — all rows are implicitly `active`. When a flow terminates,
 its row is deleted.
 
+### 2.5 `interjections`
+
+Append-only audit log of out-of-band interjection commands sent by
+the mobile user. Linked to flows by `flow_id`. A single flow may
+receive multiple interjections (e.g., a `note` followed by a
+`stop`). Uses the same composite PK pattern as
+`flow_lifecycle_events`.
+
+```sql
+CREATE TABLE IF NOT EXISTS interjections (
+    flow_id   TEXT NOT NULL,
+    action    TEXT NOT NULL
+              CHECK (action IN ('stop', 'pause', 'note')),
+    context   TEXT,            -- free-form text (for note/pause)
+    timestamp TEXT NOT NULL,   -- RFC 3339 UTC
+    PRIMARY KEY (flow_id, timestamp)
+);
+```
+
 ---
 
 ## 3. Indices
@@ -222,6 +242,10 @@ CREATE INDEX IF NOT EXISTS idx_fle_flow
 -- Flow lifecycle audit: filter by workspace, ordered by time
 CREATE INDEX IF NOT EXISTS idx_fle_workspace_ts
     ON flow_lifecycle_events (workspace_id, timestamp DESC);
+
+-- Interjection audit: lookup by flow
+CREATE INDEX IF NOT EXISTS idx_inj_flow
+    ON interjections (flow_id, timestamp DESC);
 ```
 
 ---
@@ -376,6 +400,7 @@ receives from) NATS. The NATS message provides ephemeral delivery
 | Flow terminated | Publish `FlowLifecycleEvent` (`completed`/`failed`) | Insert into `flow_lifecycle_events`; delete from `active_flows` |
 | Stale reaping | Publish `FlowLifecycleEvent` (`failed`) | Insert into `flow_lifecycle_events`; delete from `active_flows` |
 | Any tool call on a flow | (varies) | Update `active_flows.last_activity_timestamp` |
+| Interjection received | Receive `InterjectionCommand` from JetStream | `INSERT OR IGNORE INTO interjections`; for `stop`: also insert `flow_lifecycle_events` (`failed`) + delete `active_flows` |
 
 ### 5.2 Active Flow Lifecycle
 
@@ -541,6 +566,19 @@ CREATE INDEX IF NOT EXISTS idx_fle_flow
     ON flow_lifecycle_events (flow_id, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_fle_workspace_ts
     ON flow_lifecycle_events (workspace_id, timestamp DESC);
+
+CREATE TABLE IF NOT EXISTS interjections (
+    flow_id   TEXT NOT NULL,
+    action    TEXT NOT NULL
+              CHECK (action IN ('stop', 'pause', 'note')),
+    context   TEXT,
+    timestamp TEXT NOT NULL,
+    PRIMARY KEY (flow_id, timestamp)
+);
+
+-- Index for interjection audit
+CREATE INDEX IF NOT EXISTS idx_inj_flow
+    ON interjections (flow_id, timestamp DESC);
 
 PRAGMA user_version = 1;
 ```
