@@ -336,18 +336,18 @@ Replaces `workspace` and `session_id` with the new identifiers:
 
 ```go
 type NotificationRequest struct {
-    ID           string       `json:"id"`
-    FlowID       string       `json:"flow_id"`
-    DaemonID     string       `json:"daemon_id"`
-    WorkspaceID  string       `json:"workspace_id"`
-    Title        string       `json:"title"`
-    Body         string       `json:"body,omitempty"`
-    ResponseType ResponseType `json:"response_type"`
-    Priority     Priority     `json:"priority"`
-    Source       string       `json:"source"`
-    Actions      []string     `json:"actions,omitempty"`
-    TimeoutSec   int          `json:"timeout_sec,omitempty"`
-    Timestamp    time.Time    `json:"timestamp"`
+    ID            string         `json:"id"`
+    FlowID        string         `json:"flow_id"`
+    DaemonID      string         `json:"daemon_id"`
+    WorkspaceID   string         `json:"workspace_id"`
+    Title         string         `json:"title"`
+    Body          string         `json:"body,omitempty"`
+    ResponseTypes []ResponseType `json:"response_types"`
+    Priority      Priority       `json:"priority"`
+    Source        string         `json:"source"`
+    Actions       []string       `json:"actions,omitempty"`
+    TimeoutSec    int            `json:"timeout_sec,omitempty"`
+    Timestamp     time.Time      `json:"timestamp"`
 }
 ```
 
