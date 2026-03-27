@@ -743,7 +743,7 @@ and a maximum individual payload size of 64 KB.
   format and the asynchronous interjection command structure.
 - [x] **A-04: Flow State Schemas:** Document the `register_flow` and
   `terminate_flow` payloads.
-- [ ] **A-05: SQLite Ledger Schema:** Define the table structure,
+- [x] **A-05: SQLite Ledger Schema:** Define the table structure,
   columns, indices, and record lifecycle for the daemon's persistent
   SQLite database. Covers the notification history ledger (pairing
   `NotificationRequest` with `NotificationResponse`), the active
@@ -925,6 +925,7 @@ specifications.
 | D-17 | Delivery: JetStream at-least-once within TTL; Core NATS at-most-once; mobile deduplicates on notification `id` | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
 | D-18 | QR generation: `mdp/qrterminal/v3`, EC level L, half-block terminal rendering; scanning: Google ML Kit Barcode | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
 | D-19 | Flow lifecycle: CLI implicit (one flow per command) vs MCP explicit (`register_flow`/`refresh_flow`/`terminate_flow` tools); activity-based reaping timer reset | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
+| D-20 | SQLite ledger: 4 tables (notification_requests, notification_responses, flow_lifecycle_events, active_flows); PRAGMA user_version migration; `INSERT OR IGNORE` dedup; `last_activity_timestamp` for reaping | [SQLite Ledger](analysis-sqlite-ledger.md) | 2026-03-27 |
 
 ---
 
@@ -943,6 +944,7 @@ Record completed items here with the date.
 | 2026-03-27 | A-03 | Draft | Provisioning and interjection schemas confirmed complete. Added QR encoding parameters (mdp/qrterminal/v3, EC level L, half-block rendering, capacity analysis). Added ML Kit recommendation for Android QR scanning. Updated C-07 and M-06 with library references. Multi-modal response types and boolean accepted field added to NotificationResponse and DecisionResource. |
 | 2026-03-27 | A-04 | Draft | Flow lifecycle management documented. Defined two paths: CLI implicit (one flow per command) and MCP explicit (agent-managed via `register_flow`/`refresh_flow`/`terminate_flow` tools). Added MCP tool input/output schemas with Go structs, JSON exemplars, and error conditions. Activity-based reaping timer reset on any tool call referencing a flow. `refresh_flow` enables progress updates on long-running MCP flows. Future `status` field noted for transient progress messages. |
 | 2026-03-27 | Gap analysis | — | Phase 1 gap analysis identified 15 items. Added A-05 (SQLite ledger schema), A-06 (configuration schema), and A-07 through A-15 covering notification ID format, CLI contracts, shared broker path, MCP post/ask tools, interjection delivery, timeout enforcement, workspace discovery, history pagination, and payload versioning. |
+| 2026-03-27 | A-05 | Draft | SQLite ledger schema defined in standalone analysis document. Four tables: notification_requests, notification_responses (1:0..1 join), flow_lifecycle_events (append-only audit), active_flows (hot working set with last_activity_timestamp). PRAGMA user_version migration strategy with idempotent DDL. Query patterns for history, active flows, stale reaping, rate limiting, and deduplication. Complete V1 migration script. |
 
 ## 6. References
 
