@@ -31,26 +31,35 @@ Each payload's **Transport** identifies the delivery mechanism and its
 **Direction** identifies the logical actor-to-actor flow:
 
 * **NATS JetStream** — pub/sub with ephemeral in-memory buffering.
-* **NATS Pub/Sub** — plain Core NATS pub/sub without JetStream persistence.
+* **NATS Pub/Sub** — plain Core NATS pub/sub without JetStream
+  persistence.
 * **NATS Request-Reply** — synchronous Core NATS query/response.
+* **MCP Tool** — Model Context Protocol tool call (agent invokes
+  daemon via stdio transport).
 * **MCP Resource** — Model Context Protocol dynamic resource read.
 * **Offline (QR)** — out-of-band provisioning via terminal QR code.
-* **Any (contextual)** — transport depends on the originating request.
+* **Any (contextual)** — transport depends on the originating
+  request.
 
 | Payload Name | Transport | Direction | Requirement Cross-Ref | ConOps Workflow | Description |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **NotificationRequest** | NATS JetStream | CLI/Agent -> App | R-API-01, N-01 | W2, W3 | The core domain model representing an interrupt or alert. Contains the title, body, priority, source, and the type of response required. |
-| **NotificationResponse** | NATS JetStream | App -> CLI/Agent | R-API-02, N-03 | W3 | The human decision. Correlates to a `NotificationRequest` ID, capturing the selected action or free-form text input alongside the decision timestamp. |
-| **FlowLifecycleEvent** | NATS JetStream | CLI/Agent -> Daemon | R-API-10, N-04 | W3, W5 | A structured event indicating the birth or death of a distinct pipeline flow. Used by the daemon to maintain the active flow registry. |
-| **ProvisioningPayload** | Offline (QR) | CLI -> App | R-API-08, N-01 | W1 | The secure handshake payload containing the target IP, port, auth token, and required TLS certificate fingerprints in a minified JSON map. |
-| **InterjectionCommand** | NATS JetStream | App -> Daemon/Agent | R-API-09, N-05 | W5 | An asynchronous, unprompted control signal emitted by the user targeting a specific flow by its globally unique flow_id. |
-| **DaemonHeartbeat** | NATS Pub/Sub | Daemon -> App | R-CLI-14 | W5 | Periodic structural context (daemon identity, hostname, workspaces, active flows) enabling the mobile dashboard to group and display the system hierarchy. |
-| **ActiveFlowsQuery** | NATS Request-Reply | App -> Daemon | R-CLI-14, R-MOB-09 | W5 | Core NATS query sent by the Android app to list all currently running flows across the host. |
-| **ActiveFlowsResult** | NATS Request-Reply | Daemon -> App | R-CLI-14, R-MOB-09 | W5 | The daemon's reply containing the array of currently active `FlowLifecycleEvent` contexts. |
-| **HistoryQueryRequest** | NATS Request-Reply | App -> Daemon | R-CLI-13, R-MOB-07 | W4 | Core NATS query sent by the Android app requesting the historical ledger of past notifications and decisions. |
-| **HistoryQueryResult** | NATS Request-Reply | Daemon -> App | R-CLI-13, R-MOB-07 | W4 | The daemon's structured payload wrapping the requested SQLite history records to be rendered native on the device. |
-| **ErrorResponse** | Any (contextual) | Daemon -> Caller | R-API-11, N-04 | W2, W3, W4, W5 | A generic error envelope returned when any request fails at the daemon or broker level. Contains a correlation ID, error code, human-readable message, and timestamp. |
-| **DecisionResource** | MCP Resource | Daemon -> Agent | R-CLI-10 | W3 | The MCP dynamic resource exposing a decision result that agents read after receiving the `notifications/resources/updated` notification. |
+| [**NotificationRequest**](#notificationrequest) | NATS JetStream | CLI/Agent -> App | R-API-01, N-01 | W2, W3 | The core domain model representing an interrupt or alert. Contains the title, body, priority, source, and the type of response required. |
+| [**NotificationResponse**](#notificationresponse) | NATS JetStream | App -> CLI/Agent | R-API-02, N-03 | W3 | The human decision. Correlates to a `NotificationRequest` ID, capturing the selected action or free-form text input alongside the decision timestamp. |
+| [**FlowLifecycleEvent**](#flowlifecycleevent) | NATS JetStream | CLI/Agent -> Daemon | R-API-10, N-04 | W3, W5 | A structured event indicating the birth or death of a distinct pipeline flow. Used by the daemon to maintain the active flow registry. |
+| [**RegisterFlowRequest/Result**](#register_flow-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08 | W3, W5 | MCP tool to begin a new flow. Daemon generates `flow_id` and publishes `FlowLifecycleEvent`. |
+| [**RefreshFlowRequest/Result**](#refresh_flow-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08 | W5 | MCP tool to signal continued activity and update flow label/metadata. Resets stale reaping timer. |
+| [**TerminateFlowRequest/Result**](#terminate_flow-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08 | W3, W5 | MCP tool to end a flow with `completed` or `failed` status. |
+| [**PostNotificationRequest/Result**](#post-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08 | W2 | MCP tool for fire-and-forget notification within an active flow. Daemon fills system fields from flow context. |
+| [**AskNotificationRequest/Result**](#ask-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08, R-CLI-10 | W3 | MCP tool for non-blocking interactive prompt. Returns `resource_uri` for async `DecisionResource` polling. |
+| [**ProvisioningPayload**](#provisioningpayload) | Offline (QR) | CLI -> App | R-API-08, N-01 | W1 | The secure handshake payload containing the target IP, port, auth token, and required TLS certificate fingerprints in a minified JSON map. |
+| [**InterjectionCommand**](#interjectioncommand) | NATS JetStream | App -> Daemon/Agent | R-API-09, N-05 | W5 | An asynchronous, unprompted control signal emitted by the user targeting a specific flow by its globally unique flow_id. |
+| [**DaemonHeartbeat**](#daemonheartbeat) | NATS Pub/Sub | Daemon -> App | R-CLI-14 | W5 | Periodic structural context (daemon identity, hostname, workspaces, active flows) enabling the mobile dashboard to group and display the system hierarchy. |
+| [**ActiveFlowsQuery**](#activeflowsquery) | NATS Request-Reply | App -> Daemon | R-CLI-14, R-MOB-09 | W5 | Core NATS query sent by the Android app to list all currently running flows across the host. |
+| [**ActiveFlowsResult**](#activeflowsresult) | NATS Request-Reply | Daemon -> App | R-CLI-14, R-MOB-09 | W5 | The daemon's reply containing the array of currently active `FlowLifecycleEvent` contexts. |
+| [**HistoryQueryRequest**](#historyqueryrequest) | NATS Request-Reply | App -> Daemon | R-CLI-13, R-MOB-07 | W4 | Core NATS query sent by the Android app requesting the historical ledger of past notifications and decisions. |
+| [**HistoryQueryResult**](#historyqueryresult) | NATS Request-Reply | Daemon -> App | R-CLI-13, R-MOB-07 | W4 | The daemon's structured payload wrapping the requested SQLite history records to be rendered native on the device. |
+| [**ErrorResponse**](#errorresponse) | Any (contextual) | Daemon -> Caller | R-API-11, N-04 | W2, W3, W4, W5 | A generic error envelope returned when any request fails at the daemon or broker level. Contains a correlation ID, error code, human-readable message, and timestamp. |
+| [**DecisionResource**](#decisionresource) | MCP Resource | Daemon -> Agent | R-CLI-10 | W3 | The MCP dynamic resource exposing a decision result that agents read after receiving the `notifications/resources/updated` notification. |
 
 ---
 
@@ -329,7 +338,8 @@ on the agent's behalf.
 | Operation | CLI Path | MCP Path |
 | :--- | :--- | :--- |
 | Start a flow | Implicit: CLI generates `flow_id` and publishes `FlowLifecycleEvent` (`active`) | Explicit: agent calls `register_flow` tool; daemon generates `flow_id` and publishes event |
-| Send notification | `renotify post` or `renotify ask` (flow_id set internally) | Agent calls `post` or `ask` tool with the `flow_id` returned by `register_flow` |
+| Send fire-and-forget | `renotify post` (flow_id set internally) | Agent calls `post` tool with `flow_id`; daemon returns `notification_id` |
+| Send blocking prompt | `renotify ask` (blocks until response or timeout) | Agent calls `ask` tool (non-blocking); daemon returns `notification_id` + `resource_uri`; agent reads `DecisionResource` asynchronously via `notifications/resources/updated` |
 | Signal progress | N/A (CLI flows are short-lived) | Agent calls `refresh_flow` with optional label/metadata update; resets reaping timer |
 | End a flow | Implicit: CLI publishes `FlowLifecycleEvent` (`completed` or `failed`) on exit | Explicit: agent calls `terminate_flow` tool; daemon publishes event |
 | Stale reaping | Daemon detects CLI process termination (5-min grace, R-CLI-18) | Daemon detects absence of any tool call referencing the flow (5-min grace, R-CLI-18) |
@@ -544,6 +554,228 @@ human-readable flow name. This would allow the mobile dashboard
 to display both a stable title and a changing status line. This
 is deferred to avoid adding fields before their UI rendering is
 designed.
+
+#### `post` MCP Tool
+
+Called by an AI agent to send a fire-and-forget notification
+within an active flow. The daemon generates the notification ID,
+fills in system fields (`daemon_id`, `workspace_id`, `timestamp`)
+from the flow's registration context, publishes the
+`NotificationRequest` to NATS, inserts it into the SQLite ledger,
+and returns the generated ID.
+
+**Input parameters:**
+
+```go
+type PostNotificationRequest struct {
+	FlowID   string   `json:"flow_id"`
+	Title    string   `json:"title"`
+	Body     string   `json:"body,omitempty"`
+	Priority Priority `json:"priority,omitempty"`
+	Source   string   `json:"source,omitempty"`
+}
+```
+
+- `flow_id` (required) — the active flow this notification
+  belongs to. Must have been returned by a prior `register_flow`
+  call.
+- `title` (required) — notification title displayed on the
+  mobile app.
+- `body` (optional) — notification body text.
+- `priority` (optional) — `"low"`, `"normal"` (default), or
+  `"high"`.
+- `source` (optional) — identifies the originating pipeline or
+  agent (e.g., `"ci/build-pipeline"`, `"claude-code"`).
+
+The daemon sets `response_types` to `["none"]` automatically.
+The `actions` and `timeout_sec` fields do not apply to
+fire-and-forget notifications.
+
+**Output:**
+
+```go
+type PostNotificationResult struct {
+	NotificationID string    `json:"notification_id"`
+	Timestamp      time.Time `json:"timestamp"`
+}
+```
+
+**Exemplar — request:**
+
+```json
+{
+  "flow_id": "fl_0R3FABM7TP2XE89YWCGKN4QJ5V",
+  "title": "Build complete",
+  "body": "All 42 tests passed in 3m12s.",
+  "source": "ci/build-pipeline"
+}
+```
+
+**Exemplar — result:**
+
+```json
+{
+  "notification_id": "ntf_0R3FABM6NQKJ71XW",
+  "timestamp": "2026-03-27T10:15:00Z"
+}
+```
+
+**Error conditions:**
+
+| Error Code | Condition |
+| :--- | :--- |
+| `not_found` | The `flow_id` is not in the active flow registry. |
+| `rate_limited` | The flow has exceeded the per-flow notification rate limit (R-CLI-16). |
+| `internal` | Unexpected daemon-side failure. |
+
+#### `ask` MCP Tool
+
+Called by an AI agent to send a notification that requires a
+human response. Unlike the CLI `ask` command (which blocks until
+a response arrives), the MCP `ask` tool **returns immediately**
+with a notification ID and a `DecisionResource` URI. The agent
+receives the human's decision asynchronously via the MCP
+`notifications/resources/updated` event pattern (R-CLI-10).
+
+**Input parameters:**
+
+```go
+type AskNotificationRequest struct {
+	FlowID        string         `json:"flow_id"`
+	Title         string         `json:"title"`
+	Body          string         `json:"body,omitempty"`
+	ResponseTypes []ResponseType `json:"response_types"`
+	Priority      Priority       `json:"priority,omitempty"`
+	Source        string         `json:"source,omitempty"`
+	Actions       []string       `json:"actions,omitempty"`
+	TimeoutSec    int            `json:"timeout_sec,omitempty"`
+}
+```
+
+- `flow_id` (required) — the active flow this notification
+  belongs to.
+- `title` (required) — notification title.
+- `body` (optional) — notification body text.
+- `response_types` (required) — array of accepted response
+  types (e.g., `["boolean", "text"]`). Must not include
+  `"none"` (use `post` for fire-and-forget).
+- `priority` (optional) — default `"normal"`.
+- `source` (optional) — originating pipeline/agent identifier.
+- `actions` (required when `"choice"` is in `response_types`) —
+  list of choice labels (e.g., `["Approve", "Reject", "Defer"]`).
+- `timeout_sec` (optional) — server-side timeout in seconds.
+  Default from `timeout.default_ask_timeout` config (5 minutes).
+
+**Output:**
+
+```go
+type AskNotificationResult struct {
+	NotificationID string    `json:"notification_id"`
+	ResourceURI    string    `json:"resource_uri"`
+	Timestamp      time.Time `json:"timestamp"`
+}
+```
+
+- `notification_id` — the generated notification ID. Correlates
+  to `DecisionResource.request_id`.
+- `resource_uri` — the MCP resource URI the agent reads to
+  obtain the decision (e.g.,
+  `renotify://decisions/ntf_4H7DCRW2VNPK9FMJ`).
+- `timestamp` — when the notification was published.
+
+**Exemplar — request:**
+
+```json
+{
+  "flow_id": "fl_0R3FABM7TP2XE89YWCGKN4QJ5V",
+  "title": "Deploy to production?",
+  "body": "Image sha256:ab12cd34 is ready. 3 migrations pending.",
+  "response_types": ["choice"],
+  "priority": "high",
+  "source": "cd/deploy-pipeline",
+  "actions": ["Approve", "Reject", "Defer"],
+  "timeout_sec": 300
+}
+```
+
+**Exemplar — result:**
+
+```json
+{
+  "notification_id": "ntf_4H7DCRW2VNPK9FMJ",
+  "resource_uri": "renotify://decisions/ntf_4H7DCRW2VNPK9FMJ",
+  "timestamp": "2026-03-27T14:30:00Z"
+}
+```
+
+**Error conditions:**
+
+| Error Code | Condition |
+| :--- | :--- |
+| `not_found` | The `flow_id` is not in the active flow registry. |
+| `rate_limited` | The flow has exceeded the per-flow notification rate limit (R-CLI-16). |
+| `unroutable` | No mobile client is connected to receive the notification. |
+| `internal` | Unexpected daemon-side failure. |
+
+#### MCP `ask` Decision Flow
+
+The MCP `ask` tool is non-blocking. The agent receives the
+human's decision asynchronously through the MCP resource
+subscription pattern (R-CLI-10). The complete sequence:
+
+1. **Agent calls `ask` tool.** The daemon generates a
+   notification ID, publishes the `NotificationRequest` to
+   NATS, creates a pending `DecisionResource`, and returns the
+   `AskNotificationResult` with the resource URI.
+
+2. **Mobile app renders the notification.** The user sees the
+   prompt with the requested response controls (boolean buttons,
+   choice list, text field, or a combination).
+
+3. **User responds.** The mobile app publishes a
+   `NotificationResponse` to NATS. The daemon receives it,
+   inserts it into the SQLite ledger, and updates the
+   `DecisionResource` with the decision fields (`accepted`,
+   `action`, `text`) and sets `decided: true`.
+
+4. **Daemon sends MCP notification.** The daemon emits a
+   `notifications/resources/updated` event to all connected MCP
+   clients, referencing the updated resource URI.
+
+5. **Agent reads the decision.** The agent receives the SSE
+   event and reads the `DecisionResource` at the resource URI.
+   The resource now contains the human's decision:
+
+   ```json
+   {
+     "request_id": "ntf_4H7DCRW2VNPK9FMJ",
+     "decided": true,
+     "action": "Approve",
+     "timestamp": "2026-03-27T14:32:15Z"
+   }
+   ```
+
+6. **Timeout handling.** If the timeout expires before the human
+   responds, the daemon updates the `DecisionResource` with
+   `decided: true` and no response fields (indicating timeout),
+   publishes a `FlowLifecycleEvent` with `status: failed`, and
+   emits the `notifications/resources/updated` event. The agent
+   detects timeout by reading a `DecisionResource` where
+   `decided: true` but `accepted`, `action`, and `text` are all
+   absent.
+
+**Timeout detection exemplar:**
+
+```json
+{
+  "request_id": "ntf_4H7DCRW2VNPK9FMJ",
+  "decided": true,
+  "timestamp": "2026-03-27T14:35:00Z"
+}
+```
+
+When `decided` is `true` but all response fields are absent, the
+agent knows the request timed out.
 
 #### Stale Flow Reaping
 
