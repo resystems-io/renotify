@@ -326,6 +326,34 @@ type ProvisioningPayload struct {
 {"h":"192.168.1.42","p":4223,"t":"rn_tk_0A1B2C3D4E5F6G7H8J9K0M1N2P3Q4R5S6T7V8W9X0Y1Z2A3B4C5D","c":"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"}
 ```
 
+#### QR Encoding Parameters
+
+The minified JSON payload above is approximately 170 bytes. The
+following parameters govern how it is encoded and rendered as a QR code
+during `renotify pair`:
+
+| Parameter | Value | Rationale |
+| :--- | :--- | :--- |
+| Library | [`mdp/qrterminal`][qrterminal] | Terminal-native API, actively maintained (v3.2.1, March 2025), half-block rendering is first-class. Underlying encoder is `rsc.io/qr` (Russ Cox). |
+| Error correction | Level L (7% recovery) | The QR code is displayed on a screen and scanned at close range in a controlled environment. Level L minimises module count for a given payload, producing a smaller and faster-to-scan code. |
+| QR version | ~7 (45x45 modules) | 170 bytes of alphanumeric/byte data at EC level L fits comfortably in version 7 (capacity: 224 bytes binary). The library selects the minimum version automatically. |
+| Terminal rendering | Unicode half-block characters | Uses `U+2580` / `U+2584` / `U+2588` to pack two module rows per terminal line, halving the vertical footprint to ~23 terminal rows for a version 7 code. |
+| Quiet zone | 1 module (library default) | The ISO 18004 standard specifies a 4-module quiet zone, but 1 module is sufficient for screen-to-camera scanning where the terminal background provides contrast. |
+
+Terminal output (single function call in the `pair` command):
+
+```go
+qrterminal.GenerateHalfBlock(
+	provisioningJSON, qrterminal.L, os.Stdout,
+)
+```
+
+On the Android side, the QR code is scanned using the device camera
+(R-MOB-06). The recommended library is [Google ML Kit Barcode
+Scanning][mlkit-barcode], which supports all QR versions and error
+correction levels, runs on-device without network access, and is
+actively maintained as part of the ML Kit SDK.
+
 ### InterjectionCommand
 
 An asynchronous, unprompted control signal emitted by the developer from the
@@ -651,3 +679,6 @@ Decided:
   "timestamp": "2026-03-27T14:32:15Z"
 }
 ```
+
+[qrterminal]: https://github.com/mdp/qrterminal
+[mlkit-barcode]: https://developers.google.com/ml-kit/vision/barcode-scanning

@@ -738,7 +738,7 @@ and a maximum individual payload size of 64 KB.
   `resystems.renotify.{username}.flow.{flow_id}.{event_type}`). Also document
   the WebSocket connection security (auth, wss:// TLS) and the daemon heartbeat
   subject pattern.
-- [ ] **A-03: Provisioning & Interjection Schemas:** Document the QR payload
+- [x] **A-03: Provisioning & Interjection Schemas:** Document the QR payload
   format and the asynchronous interjection command structure.
 - [ ] **A-04: Flow State Schemas:** Document the `register_flow` and
   `terminate_flow` payloads.
@@ -765,11 +765,18 @@ WebSockets).*
 - [ ] **C-02: Daemon Controller:** Implement the daemon orchestrator to run the
   NATS server, the MCP server, or both based on configuration.
 - [ ] **C-07: Pairing Generator:** Implement `renotify pair` logic, IP
-  discovery, TLS cert generation, and ASCII QR output.
+  discovery, TLS cert generation, and ASCII QR output. Use
+  [`mdp/qrterminal`][qrterminal] for terminal QR rendering with
+  half-block characters at EC level L. See
+  [Payload Schemas](analysis-payload-schemas.md) QR Encoding
+  Parameters.
 - [ ] **C-08: JetStream Configuration:** Implement the strict memory-backed and
   TTL setup for embedded NATS.
-- [ ] **M-06: Secure Pairing Scanner:** Integrate QR code scanning and TLS cert
-  pinning for secure connection bootstrapping.
+- [ ] **M-06: Secure Pairing Scanner:** Integrate QR code scanning and TLS
+  cert pinning for secure connection bootstrapping. Use
+  [Google ML Kit Barcode Scanning][mlkit-barcode] for on-device QR
+  decoding. See [NATS Transport Design](analysis-nats-transport-design.md)
+  Section 5.5 for the `X509TrustManager` fingerprint pinning approach.
 - [ ] **M-02: NATS Client Service:** Integrate the NATS client into a background
   service to listen for incoming events configured to the pinned user profile.
 - [ ] **C-12: Token Revocation:** Implement `renotify revoke` to invalidate the
@@ -866,6 +873,7 @@ specifications.
 | D-15 | Auth token: `rn_tk_` prefix + 52 Crockford Base32 chars (256-bit entropy); two-account NATS model | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
 | D-16 | ACL: mobile client scoped to response/interject/svc publish only; cannot publish to request/lifecycle/heartbeat | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
 | D-17 | Delivery: JetStream at-least-once within TTL; Core NATS at-most-once; mobile deduplicates on notification `id` | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
+| D-18 | QR generation: `mdp/qrterminal/v3`, EC level L, half-block terminal rendering; scanning: Google ML Kit Barcode | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
 
 ---
 
@@ -881,9 +889,45 @@ Record completed items here with the date.
 | 2026-03-27 | A-01b | Draft | Defined Go structs and JSON exemplars for all 11 payload schemas with shared enumeration types. |
 | 2026-03-27 | Harmonisation | Draft | Renamed "session" to "flow" throughout. Introduced daemon_id, workspace_id, and Crockford Base32 identifiers per naming analysis. Simplified NATS namespace to flat flow-based subjects. Added DaemonHeartbeat payload. Extracted payload schemas into standalone analysis document. Restructured Section 4 as Design Decision Register. |
 | 2026-03-27 | A-02 | Draft | NATS transport and subject design analysis. Subject catalogue (7 subjects), JetStream stream and consumer configuration, delivery guarantees and idempotency analysis, listener configuration (TCP 4222 + WSS 4223), TLS certificate spec (ECDSA P-256) with Android trust bootstrap analysis (TOFU fingerprint pinning), auth token design (256-bit Crockford Base32), two-account ACL model, connection lifecycle sequences, deployment model comparison. Updated ProvisioningPayload example (port 4223, full-length token). |
+| 2026-03-27 | A-03 | Draft | Provisioning and interjection schemas confirmed complete. Added QR encoding parameters (mdp/qrterminal/v3, EC level L, half-block rendering, capacity analysis). Added ML Kit recommendation for Android QR scanning. Updated C-07 and M-06 with library references. Multi-modal response types and boolean accepted field added to NotificationResponse and DecisionResource. |
 
 ## 6. References
 
 1. [Model Context Protocol Specification
    (2025-06-18)](https://modelcontextprotocol.io/specification/2025-06-18)
-2. INCOSE Guide for Writing Requirements (INCOSE-TP-2010-006-03, v3, 2019)
+2. INCOSE Guide for Writing Requirements (INCOSE-TP-2010-006-03,
+   v3, 2019)
+3. [`mdp/qrterminal`][qrterminal] — Go library for terminal QR code
+   rendering with Unicode half-block characters.
+4. [Google ML Kit Barcode Scanning][mlkit-barcode] — Android
+   on-device barcode and QR code scanning SDK.
+5. [NATS Server][nats] — Cloud-native message broker. JetStream
+   provides at-least-once delivery with memory-backed streams.
+6. [Crockford Base32][crockford-base32] — Encoding used for all
+   generated identifiers (`daemon_id`, `workspace_id`, `flow_id`,
+   auth tokens). Case-insensitive, excludes visually ambiguous
+   characters (I, L, O, U).
+7. [XDG Base Directory Specification][xdg-basedir] — Storage
+   convention for configuration (`$XDG_CONFIG_HOME`) and state
+   (`$XDG_STATE_HOME`) paths on Unix-like systems.
+8. [RFC 3339][rfc3339] — Date and time format used for all payload
+   timestamps.
+9. [RFC 9562][rfc9562] — UUID version 7 (time-ordered) used for
+   `flow_id` generation; UUID version 4 (random) used for
+   `daemon_id` and `device_id`.
+10. [ISO 18004][iso18004] — QR code symbology specification. Governs
+    error correction levels, module layout, and quiet zone
+    requirements.
+11. [jnats][jnats] — Official NATS Java client library. Candidate
+    for Android NATS WebSocket connectivity (supports `wss://` and
+    custom `SSLContext`).
+
+[qrterminal]: https://github.com/mdp/qrterminal
+[mlkit-barcode]: https://developers.google.com/ml-kit/vision/barcode-scanning
+[nats]: https://docs.nats.io/
+[crockford-base32]: https://www.crockford.com/base32.html
+[xdg-basedir]: https://specifications.freedesktop.org/basedir-spec/latest/
+[rfc3339]: https://www.rfc-editor.org/rfc/rfc3339
+[rfc9562]: https://www.rfc-editor.org/rfc/rfc9562
+[iso18004]: https://www.iso.org/standard/62021.html
+[jnats]: https://github.com/nats-io/nats.java
