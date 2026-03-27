@@ -32,6 +32,7 @@ $XDG_CONFIG_HOME/renotify/
 
 $XDG_STATE_HOME/renotify/
 ├── daemon_id                  # Auto-generated daemon identifier
+├── internal_token             # Embedded broker internal auth token (0600)
 ├── renotify.db                # SQLite ledger (see analysis-sqlite-ledger.md)
 ├── daemon.log                 # Log file (background mode)
 ├── tls/

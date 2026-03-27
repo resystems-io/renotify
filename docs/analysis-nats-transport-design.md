@@ -393,16 +393,33 @@ practical brute-force threshold.
 
 The embedded NATS server is configured with a two-account model:
 
-* **Daemon account:** Uses a hardcoded internal token (generated at daemon
-  startup, never exposed externally) for the daemon's own NATS connection and
-  co-located CLI processes connecting via the loopback TCP listener. Full
-  publish/subscribe permissions (see Section 7).
-* **Mobile account:** Uses the pairing token (`rn_tk_...`) for the mobile app
-  connecting via WSS. Scoped publish/subscribe permissions (see Section 7).
+* **Daemon account:** Uses an internal token for the daemon's own
+  NATS connection and co-located CLI processes connecting via the
+  loopback TCP listener. Full publish/subscribe permissions (see
+  Section 7).
+* **Mobile account:** Uses the pairing token (`rn_tk_...`) for the
+  mobile app connecting via WSS. Scoped publish/subscribe
+  permissions (see Section 7).
 
-The embedded NATS server API supports runtime auth reconfiguration. When
-`renotify pair` or `renotify revoke` is executed while the daemon is running,
-the auth configuration is hot-reloaded without restarting the broker.
+The embedded NATS server API supports runtime auth reconfiguration.
+When `renotify pair` or `renotify revoke` is executed while the
+daemon is running, the auth configuration is hot-reloaded without
+restarting the broker.
+
+**Internal token persistence.** The internal token is generated
+once on first daemon startup using the same algorithm as the
+pairing token (`rn_tk_` prefix + 52 Crockford Base32 characters,
+256-bit entropy) and persisted to:
+
+| Artifact | Path | Permissions |
+| :--- | :--- | :--- |
+| Internal token | `$XDG_STATE_HOME/renotify/internal_token` | 0600 |
+
+The token is reused across daemon restarts. Co-located CLI
+processes (`renotify post`, `renotify ask`, `renotify history`)
+read it from this file before connecting to the loopback TCP
+listener. If the file does not exist, the CLI reports an error
+("daemon has not been started") and exits with code 1.
 
 ### 6.5 NATS Auth Integration (Shared Broker)
 
@@ -602,24 +619,53 @@ The following are explicitly deferred per R-SEC-03:
 
 ### 8.6 CLI Command Connection (`renotify ask`)
 
-1. Read daemon configuration to determine the NATS TCP address
-   (`127.0.0.1:4222`).
-2. Connect to the embedded broker via native TCP using the daemon's internal
-   token (no TLS — loopback only).
-3. Generate a `flow_id` (UUIDv7, Crockford Base32 encoded with `fl_` prefix).
+The CLI reads `settings.json` to determine whether the embedded
+broker or a shared broker is in use, then connects accordingly.
+Steps 3-9 are identical in both modes — only the connection
+target and credential differ.
+
+**Step 1-2 (Embedded broker — `broker.enabled: true`):**
+
+1. Read `broker.tcp_host` and `broker.tcp_port` from daemon
+   configuration (default: `127.0.0.1:4222`).
+2. Read the internal token from
+   `$XDG_STATE_HOME/renotify/internal_token`. If the file does
+   not exist, exit with code 1 ("daemon has not been started").
+3. Connect via native TCP using the internal token (no TLS —
+   loopback only).
+
+**Step 1-2 (Shared broker — `broker.enabled: false`):**
+
+1. Read `shared_broker.url` and credentials (`token` or
+   `username`/`password`) from daemon configuration.
+2. If `shared_broker.tls_enabled` is true, configure the TLS
+   client using `ca_cert` (and optionally `client_cert`/
+   `client_key` for mutual TLS).
+3. Connect to the shared broker URL using the configured
+   credentials.
+
+**Steps 3-9 (common to both modes):**
+
+3. Generate a `flow_id` (UUIDv7, Crockford Base32 encoded with
+   `fl_` prefix).
 4. Publish a `FlowLifecycleEvent` (`status: active`) to
    `resystems.renotify.{username}.flow.{flow_id}.lifecycle`.
-5. Create an ephemeral JetStream consumer `cli-response-{flow_id}` filtering on
+5. Create an ephemeral JetStream consumer
+   `cli-response-{flow_id}` filtering on
    `resystems.renotify.{username}.flow.{flow_id}.response` with
    DeliverPolicy=New.
 6. Publish the `NotificationRequest` to
    `resystems.renotify.{username}.flow.{flow_id}.request`.
-7. Wait for a response on the ephemeral consumer, subject to the configured
-   timeout (R-CLI-06, R-CLI-17).
-8. On response: print the result, publish a `FlowLifecycleEvent` (`status:
-   completed`), disconnect.
+7. Wait for a response on the ephemeral consumer, subject to
+   the configured timeout (R-CLI-06, R-CLI-17).
+8. On response: print the result, publish a `FlowLifecycleEvent`
+   (`status: completed`), disconnect.
 9. On timeout: print the error (non-zero exit code), publish a
    `FlowLifecycleEvent` (`status: failed`), disconnect.
+
+The same branching logic applies to `renotify post` (steps 3-6
+only, no response wait) and `renotify history` (connects, sends
+a Core NATS request to `svc.history`, prints result, disconnects).
 
 ### 8.7 Token Revocation (`renotify revoke`)
 
@@ -652,10 +698,16 @@ The following are explicitly deferred per R-SEC-03:
 | **Mobile connection target** | Daemon's IP:`4223` (WSS) | Shared broker's address and WSS port |
 | **`renotify pair` output** | QR with daemon's local IP and WSS port | QR with shared broker's address and WSS port (from daemon config) |
 | **`renotify revoke`** | Daemon removes token and disconnects client | Daemon deletes local token; operator must revoke on broker |
+| **CLI connection target** | Loopback TCP (`127.0.0.1:4222`) | Shared broker URL (from `shared_broker.url` in config) |
+| **CLI auth credential** | Internal token (from `$XDG_STATE_HOME/renotify/internal_token`) | Shared broker credentials (from `shared_broker` config section) |
 | **Multi-user** | Single user (the daemon owner) | Multiple users, each with own namespace |
 | **Multi-daemon** | N/A (one embedded broker per daemon) | Multiple daemons connect as clients; mobile discovers them via heartbeats |
 
-The mobile app's behaviour is identical in both models. It connects to whatever
-`host:port` was provisioned, authenticates with the token, and subscribes to its
-user's namespace. The heartbeat messages from connected daemons provide the
-structural context for the dashboard regardless of broker topology.
+The mobile app's behaviour is identical in both models. It connects
+to whatever `host:port` was provisioned, authenticates with the
+token, and subscribes to its user's namespace. The CLI's behaviour
+is also identical after connection — it publishes to the same
+subjects and consumes from the same consumers regardless of broker
+topology. Only the connection target and credential differ. The
+heartbeat messages from connected daemons provide the structural
+context for the dashboard regardless of broker topology.
