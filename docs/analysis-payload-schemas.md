@@ -254,10 +254,20 @@ Flow completion:
 
 The secure handshake payload encoded as minified JSON inside a QR code during
 `renotify pair`. Field names are single characters to minimise QR density
-(R-API-08). The `c` field carries the hex-encoded SHA-256 fingerprint of the
-TLS certificate used by the connection target (whether that is an embedded
-daemon or a shared broker), which the Android app pins for all subsequent
-connections.
+(R-API-08):
+- The `h` field carries the connection target as an IP address or hostname
+(e.g., `192.168.1.42` for an embedded broker, or a DNS name for a shared
+broker).
+- The `p` field carries the WSS port (default 4223 for the embedded
+broker).
+- The `t` field carries the NATS authentication token (`rn_tk_` prefix + 52
+Crockford Base32 characters, 256-bit entropy). See
+[NATS Transport Design](analysis-nats-transport-design.md) Section 6.
+- The `c` field carries the hex-encoded SHA-256 fingerprint of the TLS
+certificate used by the connection target (whether that is an embedded daemon or
+a shared broker), which the Android app pins for all subsequent connections via
+a custom `X509TrustManager` (see [NATS Transport Design](analysis-nats-transport-design.md)
+Section 5.5).
 
 ```go
 type ProvisioningPayload struct {
@@ -269,7 +279,7 @@ type ProvisioningPayload struct {
 ```
 
 ```json
-{"h":"192.168.1.42","p":4222,"t":"rn_tk_8a3b5c7d9e","c":"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"}
+{"h":"192.168.1.42","p":4223,"t":"rn_tk_0A1B2C3D4E5F6G7H8J9K0M1N2P3Q4R5S6T7V8W9X0Y1Z2A3B4C5D","c":"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"}
 ```
 
 ### InterjectionCommand
