@@ -180,6 +180,7 @@ messages unambiguously.
 | Workspace | `workspace_id` | `ws_` + 16 Base32 (80 bits) | Global | Deterministic hash | Yes (same daemon + path) |
 | Workspace (display) | `display_name` | Directory basename | NOT unique | Derived from path | Yes |
 | Flow | `flow_id` | `fl_` + 26 Base32 (128 bits) | Global | Generated at flow start | N/A (single-use) |
+| Notification | `notification_id` | `ntf_` + 16 Base32 (80 bits) | Global | Generated per notification (UUIDv7 truncated) | N/A (single-use) |
 | Mobile Client | `device_id` | `mb_` + 13 Base32 (65 bits) | Per user | Generated at pairing | Yes |
 
 ---
