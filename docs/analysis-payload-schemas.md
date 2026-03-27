@@ -794,9 +794,12 @@ type HistoryQueryRequest struct {
 ### HistoryQueryResult
 
 The daemon's reply to a `HistoryQueryRequest`, wrapping an array of
-`HistoryRecord` entries. Each record pairs the original `NotificationRequest`
-with its `NotificationResponse` (if one was received). The `total` field reports
-the full count of matching records, allowing the client to detect when results
+`HistoryRecord` entries. Each record pairs the original
+`NotificationRequest` with its `NotificationResponse` (if one was
+received). The underlying storage model, query patterns, and
+indices are defined in the [SQLite Ledger
+Schema](analysis-sqlite-ledger.md). The `total` field reports the
+full count of matching records, allowing the client to detect when results
 have been truncated by the `limit`.
 
 ```go
