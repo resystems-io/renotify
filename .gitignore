@@ -33,6 +33,7 @@ cli/embed/
 clients/android/app/build/
 clients/android/.gradle/
 clients/android/build/
+clients/android/local.properties
 
 # Editor/IDE
 .idea/
