@@ -789,7 +789,7 @@ and a maximum individual payload size of 64 KB.
 - [x] **A-14: History Pagination:** Add `offset` or cursor-based
   pagination to `HistoryQueryRequest` and `HistoryQueryResult`
   schemas.
-- [ ] **A-15: Payload Version Field:** Add a `"v": 1` version field
+- [x] **A-15: Payload Version Field:** Add a `"v": 1` version field
   to `ProvisioningPayload` and optionally to other payloads for
   forward-compatible parsing.
 
@@ -939,6 +939,7 @@ specifications.
 | D-27 | Timeout: daemon-only enforcement (Model A). Daemon reads `timeout_sec` from `NotificationRequest`, publishes `ErrorResponse` (`code: "timeout"`) on `.response` subject on expiry. CLI has no local timer. MCP agents detect timeout via `DecisionResource` with `decided: true` and absent response fields. | [NATS Transport](analysis-nats-transport-design.md), [CLI Contract](analysis-cli-contract.md) | 2026-03-28 |
 | D-28 | Workspace discovery: CLI computes `workspace_id` locally from `daemon_id` + cwd (B1). MCP agents provide `workspace_path` in `register_flow`; daemon computes `workspace_id` (Option B). Workspaces created implicitly on first use. No project-detection heuristic. | [Naming & Addressing](analysis-naming-and-addressing.md), [Payload Schemas](analysis-payload-schemas.md) | 2026-03-28 |
 | D-29 | History pagination: offset-based (`offset` + `limit` fields in `HistoryQueryRequest`); safe for append-only ledger. `total` field enables page calculation. | [Payload Schemas](analysis-payload-schemas.md), [SQLite Ledger](analysis-sqlite-ledger.md) | 2026-03-28 |
+| D-30 | Payload versioning: `ProvisioningPayload` only (`"v": 1`). Other payloads deferred — they are ephemeral and flow between co-deployed components where version mismatches cannot occur at runtime. | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-28 |
 
 ---
 
@@ -967,6 +968,7 @@ Record completed items here with the date.
 | 2026-03-28 | A-12 | Timeout enforcement resolved: daemon-only model (Model A). Daemon reads `timeout_sec` from `NotificationRequest` payload and is the sole timer enforcer (R-CLI-17). On expiry daemon publishes `ErrorResponse` (`code: "timeout"`) on `.response` subject — CLI receives it directly, no local timer needed. Resolved contradictions in Sections 3.3, 8.6, 8.8 of transport design. Updated CLI contract and payload schemas with enforcement clarification. |
 | 2026-03-28 | A-13 | Workspace discovery documented. CLI computes workspace_id locally from daemon_id + cwd (B1 model). MCP agents provide workspace_path in register_flow; daemon computes workspace_id and returns it (Option B). RegisterFlowRequest changed from workspace_id to workspace_path; RegisterFlowResult now includes workspace_id. Workspaces created implicitly on first use. No project-detection heuristic. Updated naming analysis Section 2.4, transport design Section 8.6, and C-01 description. |
 | 2026-03-28 | A-14 | Added `offset` field to `HistoryQueryRequest` for offset-based pagination. Updated SQLite history query with `OFFSET :offset`. Added `--offset` CLI flag to `renotify history`. |
+| 2026-03-28 | A-15 | Added `"v": 1` version field to `ProvisioningPayload` only. Other payloads deferred — they are ephemeral and flow between co-deployed components. ProvisioningPayload is uniquely at risk because it persists in the mobile app's local storage across daemon upgrades. |
 
 ## 6. References
 
