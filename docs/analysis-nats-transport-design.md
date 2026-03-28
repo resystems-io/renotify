@@ -665,40 +665,46 @@ target and credential differ.
 3. Connect to the shared broker URL using the configured
    credentials.
 
-**Steps 3-11 (common to both modes):**
+**Steps 3-12 (common to both modes):**
 
-3. Generate a `flow_id` (UUIDv7, Crockford Base32 encoded with
+3. Derive `workspace_id` from the current working directory:
+   read `daemon_id` from XDG state, compute
+   `SHA-256(daemon_id + "|" + cwd)`, truncate to 80 bits,
+   encode as Crockford Base32 with `ws_` prefix. Derive
+   `display_name` from `path.Base(cwd)`. See [Naming &
+   Addressing](analysis-naming-and-addressing.md) Section 2.4.
+4. Generate a `flow_id` (UUIDv7, Crockford Base32 encoded with
    `fl_` prefix).
-4. Publish a `FlowLifecycleEvent` (`status: active`) to
+5. Publish a `FlowLifecycleEvent` (`status: active`) to
    `resystems.renotify.{username}.flow.{flow_id}.lifecycle`.
-5. Create an ephemeral JetStream consumer
+6. Create an ephemeral JetStream consumer
    `cli-response-{flow_id}` filtering on
    `resystems.renotify.{username}.flow.{flow_id}.response` with
    DeliverPolicy=New.
-6. Subscribe to
+7. Subscribe to
    `resystems.renotify.{username}.flow.{flow_id}.interject`
    via a second ephemeral consumer `cli-interject-{flow_id}`
    with DeliverPolicy=New.
-7. Publish the `NotificationRequest` (including `timeout_sec`
+8. Publish the `NotificationRequest` (including `timeout_sec`
    from the `--timeout` flag or config default) to
    `resystems.renotify.{username}.flow.{flow_id}.request`.
    The daemon reads `timeout_sec` and starts a server-side
    timer (R-CLI-17).
-8. Wait concurrently on both consumers (`.response` and
+9. Wait concurrently on both consumers (`.response` and
    `.interject`) with no local timer. The daemon is the sole
    timeout enforcer (see Section 3.3). See Section 8.8 for
    interjection handling during this wait.
-9. On `NotificationResponse` from `.response`: print the
-   result, publish a `FlowLifecycleEvent` (`status: completed`),
-   disconnect.
-10. On `ErrorResponse` (`code: "timeout"`) from `.response`:
+10. On `NotificationResponse` from `.response`: print the
+    result, publish a `FlowLifecycleEvent`
+    (`status: completed`), disconnect.
+11. On `ErrorResponse` (`code: "timeout"`) from `.response`:
     print the error to stderr, exit with code 3. The daemon
     has already published `FlowLifecycleEvent` (`status: failed`).
-11. On `stop` interjection from `.interject`: print "Flow
+12. On `stop` interjection from `.interject`: print "Flow
     stopped by user" to stderr, publish a `FlowLifecycleEvent`
     (`status: failed`), exit with code 1.
 
-The same branching logic applies to `renotify post` (steps 3-7
+The same branching logic applies to `renotify post` (steps 3-8
 only, no response wait or interjection subscription) and
 `renotify history` (connects, sends a Core NATS request to
 `svc.history`, prints result, disconnects).
