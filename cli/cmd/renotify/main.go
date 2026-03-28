@@ -1,11 +1,7 @@
 package main
 
-import (
-	"fmt"
-	"os"
-)
+import "go.resystems.io/renotify/internal/command"
 
 func main() {
-	fmt.Fprintln(os.Stderr, "renotify: not yet implemented")
-	os.Exit(1)
+	command.Execute()
 }
