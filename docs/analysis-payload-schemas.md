@@ -1036,13 +1036,35 @@ type HistoryQueryRequest struct {
 	Since       *time.Time `json:"since,omitempty"`
 	Until       *time.Time `json:"until,omitempty"`
 	Limit       int        `json:"limit,omitempty"`
+	Offset      int        `json:"offset,omitempty"`
 }
 ```
+
+The `offset` field enables pagination: the client requests
+successive pages by incrementing `offset` by `limit` on each
+call. The `total` field in `HistoryQueryResult` reports the full
+count of matching records (before `limit` and `offset` are
+applied), allowing the client to calculate page count and detect
+the final page. Offset-based pagination is safe for the history
+ledger because rows are append-only and ordered by timestamp
+DESC — positions do not shift.
+
+First page:
 
 ```json
 {
   "workspace_id": "ws_5MBJR1HXNP3KQ8DW",
   "limit": 25
+}
+```
+
+Second page:
+
+```json
+{
+  "workspace_id": "ws_5MBJR1HXNP3KQ8DW",
+  "limit": 25,
+  "offset": 25
 }
 ```
 
