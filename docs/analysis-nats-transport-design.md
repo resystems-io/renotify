@@ -139,11 +139,32 @@ starts waiting.
 
 ### 3.3 Timeout Semantics
 
-The daemon computes blocking `ask` timeouts server-side from the moment the
-request is received (R-CLI-17). Mobile disconnection and reconnection do not
-reset or extend the timeout. If the timeout expires before a response arrives,
-the daemon publishes a `FlowLifecycleEvent` with `status: failed` and the CLI
-receives an error. The mobile app may subsequently display the timed-out request
+The daemon is the sole timeout enforcer for blocking `ask`
+requests (R-CLI-17). It reads the `timeout_sec` value from the
+`NotificationRequest` payload (set by the CLI from its `--timeout`
+flag or the configured default) and starts a server-side timer
+from the moment the request is received. Mobile disconnection
+and reconnection do not reset or extend the timeout.
+
+If the timeout expires before a response arrives, the daemon:
+
+1. Publishes an `ErrorResponse` with `code: "timeout"` to the
+   `.response` subject
+   (`resystems.renotify.{username}.flow.{flow_id}.response`).
+   The CLI is already waiting on this subject and receives the
+   error directly.
+2. Publishes a `FlowLifecycleEvent` with `status: failed` to
+   the `.lifecycle` subject.
+3. For MCP flows: updates the `DecisionResource` with
+   `decided: true` and absent response fields, then emits
+   `notifications/resources/updated`.
+
+The CLI does not run its own timeout timer. It waits on
+`.response` and `.interject` indefinitely; the daemon's
+`ErrorResponse` publication on `.response` is the signal that
+unblocks the CLI and causes it to exit with code 3 (timeout).
+
+The mobile app may subsequently display the timed-out request
 as expired when it reconnects and processes the lifecycle event.
 
 ---
@@ -658,19 +679,24 @@ target and credential differ.
    `resystems.renotify.{username}.flow.{flow_id}.interject`
    via a second ephemeral consumer `cli-interject-{flow_id}`
    with DeliverPolicy=New.
-7. Publish the `NotificationRequest` to
+7. Publish the `NotificationRequest` (including `timeout_sec`
+   from the `--timeout` flag or config default) to
    `resystems.renotify.{username}.flow.{flow_id}.request`.
+   The daemon reads `timeout_sec` and starts a server-side
+   timer (R-CLI-17).
 8. Wait concurrently on both consumers (`.response` and
-   `.interject`), subject to the configured timeout
-   (R-CLI-06, R-CLI-17). See Section 8.8 for interjection
-   handling during this wait.
-9. On response: print the result, publish a
-   `FlowLifecycleEvent` (`status: completed`), disconnect.
-10. On timeout: print the error (non-zero exit code), publish a
-    `FlowLifecycleEvent` (`status: failed`), disconnect.
-11. On `stop` interjection: print "Flow stopped by user" to
-    stderr, publish a `FlowLifecycleEvent` (`status: failed`),
-    exit with code 1.
+   `.interject`) with no local timer. The daemon is the sole
+   timeout enforcer (see Section 3.3). See Section 8.8 for
+   interjection handling during this wait.
+9. On `NotificationResponse` from `.response`: print the
+   result, publish a `FlowLifecycleEvent` (`status: completed`),
+   disconnect.
+10. On `ErrorResponse` (`code: "timeout"`) from `.response`:
+    print the error to stderr, exit with code 3. The daemon
+    has already published `FlowLifecycleEvent` (`status: failed`).
+11. On `stop` interjection from `.interject`: print "Flow
+    stopped by user" to stderr, publish a `FlowLifecycleEvent`
+    (`status: failed`), exit with code 1.
 
 The same branching logic applies to `renotify post` (steps 3-7
 only, no response wait or interjection subscription) and
@@ -766,7 +792,7 @@ steps 5-6). It waits concurrently on both consumers:
 | `.response` arrives | Normal exit: print response, publish `FlowLifecycleEvent` (`completed`), exit 0 |
 | `.interject` with `stop` arrives | Print "Flow stopped by user" to stderr, publish `FlowLifecycleEvent` (`failed`), exit 1 |
 | `.interject` with `note` arrives | Print context to stderr, continue waiting |
-| Timeout expires | Print timeout error to stderr, publish `FlowLifecycleEvent` (`failed`), exit 3 |
+| `ErrorResponse` (`code: "timeout"`) arrives on `.response` | Print timeout error to stderr, exit 3. Daemon has already published `FlowLifecycleEvent` (`failed`). |
 
 The CLI `post` command does not subscribe to `.interject` because
 it exits immediately after publishing (no blocking wait).

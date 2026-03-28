@@ -177,6 +177,13 @@ Sends a blocking notification and waits for a human response.
 This is the most important output contract — scripts and agents
 parse the stdout JSON to extract the decision.
 
+The CLI does not run its own timeout timer. The daemon is the sole
+timeout enforcer (R-CLI-17): the CLI publishes the `timeout_sec`
+value in the `NotificationRequest` payload, and the daemon starts
+a server-side timer. On expiry the daemon publishes an
+`ErrorResponse` (`code: "timeout"`) to the `.response` subject.
+The CLI receives this and exits with code 3.
+
 **Success (`--format json`, default):**
 
 The `NotificationResponse` JSON is printed to stdout as a single

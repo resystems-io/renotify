@@ -778,7 +778,7 @@ and a maximum individual payload size of 64 KB.
   commands reach the originating process (CLI subscription to
   `.interject` subject, MCP interjection notification, "pause"
   operational semantics).
-- [ ] **A-12: Timeout Enforcement & Delivery:** Clarify the
+- [x] **A-12: Timeout Enforcement & Delivery:** Clarify the
   authoritative timeout enforcer (daemon vs CLI), how the CLI learns
   about server-side timeout expiry, and whether `ErrorResponse` is
   published on the response subject.
@@ -932,6 +932,7 @@ specifications.
 | D-24 | Shared broker CLI path: CLI reads `broker.enabled` from config and branches — embedded uses loopback + internal token, shared uses `shared_broker.url` + configured credentials. Internal token persisted to XDG state (0600). | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-27 |
 | D-25 | MCP `post`: fire-and-forget, returns `notification_id`. MCP `ask`: non-blocking, returns `notification_id` + `resource_uri`; agent reads `DecisionResource` asynchronously via `notifications/resources/updated` (R-CLI-10). Daemon fills system fields from flow context. | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
 | D-26 | Interjection delivery: CLI dual-subscribes to `.response` + `.interject`; MCP via `InterjectionResource` at `renotify://interjections/{flow_id}`. `stop` terminates flow (failed). `note` forwarded without state change. `pause` deferred to post-MVP. Debounce 5s per flow+action. | [NATS Transport](analysis-nats-transport-design.md), [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
+| D-27 | Timeout: daemon-only enforcement (Model A). Daemon reads `timeout_sec` from `NotificationRequest`, publishes `ErrorResponse` (`code: "timeout"`) on `.response` subject on expiry. CLI has no local timer. MCP agents detect timeout via `DecisionResource` with `decided: true` and absent response fields. | [NATS Transport](analysis-nats-transport-design.md), [CLI Contract](analysis-cli-contract.md) | 2026-03-28 |
 
 ---
 
@@ -957,6 +958,7 @@ Record completed items here with the date.
 | 2026-03-27 | A-09 | Draft | Shared broker CLI path documented. CLI branches on `broker.enabled`: embedded mode uses loopback TCP + internal token from XDG state, shared mode uses `shared_broker.url` + configured credentials. Internal token persisted to `$XDG_STATE_HOME/renotify/internal_token` (0600), generated once on first daemon startup. Section 8.6 split into embedded/shared subsections. Deployment comparison table updated with CLI connection rows. |
 | 2026-03-27 | A-10 | Draft | MCP `post` and `ask` tool schemas defined. `post` is fire-and-forget, returns notification_id. `ask` is non-blocking, returns notification_id + resource_uri; agent reads DecisionResource asynchronously via notifications/resources/updated (R-CLI-10). Daemon fills system fields (id, daemon_id, workspace_id, timestamp) from flow context. Timeout detection via DecisionResource with decided:true but absent response fields. Operations comparison table updated. |
 | 2026-03-27 | A-11 | Draft | Interjection delivery path fully specified. CLI dual-subscribes to `.response` + `.interject` during `ask` wait. Daemon processes interjections: `stop` terminates flow (publishes FlowLifecycleEvent failed), `note` forwards context without state change, `pause` deferred to post-MVP (treated as note). MCP delivery via new `InterjectionResource` at `renotify://interjections/{flow_id}`. Debounce: 5s per flow+action, configurable via `interjection.debounce_window`. New `interjections` SQLite table added to V1 migration. |
+| 2026-03-28 | A-12 | Draft | Timeout enforcement resolved: daemon-only model (Model A). Daemon reads `timeout_sec` from `NotificationRequest` payload and is the sole timer enforcer (R-CLI-17). On expiry daemon publishes `ErrorResponse` (`code: "timeout"`) on `.response` subject — CLI receives it directly, no local timer needed. Resolved contradictions in Sections 3.3, 8.6, 8.8 of transport design. Updated CLI contract and payload schemas with enforcement clarification. |
 
 ## 6. References
 

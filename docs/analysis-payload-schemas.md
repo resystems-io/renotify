@@ -116,8 +116,13 @@ command or AI agent to the Android app. The `response_types` field is an array
 of `ResponseType` values indicating which kinds of feedback the notification
 accepts. For fire-and-forget notifications (`response_types: ["none"]`), the
 `actions` and `timeout_sec` fields are omitted. For blocking prompts, `actions`
-lists the available choices (when `"choice"` is present) and `timeout_sec` sets
-the server-side deadline. Multi-modal requests (e.g., `["boolean", "text"]`)
+lists the available choices (when `"choice"` is present) and
+`timeout_sec` communicates the timeout to the daemon, which is the
+sole enforcer (R-CLI-17). The daemon starts a server-side timer
+from the moment it receives the request; on expiry it publishes
+an `ErrorResponse` (`code: "timeout"`) to the `.response` subject.
+See [NATS Transport Design](analysis-nats-transport-design.md)
+Section 3.3. Multi-modal requests (e.g., `["boolean", "text"]`)
 allow the user to provide more than one form of feedback simultaneously. The
 `daemon_id` and `workspace_id` fields are denormalised from the heartbeat so
 that each notification record is self-contained.
