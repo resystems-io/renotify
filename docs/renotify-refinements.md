@@ -809,7 +809,7 @@ exist.)*
 - [x] **M-01: App Scaffolding:** Initialise the Kotlin-based Android project
   with necessary permissions (Network, Notifications). *(Crucially, this allows
   a skeleton APK build for later Go embedding).*
-- [ ] **V-03: Build Verification:** Verify that the CLI and Android applications
+- [x] **V-03: Build Verification:** Verify that the CLI and Android applications
   can be built and run.
 
 ### Phase 3: Secure Transport & Provisioning
@@ -975,6 +975,7 @@ Record completed items here with the date.
 | 2026-03-28 | P-01 | Root build orchestration implemented. Monorepo layout: `cli/` (Go, `go.resystems.io/renotify`), `clients/android/` (Gradle), `clients/ios/` (future placeholder), `lib/make/` (shared common.mk, go.mk, gradle.mk). Chained Makefiles with standard targets (build, clean, test). `go.mod` in `cli/` for polyglot separation; APK copied to `cli/embed/` by root Makefile. `build-cli-dev` target for fast Go iteration without APK. |
 | 2026-03-28 | C-01 | CLI scaffolding implemented. Cobra root command + 7 subcommands (daemon, post, ask, history, pair, revoke, extract-apk) with full flag sets. Viper config loading with RENOTIFY_ env prefix, settings.json file, and compiled defaults. Custom Duration type with mapstructure decode hook. Config validation (all constraints from A-06). XDG path resolution. Exit code constants 0-6. App struct pattern for explicit config passing. |
 | 2026-03-29 | M-01 | Android project scaffolding. Kotlin, namespace `io.resystems.renotify`, compileSdk 36, minSdk 26, targetSdk 36, buildToolsVersion 36.1.0. Gradle 8.13 wrapper. Permissions: INTERNET, POST_NOTIFICATIONS, CAMERA. Stub MainActivity. Makefile auto-generates local.properties from ANDROID_HOME. Root Makefile updated for unsigned APK filename. |
+| 2026-03-29 | V-03 | Build verification passed. CLI: `make build-dev` produces 8.1 MB binary, 18 tests pass, `go vet` clean. Android: `assembleRelease` produces 1.8 MB unsigned APK. Full chain: `make build-all` builds Android then CLI with APK copy to `cli/embed/`. `make clean` removes all artifacts. |
 
 ## 6. References
 
