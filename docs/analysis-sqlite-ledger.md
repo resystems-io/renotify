@@ -276,7 +276,8 @@ WHERE (:workspace_id IS NULL OR req.workspace_id = :workspace_id)
   AND (:since         IS NULL OR req.timestamp    >= :since)
   AND (:until         IS NULL OR req.timestamp    <= :until)
 ORDER BY req.timestamp DESC
-LIMIT :limit;
+LIMIT :limit
+OFFSET :offset;
 ```
 
 **Total count query** (for `HistoryQueryResult.total`):

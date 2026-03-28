@@ -401,6 +401,7 @@ daemon-internal parameters to command-line users.
 | `renotify history` | `--since` | (per-invocation, not persisted) | RFC 3339 |
 | `renotify history` | `--until` | (per-invocation, not persisted) | RFC 3339 |
 | `renotify history` | `--limit` | (per-invocation, not persisted) | int |
+| `renotify history` | `--offset` | (per-invocation, not persisted) | int |
 
 Flags marked "per-invocation, not persisted" are command arguments
 that do not map to `settings.json` keys. They are parsed by Cobra
