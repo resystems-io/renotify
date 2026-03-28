@@ -118,9 +118,46 @@ collide across users, machines, and even across daemons on the same machine
     `/home/stewart/projects/renotify` → `ws_5MBJR1HXNP3KQ8DW`
   * `stewart`'s CI daemon `dn_9F4HN2TCRWK6Y` with path `/opt/builds/renotify` →
     `ws_R7CV4WFQE2NM1KGX` (different ID, same display name)
-* **Generation:** Computed by the daemon when a workspace is first referenced.
-  Deterministic — the same daemon + path always produces the same ID.
-* **Stability:** Stable as long as the daemon_id and path don't change.
+* **Generation:** Deterministic — the same daemon + path always
+  produces the same ID. See "Workspace Discovery" below for how
+  each caller obtains the workspace_id.
+* **Stability:** Stable as long as the daemon_id and path don't
+  change.
+
+#### Workspace Discovery
+
+Two paths exist for workspace_id computation, depending on the
+caller. In both cases, workspaces are created implicitly on first
+use — no pre-registration is required.
+
+**CLI path (local computation).** The CLI process computes
+`workspace_id` locally before publishing to NATS:
+
+1. Read `daemon_id` from `$XDG_STATE_HOME/renotify/daemon_id`.
+2. Get the current working directory via `os.Getwd()`.
+3. Compute `SHA-256(daemon_id + "|" + abs_path)`, truncate to
+   80 bits, encode as Crockford Base32 with `ws_` prefix.
+4. Derive `display_name` from `path.Base(abs_path)`.
+5. Include both values in the `FlowLifecycleEvent` and
+   `NotificationRequest` payloads.
+
+The daemon receives the `workspace_id` via its JetStream
+consumers and caches the mapping (workspace_id → display_name,
+abs_path) if it has not seen this workspace before.
+
+**MCP path (daemon computation).** The MCP agent provides the
+absolute workspace path in the `register_flow` tool call (the
+`workspace_path` field). The daemon computes `workspace_id`
+using the same formula, caches the mapping, and returns the
+computed `workspace_id` in the `RegisterFlowResult`. The agent
+does not need to know the hash formula or the `daemon_id`.
+
+**Fallback behaviour.** When the CLI runs outside a recognisable
+project directory (e.g., `/tmp`, `$HOME`), it uses the current
+working directory as-is. There is no project-detection heuristic
+(no `.git` check, no marker file). The workspace is simply "the
+directory where the command was invoked." This keeps the logic
+deterministic and avoids magic.
 
 ### 2.5 Flow (renamed from "Session")
 

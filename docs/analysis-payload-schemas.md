@@ -46,7 +46,7 @@ Each payload's **Transport** identifies the delivery mechanism and its
 | [**NotificationRequest**](#notificationrequest) | NATS JetStream | CLI/Agent -> App | R-API-01, N-01 | W2, W3 | The core domain model representing an interrupt or alert. Contains the title, body, priority, source, and the type of response required. |
 | [**NotificationResponse**](#notificationresponse) | NATS JetStream | App -> CLI/Agent | R-API-02, N-03 | W3 | The human decision. Correlates to a `NotificationRequest` ID, capturing the selected action or free-form text input alongside the decision timestamp. |
 | [**FlowLifecycleEvent**](#flowlifecycleevent) | NATS JetStream | CLI/Agent -> Daemon | R-API-10, N-04 | W3, W5 | A structured event indicating the birth or death of a distinct pipeline flow. Used by the daemon to maintain the active flow registry. |
-| [**RegisterFlowRequest/Result**](#register_flow-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08 | W3, W5 | MCP tool to begin a new flow. Daemon generates `flow_id` and publishes `FlowLifecycleEvent`. |
+| [**RegisterFlowRequest/Result**](#register_flow-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08 | W3, W5 | MCP tool to begin a new flow. Agent provides `workspace_path`; daemon computes `workspace_id`, generates `flow_id`, publishes `FlowLifecycleEvent`. |
 | [**RefreshFlowRequest/Result**](#refresh_flow-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08 | W5 | MCP tool to signal continued activity and update flow label/metadata. Resets stale reaping timer. |
 | [**TerminateFlowRequest/Result**](#terminate_flow-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08 | W3, W5 | MCP tool to end a flow with `completed` or `failed` status. |
 | [**PostNotificationRequest/Result**](#post-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08 | W2 | MCP tool for fire-and-forget notification within an active flow. Daemon fills system fields from flow context. |
@@ -343,7 +343,7 @@ on the agent's behalf.
 
 | Operation | CLI Path | MCP Path |
 | :--- | :--- | :--- |
-| Start a flow | Implicit: CLI generates `flow_id` and publishes `FlowLifecycleEvent` (`active`) | Explicit: agent calls `register_flow` tool; daemon generates `flow_id` and publishes event |
+| Start a flow | Implicit: CLI derives `workspace_id` from cwd, generates `flow_id`, publishes `FlowLifecycleEvent` (`active`) | Explicit: agent calls `register_flow` with `workspace_path`; daemon computes `workspace_id`, generates `flow_id`, publishes event |
 | Send fire-and-forget | `renotify post` (flow_id set internally) | Agent calls `post` tool with `flow_id`; daemon returns `notification_id` |
 | Send blocking prompt | `renotify ask` (blocks until response or timeout) | Agent calls `ask` tool (non-blocking); daemon returns `notification_id` + `resource_uri`; agent reads `DecisionResource` asynchronously via `notifications/resources/updated` |
 | Signal progress | N/A (CLI flows are short-lived) | Agent calls `refresh_flow` with optional label/metadata update; resets reaping timer |
@@ -352,27 +352,35 @@ on the agent's behalf.
 
 #### `register_flow` MCP Tool
 
-Called by an AI agent to begin a new flow. The daemon generates
-the `flow_id`, publishes a `FlowLifecycleEvent` with
-`status: active`, adds the flow to the active registry, and
-returns the generated identifier to the agent.
+Called by an AI agent to begin a new flow. The agent provides
+the absolute path of the workspace directory. The daemon computes
+the `workspace_id` from the path (see [Naming &
+Addressing](analysis-naming-and-addressing.md) Section 2.4),
+generates the `flow_id`, publishes a `FlowLifecycleEvent` with
+`status: active`, adds the flow to the active registry, caches
+the workspace mapping if new, and returns both identifiers to the
+agent.
 
 **Input parameters:**
 
 ```go
 type RegisterFlowRequest struct {
-	WorkspaceID string            `json:"workspace_id"`
-	Label       string            `json:"label,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
+	WorkspacePath string            `json:"workspace_path"`
+	Label         string            `json:"label,omitempty"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
 }
 ```
 
-- `workspace_id` (required) — the workspace this flow belongs to.
-  Must match a workspace known to the daemon (present in the
-  daemon's heartbeat). The daemon rejects unknown workspace IDs
-  with error code `not_found`.
+- `workspace_path` (required) — the absolute filesystem path of
+  the workspace directory (e.g., `/home/stewart/projects/renotify`).
+  The daemon computes `workspace_id` from
+  `SHA-256(daemon_id + "|" + workspace_path)` and derives
+  `display_name` from the directory basename. New workspaces are
+  created implicitly on first use — no pre-registration is
+  required.
 - `label` (optional) — human-readable name for the flow displayed
-  on the Android dashboard (e.g., "Code Review", "Deploy Pipeline").
+  on the Android dashboard (e.g., "Code Review", "Deploy
+  Pipeline").
 - `metadata` (optional) — arbitrary key-value context attached to
   the `FlowLifecycleEvent` (e.g., branch, commit, agent name).
 
@@ -380,21 +388,24 @@ type RegisterFlowRequest struct {
 
 ```go
 type RegisterFlowResult struct {
-	FlowID    string    `json:"flow_id"`
-	Timestamp time.Time `json:"timestamp"`
+	FlowID      string    `json:"flow_id"`
+	WorkspaceID string    `json:"workspace_id"`
+	Timestamp   time.Time `json:"timestamp"`
 }
 ```
 
 The daemon generates the `flow_id` (UUIDv7, Crockford Base32
-with `fl_` prefix) and returns it. The agent must use this
-`flow_id` in all subsequent `post`, `ask`, and `terminate_flow`
-calls within this flow.
+with `fl_` prefix) and computes `workspace_id` from the path.
+The agent must use the returned `flow_id` in all subsequent
+`post`, `ask`, and `terminate_flow` calls within this flow. The
+`workspace_id` is returned for informational purposes (logging,
+correlation) but is not required for subsequent tool calls.
 
 **Exemplar — request:**
 
 ```json
 {
-  "workspace_id": "ws_5MBJR1HXNP3KQ8DW",
+  "workspace_path": "/home/stewart/projects/renotify",
   "label": "Production Deploy",
   "metadata": {
     "branch": "main",
@@ -408,6 +419,7 @@ calls within this flow.
 ```json
 {
   "flow_id": "fl_0R3FABM7TP2XE89YWCGKN4QJ5V",
+  "workspace_id": "ws_5MBJR1HXNP3KQ8DW",
   "timestamp": "2026-03-27T14:00:00Z"
 }
 ```
@@ -416,7 +428,6 @@ calls within this flow.
 
 | Error Code | Condition |
 | :--- | :--- |
-| `not_found` | The `workspace_id` does not match any workspace known to the daemon. |
 | `rate_limited` | The agent has exceeded the maximum number of concurrent active flows (R-SYS-01: 20). |
 | `internal` | Unexpected daemon-side failure during flow registration. |
 

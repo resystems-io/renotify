@@ -782,7 +782,7 @@ and a maximum individual payload size of 64 KB.
   authoritative timeout enforcer (daemon vs CLI), how the CLI learns
   about server-side timeout expiry, and whether `ErrorResponse` is
   published on the response subject.
-- [ ] **A-13: Workspace Discovery:** Document how CLI commands derive
+- [x] **A-13: Workspace Discovery:** Document how CLI commands derive
   `workspace_id` from the current working directory, how the daemon
   learns about new workspaces, and fallback behaviour when the CLI
   runs outside a project directory.
@@ -799,9 +799,13 @@ exist.)*
 
 - [ ] **P-01: Root Build Orchestration:** Create a top-level `Makefile` with
   targets for `build-android`, `build-cli`, and `build-all`.
-- [ ] **C-01: CLI Scaffolding:** Set up Cobra/Viper commands (with XDG-compliant
-  config management) for `daemon`, `post`, `ask`, `history`. Ensure `username`
-  and `workspace` are configurable properties.
+- [ ] **C-01: CLI Scaffolding:** Set up Cobra/Viper commands (with
+  XDG-compliant config management) for `daemon`, `post`, `ask`,
+  `history`. Ensure `username` is a configurable property.
+  Workspace identity is derived from the current working directory
+  at runtime (see [Naming &
+  Addressing](analysis-naming-and-addressing.md) Section 2.4),
+  not from configuration.
 - [ ] **M-01: App Scaffolding:** Initialise the Kotlin-based Android project
   with necessary permissions (Network, Notifications). *(Crucially, this allows
   a skeleton APK build for later Go embedding).*
@@ -933,6 +937,7 @@ specifications.
 | D-25 | MCP `post`: fire-and-forget, returns `notification_id`. MCP `ask`: non-blocking, returns `notification_id` + `resource_uri`; agent reads `DecisionResource` asynchronously via `notifications/resources/updated` (R-CLI-10). Daemon fills system fields from flow context. | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
 | D-26 | Interjection delivery: CLI dual-subscribes to `.response` + `.interject`; MCP via `InterjectionResource` at `renotify://interjections/{flow_id}`. `stop` terminates flow (failed). `note` forwarded without state change. `pause` deferred to post-MVP. Debounce 5s per flow+action. | [NATS Transport](analysis-nats-transport-design.md), [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
 | D-27 | Timeout: daemon-only enforcement (Model A). Daemon reads `timeout_sec` from `NotificationRequest`, publishes `ErrorResponse` (`code: "timeout"`) on `.response` subject on expiry. CLI has no local timer. MCP agents detect timeout via `DecisionResource` with `decided: true` and absent response fields. | [NATS Transport](analysis-nats-transport-design.md), [CLI Contract](analysis-cli-contract.md) | 2026-03-28 |
+| D-28 | Workspace discovery: CLI computes `workspace_id` locally from `daemon_id` + cwd (B1). MCP agents provide `workspace_path` in `register_flow`; daemon computes `workspace_id` (Option B). Workspaces created implicitly on first use. No project-detection heuristic. | [Naming & Addressing](analysis-naming-and-addressing.md), [Payload Schemas](analysis-payload-schemas.md) | 2026-03-28 |
 
 ---
 
@@ -959,6 +964,7 @@ Record completed items here with the date.
 | 2026-03-27 | A-10 | Draft | MCP `post` and `ask` tool schemas defined. `post` is fire-and-forget, returns notification_id. `ask` is non-blocking, returns notification_id + resource_uri; agent reads DecisionResource asynchronously via notifications/resources/updated (R-CLI-10). Daemon fills system fields (id, daemon_id, workspace_id, timestamp) from flow context. Timeout detection via DecisionResource with decided:true but absent response fields. Operations comparison table updated. |
 | 2026-03-27 | A-11 | Draft | Interjection delivery path fully specified. CLI dual-subscribes to `.response` + `.interject` during `ask` wait. Daemon processes interjections: `stop` terminates flow (publishes FlowLifecycleEvent failed), `note` forwards context without state change, `pause` deferred to post-MVP (treated as note). MCP delivery via new `InterjectionResource` at `renotify://interjections/{flow_id}`. Debounce: 5s per flow+action, configurable via `interjection.debounce_window`. New `interjections` SQLite table added to V1 migration. |
 | 2026-03-28 | A-12 | Draft | Timeout enforcement resolved: daemon-only model (Model A). Daemon reads `timeout_sec` from `NotificationRequest` payload and is the sole timer enforcer (R-CLI-17). On expiry daemon publishes `ErrorResponse` (`code: "timeout"`) on `.response` subject — CLI receives it directly, no local timer needed. Resolved contradictions in Sections 3.3, 8.6, 8.8 of transport design. Updated CLI contract and payload schemas with enforcement clarification. |
+| 2026-03-28 | A-13 | Draft | Workspace discovery documented. CLI computes workspace_id locally from daemon_id + cwd (B1 model). MCP agents provide workspace_path in register_flow; daemon computes workspace_id and returns it (Option B). RegisterFlowRequest changed from workspace_id to workspace_path; RegisterFlowResult now includes workspace_id. Workspaces created implicitly on first use. No project-detection heuristic. Updated naming analysis Section 2.4, transport design Section 8.6, and C-01 description. |
 
 ## 6. References
 
