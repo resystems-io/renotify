@@ -104,6 +104,12 @@ func (c *Controller) Run(ctx context.Context) error {
 		}
 	}()
 
+	// 2.5. Ensure JetStream stream and consumers.
+	if err := broker.EnsureJetStream(ctx, nc,
+		c.cfg.Username, c.cfg.JetStream, c.logger); err != nil {
+		return fmt.Errorf("jetstream: %w", err)
+	}
+
 	// 3. Start subsystems with ready-wait.
 	started := make([]Subsystem, 0, len(c.subsystems))
 	defer func() {
