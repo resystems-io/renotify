@@ -2,6 +2,7 @@ package broker
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"os"
@@ -57,17 +58,25 @@ func NewEmbeddedServer(cfg EmbeddedConfig, logger *slog.Logger) (*EmbeddedServer
 		Users:              BuildAuthConfig(cfg.Username, cfg.InternalToken, cfg.PairingToken),
 	}
 
-	// Configure WSS listener if TLS is available.
+	// Configure WSS listener if TLS is available. Load the
+	// certificate directly into the Websocket TLSConfig rather
+	// than using TLSMap (which requires server-level TLS on the
+	// TCP listener, which we don't want for loopback-only TCP).
 	if cfg.TLSCert != "" && cfg.TLSKey != "" {
+		cert, err := tls.LoadX509KeyPair(cfg.TLSCert, cfg.TLSKey)
+		if err != nil {
+			os.RemoveAll(storeDir)
+			return nil, fmt.Errorf("load TLS cert/key: %w", err)
+		}
 		opts.Websocket = server.WebsocketOpts{
 			Host:  cfg.WSSHost,
 			Port:  cfg.WSSPort,
 			NoTLS: false,
+			TLSConfig: &tls.Config{
+				Certificates: []tls.Certificate{cert},
+				MinVersion:   tls.VersionTLS12,
+			},
 		}
-		opts.Websocket.TLSMap = true
-		// Set TLS cert/key at the server level for the WS listener.
-		opts.TLSCert = cfg.TLSCert
-		opts.TLSKey = cfg.TLSKey
 	}
 
 	return &EmbeddedServer{

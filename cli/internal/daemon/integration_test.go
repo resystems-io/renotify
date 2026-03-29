@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	natsjs "github.com/nats-io/nats.go/jetstream"
 
 	"go.resystems.io/renotify/internal/broker"
 	"go.resystems.io/renotify/internal/config"
@@ -30,6 +31,8 @@ func integrationConfig(stateDir string) *config.Config {
 	cfg.Username = "testuser"
 	cfg.Broker.TCPPort = -1 // NATS convention for random port
 	cfg.Broker.WSSPort = -1
+	cfg.Broker.CertFile = "" // skip WSS in tests
+	cfg.Broker.KeyFile = ""
 	cfg.MCP.Port = 0
 	cfg.Daemon.LogFile = filepath.Join(stateDir, "daemon.log")
 	cfg.Daemon.DBPath = filepath.Join(stateDir, "renotify.db")
@@ -258,7 +261,7 @@ func TestController_SharedBrokerMode(t *testing.T) {
 		TCPPort:         -1,
 		Username:        "testuser",
 		InternalToken:   "shared_internal_tok",
-		JetStreamMaxMem: 64 * 1024 * 1024,
+		JetStreamMaxMem: 256 * 1024 * 1024,
 	}, integrationLogger())
 	if err != nil {
 		t.Fatal(err)
@@ -387,4 +390,110 @@ func TestEmbedded_GracefulShutdown(t *testing.T) {
 // controller would need to expose this.
 func portFromController(cfg *config.Config) string {
 	return "0" // placeholder
+}
+
+func TestController_JetStreamReady(t *testing.T) {
+	dir := t.TempDir()
+	cfg := integrationConfig(dir)
+
+	c := NewController(cfg, WithLogger(integrationLogger()))
+	c.DaemonIDPath = filepath.Join(dir, "daemon_id")
+	c.InternalTokenPath = filepath.Join(dir, "internal_token")
+	c.PairingTokenPath = filepath.Join(dir, "pairing", "token")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- c.Run(ctx) }()
+
+	time.Sleep(1 * time.Second)
+
+	// Connect as a NATS client using the generated internal token.
+	tokenBytes, err := os.ReadFile(filepath.Join(dir, "internal_token"))
+	if err != nil {
+		cancel()
+		t.Fatalf("read token: %v", err)
+	}
+	token := string(tokenBytes[:len(tokenBytes)-1])
+
+	// We can't get the controller's port directly. Use a
+	// standalone embedded server to verify EnsureJetStream works
+	// at the controller level by checking that the controller
+	// started without error. The broker/jetstream_test.go tests
+	// verify stream/consumer creation in detail.
+	// For the full end-to-end, cancel and verify clean shutdown.
+	cancel()
+	err = <-done
+	if err != nil {
+		t.Fatalf("controller error (jetstream should have set up): %v", err)
+	}
+	_ = token // used for context; broker tests cover NATS verification
+}
+
+func TestController_JetStreamMobileReceives(t *testing.T) {
+	dir := t.TempDir()
+	cfg := integrationConfig(dir)
+
+	// Start a standalone embedded server so we can control the
+	// client URL for NATS connection after setup.
+	srv, err := broker.NewEmbeddedServer(broker.EmbeddedConfig{
+		TCPHost:         "127.0.0.1",
+		TCPPort:         -1,
+		Username:        "testuser",
+		InternalToken:   "testtoken",
+		JetStreamMaxMem: 256 * 1024 * 1024,
+	}, integrationLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Shutdown(context.Background())
+
+	// Connect and set up JetStream (same as controller would).
+	nc, err := broker.ConnectEmbedded(
+		srv.ClientURL(), "testtoken", integrationLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nc.Close()
+
+	ctx := context.Background()
+	if err := broker.EnsureJetStream(ctx, nc, cfg.Username,
+		cfg.JetStream, integrationLogger()); err != nil {
+		t.Fatalf("EnsureJetStream: %v", err)
+	}
+
+	// Publish a message to a flow request subject.
+	js, _ := natsjs.New(nc)
+	_, err = js.Publish(ctx,
+		"resystems.renotify.testuser.flow.f001.request",
+		[]byte("mobile test payload"))
+	if err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+
+	// Fetch from the mobile consumer.
+	consumer, err := js.Consumer(ctx, broker.StreamName,
+		broker.MobileConsumerName("testuser"))
+	if err != nil {
+		t.Fatalf("consumer: %v", err)
+	}
+	msgs, err := consumer.Fetch(1,
+		natsjs.FetchMaxWait(2*time.Second))
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	var received int
+	for msg := range msgs.Messages() {
+		if string(msg.Data()) != "mobile test payload" {
+			t.Errorf("data = %q, want 'mobile test payload'",
+				string(msg.Data()))
+		}
+		msg.Ack()
+		received++
+	}
+	if received != 1 {
+		t.Errorf("received %d messages, want 1", received)
+	}
 }

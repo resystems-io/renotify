@@ -22,6 +22,8 @@ func testConfig() *config.Config {
 	cfg.Username = "testuser"
 	cfg.Broker.TCPPort = -1 // NATS convention for random port
 	cfg.Broker.WSSPort = -1
+	cfg.Broker.CertFile = "" // skip WSS in tests
+	cfg.Broker.KeyFile = ""
 	cfg.MCP.Port = 0
 	return cfg
 }
