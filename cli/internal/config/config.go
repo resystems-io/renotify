@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"os/user"
 	"time"
 
 	"go.resystems.io/renotify/internal/xdg"
@@ -37,9 +38,13 @@ type BrokerConfig struct {
 	KeyFile  string `json:"key_file"  mapstructure:"key_file"`
 }
 
-// MCPConfig controls the embedded MCP server.
+// MCPConfig controls the MCP server. The daemon runs an HTTP
+// server on Host:Port serving MCP via SSE at /mcp. Multiple
+// concurrent AI agent sessions connect to this shared endpoint.
 type MCPConfig struct {
-	Enabled bool `json:"enabled" mapstructure:"enabled"`
+	Enabled bool   `json:"enabled" mapstructure:"enabled"`
+	Host    string `json:"host"    mapstructure:"host"`
+	Port    int    `json:"port"    mapstructure:"port"`
 }
 
 // JetStreamConfig holds the configurable parameters for the
@@ -97,6 +102,7 @@ type InterjectionConfig struct {
 // DaemonConfig controls daemon process behaviour.
 type DaemonConfig struct {
 	Foreground bool   `json:"foreground" mapstructure:"foreground"`
+	LogLevel   string `json:"log_level"  mapstructure:"log_level"`
 	LogFile    string `json:"log_file"   mapstructure:"log_file"`
 	DBPath     string `json:"db_path"    mapstructure:"db_path"`
 }
@@ -104,6 +110,7 @@ type DaemonConfig struct {
 // Default returns a Config with all compiled defaults applied.
 func Default() *Config {
 	return &Config{
+		Username: defaultUsername(),
 		Broker: BrokerConfig{
 			Enabled:  true,
 			TCPHost:  "127.0.0.1",
@@ -115,6 +122,8 @@ func Default() *Config {
 		},
 		MCP: MCPConfig{
 			Enabled: true,
+			Host:    "127.0.0.1",
+			Port:    4224,
 		},
 		JetStream: JetStreamConfig{
 			MaxAge:         NewDuration(30 * time.Minute),
@@ -143,6 +152,7 @@ func Default() *Config {
 		},
 		Daemon: DaemonConfig{
 			Foreground: false,
+			LogLevel:   "info",
 			LogFile:    xdg.DaemonLogPath(),
 			DBPath:     xdg.DBPath(),
 		},
@@ -176,6 +186,16 @@ func (c *Config) Validate() error {
 		return fmt.Errorf(
 			"shared_broker: username/password and token are mutually exclusive",
 		)
+	}
+
+	if c.MCP.Port < 1 || c.MCP.Port > 65535 {
+		return fmt.Errorf("mcp.port out of range: %d", c.MCP.Port)
+	}
+	if c.MCP.Enabled && c.MCP.Port == c.Broker.TCPPort {
+		return fmt.Errorf("mcp.port must differ from broker.tcp_port")
+	}
+	if c.MCP.Enabled && c.MCP.Port == c.Broker.WSSPort {
+		return fmt.Errorf("mcp.port must differ from broker.wss_port")
 	}
 
 	if c.JetStream.MaxAge.Duration <= 0 {
@@ -213,5 +233,25 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("interjection.debounce_window must be at least 1 second")
 	}
 
+	switch c.Daemon.LogLevel {
+	case "debug", "info", "warn", "error":
+		// valid
+	default:
+		return fmt.Errorf(
+			"daemon.log_level must be debug, info, warn, or error: %q",
+			c.Daemon.LogLevel)
+	}
+
 	return nil
+}
+
+// defaultUsername returns the current Unix username, or "" if it
+// cannot be determined. The validation still requires a non-empty
+// username — this just provides a sensible default.
+func defaultUsername() string {
+	u, err := user.Current()
+	if err != nil {
+		return ""
+	}
+	return u.Username
 }
