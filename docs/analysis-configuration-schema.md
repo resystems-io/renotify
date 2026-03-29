@@ -108,7 +108,7 @@ type Config struct {
 // start without it. May be set via config file, environment
 // variable (RENOTIFY_USERNAME), or CLI flag (--username).
 //
-// Default: none (must be configured).
+// Default: current Unix username (from os/user.Current()).
 ```
 
 The `daemon_id` is not part of the configuration file. It is
@@ -146,22 +146,29 @@ type BrokerConfig struct {
 ### 2.3 MCP Server
 
 ```go
-// MCPConfig controls the embedded MCP server. When Enabled is
-// false, the daemon does not expose MCP tools to agents.
+// MCPConfig controls the MCP server. The daemon runs an HTTP
+// server on Host:Port serving MCP via SSE at /mcp. Multiple
+// concurrent AI agent sessions connect to this shared endpoint.
 type MCPConfig struct {
-	Enabled bool `json:"enabled"` // default: true
+	Enabled bool   `json:"enabled"` // default: true
+	Host    string `json:"host"`    // default: "127.0.0.1"
+	Port    int    `json:"port"`    // default: 4224
 }
 ```
 
 | Field | Default | R-CLI | Notes |
 | :--- | :--- | :--- | :--- |
-| `enabled` | `true` | R-CLI-03 | MCP server uses stdio transport (launched as subprocess by agents) |
+| `enabled` | `true` | R-CLI-03 | MCP server serves via SSE on the shared loopback HTTP server |
+| `host` | `"127.0.0.1"` | R-CLI-03 | Loopback only; agents connect locally |
+| `port` | `4224` | R-CLI-03 | Shared HTTP port for MCP and future services (dashboard, API) |
 
-The MCP server uses the standard MCP stdio transport — agents
-launch the daemon (or a dedicated MCP subprocess) and communicate
-over stdin/stdout. No separate port or socket configuration is
-needed. The MCP server connects to the NATS broker internally
-(embedded or shared) using the daemon's own credentials.
+The daemon runs an HTTP server on `127.0.0.1:4224` (plain HTTP,
+loopback only) serving MCP via SSE at the `/mcp` path. Multiple
+concurrent AI agent sessions (Claude Code, custom agents) connect
+to this shared endpoint — one daemon process, one NATS connection,
+N SSE connections. No TLS is needed because the HTTP server binds
+to loopback only. Future services (dashboard, API) share the same
+HTTP server on additional paths.
 
 ### 2.4 JetStream
 

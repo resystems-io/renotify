@@ -1,0 +1,127 @@
+package broker
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+	"time"
+
+	"github.com/nats-io/nats-server/v2/server"
+)
+
+// EmbeddedConfig holds parameters for the in-process NATS server.
+type EmbeddedConfig struct {
+	TCPHost  string
+	TCPPort  int
+	WSSHost  string
+	WSSPort  int
+	TLSCert  string // empty → skip WSS listener
+	TLSKey   string
+	Username string
+
+	InternalToken string
+	PairingToken  string // empty → no mobile account
+
+	JetStreamMaxMem int64
+}
+
+// EmbeddedServer wraps a nats-server with Renotify configuration.
+type EmbeddedServer struct {
+	srv      *server.Server
+	opts     *server.Options
+	logger   *slog.Logger
+	storeDir string // temp dir for JetStream metadata; cleaned on shutdown
+}
+
+// NewEmbeddedServer creates an embedded NATS server from the
+// given configuration. Call Start() to begin listening.
+func NewEmbeddedServer(cfg EmbeddedConfig, logger *slog.Logger) (*EmbeddedServer, error) {
+	// JetStream needs a StoreDir even for memory-only storage
+	// (metadata). Use a unique temp dir to avoid conflicts
+	// between concurrent instances.
+	storeDir, err := os.MkdirTemp("", "renotify-jetstream-*")
+	if err != nil {
+		return nil, fmt.Errorf("create JetStream store dir: %w", err)
+	}
+
+	opts := &server.Options{
+		ServerName:         fmt.Sprintf("renotify-%d", os.Getpid()),
+		Host:               cfg.TCPHost,
+		Port:               cfg.TCPPort,
+		JetStream:          true,
+		JetStreamMaxMemory: cfg.JetStreamMaxMem,
+		StoreDir:           storeDir,
+		NoLog:              true,
+		NoSigs:             true,
+		Users:              BuildAuthConfig(cfg.Username, cfg.InternalToken, cfg.PairingToken),
+	}
+
+	// Configure WSS listener if TLS is available.
+	if cfg.TLSCert != "" && cfg.TLSKey != "" {
+		opts.Websocket = server.WebsocketOpts{
+			Host:  cfg.WSSHost,
+			Port:  cfg.WSSPort,
+			NoTLS: false,
+		}
+		opts.Websocket.TLSMap = true
+		// Set TLS cert/key at the server level for the WS listener.
+		opts.TLSCert = cfg.TLSCert
+		opts.TLSKey = cfg.TLSKey
+	}
+
+	return &EmbeddedServer{
+		opts:     opts,
+		logger:   logger,
+		storeDir: storeDir,
+	}, nil
+}
+
+// Start creates and starts the embedded NATS server. It blocks
+// until the server is ready for connections or returns an error.
+func (s *EmbeddedServer) Start() error {
+	srv, err := server.NewServer(s.opts)
+	if err != nil {
+		return fmt.Errorf("create NATS server: %w", err)
+	}
+	s.srv = srv
+	s.srv.Start()
+
+	if !s.srv.ReadyForConnections(10 * time.Second) {
+		s.srv.Shutdown()
+		return fmt.Errorf("NATS server failed to become ready")
+	}
+
+	s.logger.Info("embedded NATS server started",
+		"tcp", s.srv.Addr().String(),
+		"jetstream", true,
+	)
+	return nil
+}
+
+// Shutdown gracefully stops the embedded NATS server and cleans
+// up the JetStream metadata directory.
+func (s *EmbeddedServer) Shutdown(_ context.Context) error {
+	if s.srv != nil {
+		s.srv.Shutdown()
+		s.srv.WaitForShutdown()
+		s.logger.Info("embedded NATS server stopped")
+	}
+	if s.storeDir != "" {
+		os.RemoveAll(s.storeDir)
+	}
+	return nil
+}
+
+// ClientURL returns the TCP client URL for the embedded server.
+func (s *EmbeddedServer) ClientURL() string {
+	if s.srv != nil {
+		return s.srv.ClientURL()
+	}
+	return fmt.Sprintf("nats://%s:%d", s.opts.Host, s.opts.Port)
+}
+
+// Server returns the underlying nats-server instance for testing.
+func (s *EmbeddedServer) Server() *server.Server {
+	return s.srv
+}

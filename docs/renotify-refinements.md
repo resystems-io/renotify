@@ -816,7 +816,7 @@ exist.)*
 *(Goal: The devices can discover, verify, and talk to each other securely over
 WebSockets).*
 
-- [ ] **C-02: Daemon Controller:** Implement the daemon orchestrator to run the
+- [x] **C-02: Daemon Controller:** Implement the daemon orchestrator to run the
   NATS server, the MCP server, or both based on configuration.
 - [ ] **C-07: Pairing Generator:** Implement `renotify pair` logic, IP
   discovery, TLS cert generation, and ASCII QR output. Use
@@ -839,6 +839,12 @@ WebSockets).*
 - [ ] **C-13: Daemon Heartbeat Publisher:** Implement periodic (30s)
   DaemonHeartbeat publishing on the daemon's heartbeat subject, with immediate
   on-change triggers for flow and workspace state changes.
+- [ ] **C-14: Config Init & Parameter Help:** Add `renotify config init` to
+  generate a template `settings.json` at the XDG config path (minimal by
+  default, `--full` for all parameters with defaults), and `renotify config
+  list` to print a table of all configurable parameters with key path, type,
+  default value, and description. Viper does not provide either capability;
+  both require a custom parameter registry.
 
 ### Phase 4: Core Operational Workflows
 *(Goal: Scripts can successfully execute blocking prompts and wait for human
@@ -943,6 +949,10 @@ specifications.
 | D-31 | Monorepo layout: `cli/` (Go module `go.resystems.io/renotify`), `clients/android/` (Gradle), `clients/ios/` (future), `lib/make/` (shared .mk includes). `go.mod` in `cli/` not root. APK copied to `cli/embed/` by Makefile before `go:embed`. Standard targets: build, clean, test. | — | 2026-03-28 |
 | D-32 | CLI scaffolding: Cobra root + 7 subcommands with full flag sets. Viper config with RENOTIFY_ env prefix and custom Duration decode hook. App struct pattern (explicit config passing, no global state). Exit codes 0-6. | — | 2026-03-28 |
 | D-33 | Android scaffolding: Kotlin, namespace `io.resystems.renotify`, compileSdk 36, minSdk 26, Gradle 8.13 wrapper. Permissions: INTERNET, POST_NOTIFICATIONS, CAMERA. APK output: `app-release-unsigned.apk`. | — | 2026-03-29 |
+| D-34 | Daemon controller: subsystem interface with `ready chan<- error` close-signalling for ordered startup and reliable testing. `ctx` handles shutdown; `close(ready)` signals success; `ready <- err; close(ready)` signals failure. | — | 2026-03-29 |
+| D-35 | MCP transport: SSE on shared loopback HTTP server (`127.0.0.1:4224`), not stdio. Enables concurrent multi-agent access without per-session bridge processes. N agents = N SSE connections to one daemon. | — | 2026-03-29 |
+| D-36 | Port architecture: NATS WSS on `0.0.0.0:4223` (TLS, mobile), HTTP on `127.0.0.1:4224` (plain, MCP/dashboard). Separate trust boundaries require separate listeners — NATS needs all-interfaces + self-signed TLS; HTTP needs loopback-only + no TLS. | — | 2026-03-29 |
+| D-37 | Crockford Base32: custom implementation (~100 lines, zero dependencies). Go stdlib lacks Crockford variant. Supports `EncodeBits(src, nBits)` for truncated identifiers (daemon_id 65-bit, workspace_id 80-bit) and confusable mapping on decode (I/L→1, O→0). | — | 2026-03-29 |
 
 ---
 
@@ -976,6 +986,7 @@ Record completed items here with the date.
 | 2026-03-28 | C-01 | CLI scaffolding implemented. Cobra root command + 7 subcommands (daemon, post, ask, history, pair, revoke, extract-apk) with full flag sets. Viper config loading with RENOTIFY_ env prefix, settings.json file, and compiled defaults. Custom Duration type with mapstructure decode hook. Config validation (all constraints from A-06). XDG path resolution. Exit code constants 0-6. App struct pattern for explicit config passing. |
 | 2026-03-29 | M-01 | Android project scaffolding. Kotlin, namespace `io.resystems.renotify`, compileSdk 36, minSdk 26, targetSdk 36, buildToolsVersion 36.1.0. Gradle 8.13 wrapper. Permissions: INTERNET, POST_NOTIFICATIONS, CAMERA. Stub MainActivity. Makefile auto-generates local.properties from ANDROID_HOME. Root Makefile updated for unsigned APK filename. |
 | 2026-03-29 | V-03 | Build verification passed. CLI: `make build-dev` produces 8.1 MB binary, 18 tests pass, `go vet` clean. Android: `assembleRelease` produces 1.8 MB unsigned APK. Full chain: `make build-all` builds Android then CLI with APK copy to `cli/embed/`. `make clean` removes all artifacts. |
+| 2026-03-29 | C-02 | Daemon controller implemented. Embedded NATS server (TCP 4222 + WSS 4223) with JetStream enabled, two-account auth (daemon + mobile ACLs), shared broker connection path. State management: daemon_id (`dn_` + 13 Crockford Base32), internal token (`rn_tk_` + 52 chars), pairing token loading. Subsystem interface with `ready chan<- error` close-signalling for ordered startup. Shared loopback HTTP server (`127.0.0.1:4224`, plain HTTP) with MCP SSE at `/mcp`. Signal handling (SIGINT/SIGTERM), foreground/background logging modes. New packages: `crockford`, `state`, `broker`, `httpserver`, `mcpserver`, `daemon`. Dependencies: nats-server v2.12.6, nats.go v1.50.0, go-sdk v1.4.1. MCPConfig expanded with `host`/`port` fields. 65 tests (unit + integration). |
 
 ## 6. References
 

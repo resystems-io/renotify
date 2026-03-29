@@ -107,6 +107,8 @@ func setDefaults(v *viper.Viper, cfg *Config) {
 	v.SetDefault("broker.key_file", cfg.Broker.KeyFile)
 
 	v.SetDefault("mcp.enabled", cfg.MCP.Enabled)
+	v.SetDefault("mcp.host", cfg.MCP.Host)
+	v.SetDefault("mcp.port", cfg.MCP.Port)
 
 	v.SetDefault("jetstream.max_age", cfg.JetStream.MaxAge.Duration.String())
 	v.SetDefault("jetstream.max_bytes", cfg.JetStream.MaxBytes)
@@ -124,6 +126,7 @@ func setDefaults(v *viper.Viper, cfg *Config) {
 	v.SetDefault("interjection.debounce_window", cfg.Interjection.DebounceWindow.Duration.String())
 
 	v.SetDefault("daemon.foreground", cfg.Daemon.Foreground)
+	v.SetDefault("daemon.log_level", cfg.Daemon.LogLevel)
 	v.SetDefault("daemon.log_file", cfg.Daemon.LogFile)
 	v.SetDefault("daemon.db_path", cfg.Daemon.DBPath)
 }
