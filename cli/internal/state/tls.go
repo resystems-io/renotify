@@ -24,6 +24,22 @@ func LoadTLS(certPath, keyPath string) (cert, key string, err error) {
 	return certPath, keyPath, nil
 }
 
+// WriteTLS writes the TLS certificate and key files atomically.
+// The certificate is written with mode 0644 (readable for NATS
+// server), the key with mode 0600 (secret). Parent directories
+// are created with mode 0700.
+func WriteTLS(certPath string, certPEM []byte, keyPath string, keyPEM []byte) error {
+	if err := writeAtomicBytes(certPath, certPEM, 0644); err != nil {
+		return fmt.Errorf("write TLS cert: %w", err)
+	}
+	if err := writeAtomicBytes(keyPath, keyPEM, 0600); err != nil {
+		// Best-effort cleanup of cert if key write fails.
+		os.Remove(certPath)
+		return fmt.Errorf("write TLS key: %w", err)
+	}
+	return nil
+}
+
 func fileExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {

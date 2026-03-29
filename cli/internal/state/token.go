@@ -23,6 +23,26 @@ func LoadOrGenerateToken(path string) (string, error) {
 	})
 }
 
+// GenerateToken always generates a new auth token and writes it
+// atomically, even if a file already exists. Used by `renotify
+// pair` where each pairing revokes the old token by overwriting.
+func GenerateToken(path string) (string, error) {
+	b := make([]byte, 32) // 256 bits
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("generate token: %w", err)
+	}
+	tok := "rn_tk_" + crockford.EncodeBits(b, 256)
+	if err := writeAtomic(path, tok); err != nil {
+		return "", err
+	}
+	return tok, nil
+}
+
+// WriteUsername writes the pairing username atomically.
+func WriteUsername(path, username string) error {
+	return writeAtomic(path, username)
+}
+
 // LoadPairingToken reads the pairing token from path. Returns
 // ("", nil) if the file does not exist.
 func LoadPairingToken(path string) (string, error) {

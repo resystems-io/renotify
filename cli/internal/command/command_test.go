@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -228,15 +229,78 @@ func TestHistoryAcceptsFlags(t *testing.T) {
 
 func TestPairAcceptsFlags(t *testing.T) {
 	t.Setenv("RENOTIFY_USERNAME", "testuser")
-	_, stderr, err := executeCommand("pair",
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	stdout, _, err := executeCommand("pair",
 		"--ip", "192.168.1.42",
 		"--regenerate-cert",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(stderr, "not yet implemented") {
-		t.Error("expected stub message on stderr")
+	if !strings.Contains(stdout, "192.168.1.42") {
+		t.Error("output should contain the override IP")
+	}
+}
+
+func TestPairTextOutput(t *testing.T) {
+	t.Setenv("RENOTIFY_USERNAME", "testuser")
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	stdout, _, err := executeCommand("pair",
+		"--ip", "10.0.0.1",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Should contain QR code half-block characters.
+	if !strings.ContainsAny(stdout, "\u2580\u2584\u2588") {
+		t.Error("text output missing QR block characters")
+	}
+	if !strings.Contains(stdout, "Scan this code") {
+		t.Error("text output missing scan instruction")
+	}
+	if !strings.Contains(stdout, "rn_tk_") {
+		t.Error("text output missing token")
+	}
+	if !strings.Contains(stdout, "(new)") {
+		t.Error("text output missing cert label")
+	}
+}
+
+func TestPairJSONOutput(t *testing.T) {
+	t.Setenv("RENOTIFY_USERNAME", "testuser")
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	stdout, _, err := executeCommand("pair",
+		"--ip", "10.0.0.1",
+		"--format", "json",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var output map[string]interface{}
+	if err := json.Unmarshal([]byte(stdout), &output); err != nil {
+		t.Fatalf("invalid JSON output: %v\n%s", err, stdout)
+	}
+	if output["host"] != "10.0.0.1" {
+		t.Errorf("host = %v, want 10.0.0.1", output["host"])
+	}
+	if _, ok := output["token"]; !ok {
+		t.Error("JSON output missing 'token' field")
+	}
+	if _, ok := output["cert_fingerprint"]; !ok {
+		t.Error("JSON output missing 'cert_fingerprint' field")
+	}
+}
+
+func TestPairInvalidIP(t *testing.T) {
+	t.Setenv("RENOTIFY_USERNAME", "testuser")
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	_, _, err := executeCommand("pair", "--ip", "not-an-ip")
+	if err == nil {
+		t.Fatal("expected error for invalid IP")
+	}
+	if !strings.Contains(err.Error(), "invalid IP") {
+		t.Errorf("error = %q, expected 'invalid IP'", err)
 	}
 }
 
