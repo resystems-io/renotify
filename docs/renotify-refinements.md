@@ -818,7 +818,7 @@ WebSockets).*
 
 - [x] **C-02: Daemon Controller:** Implement the daemon orchestrator to run the
   NATS server, the MCP server, or both based on configuration.
-- [ ] **C-07: Pairing Generator:** Implement `renotify pair` logic, IP
+- [x] **C-07: Pairing Generator:** Implement `renotify pair` logic, IP
   discovery, TLS cert generation, and ASCII QR output. Use
   [`mdp/qrterminal`][qrterminal] for terminal QR rendering with
   half-block characters at EC level L. See
@@ -953,6 +953,10 @@ specifications.
 | D-35 | MCP transport: SSE on shared loopback HTTP server (`127.0.0.1:4224`), not stdio. Enables concurrent multi-agent access without per-session bridge processes. N agents = N SSE connections to one daemon. | — | 2026-03-29 |
 | D-36 | Port architecture: NATS WSS on `0.0.0.0:4223` (TLS, mobile), HTTP on `127.0.0.1:4224` (plain, MCP/dashboard). Separate trust boundaries require separate listeners — NATS needs all-interfaces + self-signed TLS; HTTP needs loopback-only + no TLS. | — | 2026-03-29 |
 | D-37 | Crockford Base32: custom implementation (~100 lines, zero dependencies). Go stdlib lacks Crockford variant. Supports `EncodeBits(src, nBits)` for truncated identifiers (daemon_id 65-bit, workspace_id 80-bit) and confusable mapping on decode (I/L→1, O→0). | — | 2026-03-29 |
+| D-38 | TLS certificate generation in standalone `tlsgen/` package, separating crypto (ECDSA P-256 key gen, X.509 template, fingerprinting) from state file I/O. Produces in-memory artifacts; caller persists. | — | 2026-03-29 |
+| D-39 | IP discovery in `netutil/` package with `PreferredIP` selection: IPv4 private preferred, fallback to any IPv4, then IPv6, then loopback. Independently testable and reusable by future features. | — | 2026-03-29 |
+| D-40 | Pairing orchestration in `pairing/` package with injectable `DiscoverIPs` for testability. Command layer stays thin (flag parsing + output formatting). Matches `daemon/controller.go` pattern. | — | 2026-03-29 |
+| D-41 | QR testing: automated payload assembly + output shape verification; manual scannability check; no QR decoder test dependency. `mdp/qrterminal` is well-tested upstream. | — | 2026-03-29 |
 
 ---
 
@@ -987,6 +991,7 @@ Record completed items here with the date.
 | 2026-03-29 | M-01 | Android project scaffolding. Kotlin, namespace `io.resystems.renotify`, compileSdk 36, minSdk 26, targetSdk 36, buildToolsVersion 36.1.0. Gradle 8.13 wrapper. Permissions: INTERNET, POST_NOTIFICATIONS, CAMERA. Stub MainActivity. Makefile auto-generates local.properties from ANDROID_HOME. Root Makefile updated for unsigned APK filename. |
 | 2026-03-29 | V-03 | Build verification passed. CLI: `make build-dev` produces 8.1 MB binary, 18 tests pass, `go vet` clean. Android: `assembleRelease` produces 1.8 MB unsigned APK. Full chain: `make build-all` builds Android then CLI with APK copy to `cli/embed/`. `make clean` removes all artifacts. |
 | 2026-03-29 | C-02 | Daemon controller implemented. Embedded NATS server (TCP 4222 + WSS 4223) with JetStream enabled, two-account auth (daemon + mobile ACLs), shared broker connection path. State management: daemon_id (`dn_` + 13 Crockford Base32), internal token (`rn_tk_` + 52 chars), pairing token loading. Subsystem interface with `ready chan<- error` close-signalling for ordered startup. Shared loopback HTTP server (`127.0.0.1:4224`, plain HTTP) with MCP SSE at `/mcp`. Signal handling (SIGINT/SIGTERM), foreground/background logging modes. New packages: `crockford`, `state`, `broker`, `httpserver`, `mcpserver`, `daemon`. Dependencies: nats-server v2.12.6, nats.go v1.50.0, go-sdk v1.4.1. MCPConfig expanded with `host`/`port` fields. 65 tests (unit + integration). |
+| 2026-03-29 | C-07 | Pairing generator implemented. ECDSA P-256 self-signed certificate generation (3-year validity, daemon_id in CN, all discovered IPs + localhost in SANs). Local IP discovery (non-loopback, non-link-local) with IPv4 private preference. Pairing token management (always-new `rn_tk_` token, overwrites prior). ProvisioningPayload assembly with single-char JSON keys (`v`, `h`, `p`, `t`, `c`). ASCII QR rendering via `mdp/qrterminal` half-block at EC level L. Text and JSON output formats. `--ip` override, `--regenerate-cert` flag. Certificate fingerprint: SHA-256 of DER, hex-encoded (64 chars). New packages: `tlsgen`, `netutil`, `pairing`. Extended `state/` with `WriteTLS` (0644/0600), `GenerateToken`, `WriteUsername`. Dependency: qrterminal/v3. 64 tests (unit + integration). |
 
 ## 6. References
 

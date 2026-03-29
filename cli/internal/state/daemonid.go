@@ -53,13 +53,19 @@ func loadOrGenerate(path string, generate func() (string, error)) (string, error
 // temporary file and renaming. Creates parent directories with
 // 0700. The file is written with mode 0600.
 func writeAtomic(path, val string) error {
+	return writeAtomicBytes(path, []byte(val+"\n"), 0600)
+}
+
+// writeAtomicBytes writes data to path atomically with the
+// specified permissions. Creates parent directories with 0700.
+func writeAtomicBytes(path string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("create dir %s: %w", dir, err)
 	}
 
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, []byte(val+"\n"), 0600); err != nil {
+	if err := os.WriteFile(tmp, data, perm); err != nil {
 		return fmt.Errorf("write %s: %w", tmp, err)
 	}
 	if err := os.Rename(tmp, path); err != nil {

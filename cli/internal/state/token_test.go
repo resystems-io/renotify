@@ -81,3 +81,79 @@ func TestLoadPairingToken_LoadsExisting(t *testing.T) {
 		t.Errorf("got %q, want %q", tok, "rn_tk_PAIRING")
 	}
 }
+
+func TestGenerateToken_AlwaysNew(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "token")
+	os.WriteFile(path, []byte("rn_tk_OLDTOKEN\n"), 0600)
+
+	tok, err := GenerateToken(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tok == "rn_tk_OLDTOKEN" {
+		t.Error("GenerateToken returned old token, expected new")
+	}
+	if !strings.HasPrefix(tok, "rn_tk_") {
+		t.Errorf("token should start with rn_tk_, got %q", tok)
+	}
+}
+
+func TestGenerateToken_Format(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "token")
+	tok, err := GenerateToken(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tok) != 58 {
+		t.Errorf("token length = %d, want 58", len(tok))
+	}
+	body := strings.TrimPrefix(tok, "rn_tk_")
+	for i, c := range body {
+		if !strings.ContainsRune("0123456789ABCDEFGHJKMNPQRSTVWXYZ", c) {
+			t.Errorf("char %d %q not in Crockford alphabet", i, string(c))
+		}
+	}
+}
+
+func TestGenerateToken_Permissions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "token")
+	_, err := GenerateToken(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm != 0600 {
+		t.Errorf("file perm = %o, want 0600", perm)
+	}
+}
+
+func TestWriteUsername_CreatesFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "pairing", "username")
+	err := WriteUsername(path, "testuser")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(data)) != "testuser" {
+		t.Errorf("got %q, want %q", strings.TrimSpace(string(data)), "testuser")
+	}
+}
+
+func TestWriteUsername_Permissions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "pairing", "username")
+	WriteUsername(path, "testuser")
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm != 0600 {
+		t.Errorf("file perm = %o, want 0600", perm)
+	}
+}

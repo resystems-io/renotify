@@ -1,9 +1,18 @@
 package command
 
 import (
+	"encoding/json"
 	"fmt"
+	"net"
 
 	"github.com/spf13/cobra"
+
+	qrterminal "github.com/mdp/qrterminal/v3"
+
+	"go.resystems.io/renotify/internal/exitcode"
+	"go.resystems.io/renotify/internal/netutil"
+	"go.resystems.io/renotify/internal/pairing"
+	"go.resystems.io/renotify/internal/xdg"
 )
 
 func newPairCmd(app *App) *cobra.Command {
@@ -21,16 +30,71 @@ func newPairCmd(app *App) *cobra.Command {
 code to the terminal containing the provisioning payload. The
 mobile app scans this code to establish a secure connection.
 
-If a prior pairing exists, the old token is revoked before a new
-one is issued (R-SEC-02).`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			_ = app.Config
-			_ = ip
-			_ = regenerateCert
-			_ = format
+If a prior pairing exists, the old token is replaced by a new one.
+The daemon must be restarted to pick up the new token (automatic
+hot-reload is planned for a future release).
 
-			fmt.Fprintln(cmd.ErrOrStderr(), "pair: not yet implemented")
-			return nil
+Certificate lifecycle:
+
+  First run:            Generates ECDSA P-256 self-signed cert
+  Subsequent runs:      Reuses existing cert (same fingerprint)
+  --regenerate-cert:    Forces new cert (invalidates prior pairing)
+
+IP discovery:
+
+  By default, the command discovers non-loopback IP addresses on
+  active network interfaces and selects a preferred one (IPv4
+  private preferred). Use --ip to override:
+
+    renotify pair --ip 192.168.1.42
+
+Output formats:
+
+  --format text (default):  QR code + metadata to stdout
+  --format json:            Machine-readable JSON to stdout
+
+Examples:
+
+  renotify pair
+  renotify pair --ip 10.0.0.5
+  renotify pair --regenerate-cert
+  renotify pair --format json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg := app.Config
+
+			// Validate --ip if provided.
+			if ip != "" {
+				if parsed := net.ParseIP(ip); parsed == nil {
+					return exitcode.Errorf(exitcode.Error,
+						"invalid IP address: %q", ip)
+				}
+			}
+
+			result, err := pairing.Pair(pairing.Config{
+				CertPath:       xdg.TLSCertPath(),
+				KeyPath:        xdg.TLSKeyPath(),
+				TokenPath:      xdg.PairingTokenPath(),
+				UsernamePath:   xdg.PairingUsernamePath(),
+				DaemonIDPath:   xdg.DaemonIDPath(),
+				Username:       cfg.Username,
+				WSSPort:        cfg.Broker.WSSPort,
+				RegenerateCert: regenerateCert,
+				OverrideIP:     ip,
+				DiscoverIPs:    netutil.DiscoverIPs,
+			})
+			if err != nil {
+				return exitcode.Errorf(exitcode.Error,
+					"pair: %v", err)
+			}
+
+			out := cmd.OutOrStdout()
+
+			switch format {
+			case "json":
+				return writeJSONOutput(out, result)
+			default:
+				return writeTextOutput(out, result)
+			}
 		},
 	}
 
@@ -42,4 +106,43 @@ one is issued (R-SEC-02).`,
 		"output format: json|text")
 
 	return cmd
+}
+
+func writeTextOutput(w interface{ Write([]byte) (int, error) }, result *pairing.Result) error {
+	fmt.Fprintf(w, "Pairing QR code for %s (wss://%s:%d)\n\n",
+		result.Username, result.Host, result.Port)
+
+	qrterminal.GenerateHalfBlock(result.PayloadJSON, qrterminal.L, w)
+
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Scan this code with the Renotify app to pair.")
+
+	certLabel := "existing"
+	if result.CertRegenerated {
+		certLabel = "new"
+	}
+	fmt.Fprintf(w, "Token: %s (new)\n", result.Token)
+	fmt.Fprintf(w, "Cert:  %s (%s)\n", result.CertFingerprint, certLabel)
+
+	return nil
+}
+
+type pairJSONOutput struct {
+	Host            string `json:"host"`
+	Port            int    `json:"port"`
+	Token           string `json:"token"`
+	CertFingerprint string `json:"cert_fingerprint"`
+	CertRegenerated bool   `json:"cert_regenerated"`
+}
+
+func writeJSONOutput(w interface{ Write([]byte) (int, error) }, result *pairing.Result) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(pairJSONOutput{
+		Host:            result.Host,
+		Port:            result.Port,
+		Token:           result.Token,
+		CertFingerprint: result.CertFingerprint,
+		CertRegenerated: result.CertRegenerated,
+	})
 }
