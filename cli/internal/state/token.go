@@ -55,3 +55,21 @@ func LoadPairingToken(path string) (string, error) {
 	}
 	return strings.TrimSpace(string(data)), nil
 }
+
+// DeletePairingToken removes the pairing token file. Returns nil
+// if the file does not exist.
+func DeletePairingToken(path string) error {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("delete pairing token: %w", err)
+	}
+	return nil
+}
+
+// DeletePairingUsername removes the pairing username file. Returns
+// nil if the file does not exist.
+func DeletePairingUsername(path string) error {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("delete pairing username: %w", err)
+	}
+	return nil
+}

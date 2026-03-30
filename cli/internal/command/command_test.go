@@ -304,14 +304,95 @@ func TestPairInvalidIP(t *testing.T) {
 	}
 }
 
-func TestRevokeRuns(t *testing.T) {
+func TestRevoke_NoToken(t *testing.T) {
 	t.Setenv("RENOTIFY_USERNAME", "testuser")
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	_, stderr, err := executeCommand("revoke")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(stderr, "not yet implemented") {
-		t.Error("expected stub message on stderr")
+	if !strings.Contains(stderr, "no active pairing") {
+		t.Errorf("expected 'no active pairing', got: %q", stderr)
+	}
+}
+
+func TestRevoke_DeletesToken(t *testing.T) {
+	t.Setenv("RENOTIFY_USERNAME", "testuser")
+	stateDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", stateDir)
+
+	// Create pairing token and username files.
+	pairingDir := filepath.Join(stateDir, "renotify", "pairing")
+	os.MkdirAll(pairingDir, 0700)
+	tokenPath := filepath.Join(pairingDir, "token")
+	usernamePath := filepath.Join(pairingDir, "username")
+	os.WriteFile(tokenPath, []byte("rn_tk_TESTTOKEN\n"), 0600)
+	os.WriteFile(usernamePath, []byte("testuser\n"), 0600)
+
+	_, stderr, err := executeCommand("revoke")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(stderr, "Token revoked") {
+		t.Errorf("expected 'Token revoked' in stderr, got: %q", stderr)
+	}
+
+	// Token file should be deleted.
+	if _, err := os.Stat(tokenPath); !os.IsNotExist(err) {
+		t.Error("token file should be deleted after revoke")
+	}
+	// Username file should be deleted.
+	if _, err := os.Stat(usernamePath); !os.IsNotExist(err) {
+		t.Error("username file should be deleted after revoke")
+	}
+}
+
+func TestRevoke_JSONOutput(t *testing.T) {
+	t.Setenv("RENOTIFY_USERNAME", "testuser")
+	stateDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", stateDir)
+
+	// No token — should report revoked=false.
+	stdout, _, err := executeCommand("revoke", "--format", "json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var output map[string]interface{}
+	if err := json.Unmarshal([]byte(stdout), &output); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, stdout)
+	}
+	if output["revoked"] != false {
+		t.Errorf("revoked = %v, want false", output["revoked"])
+	}
+	if output["message"] != "no active pairing" {
+		t.Errorf("message = %v, want 'no active pairing'",
+			output["message"])
+	}
+}
+
+func TestRevoke_JSONOutput_WithToken(t *testing.T) {
+	t.Setenv("RENOTIFY_USERNAME", "testuser")
+	stateDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", stateDir)
+
+	// Create a token file.
+	pairingDir := filepath.Join(stateDir, "renotify", "pairing")
+	os.MkdirAll(pairingDir, 0700)
+	os.WriteFile(filepath.Join(pairingDir, "token"),
+		[]byte("rn_tk_TESTTOKEN\n"), 0600)
+
+	stdout, _, err := executeCommand("revoke", "--format", "json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var output map[string]interface{}
+	if err := json.Unmarshal([]byte(stdout), &output); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, stdout)
+	}
+	if output["revoked"] != true {
+		t.Errorf("revoked = %v, want true", output["revoked"])
 	}
 }
 

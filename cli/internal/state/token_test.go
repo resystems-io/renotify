@@ -157,3 +157,41 @@ func TestWriteUsername_Permissions(t *testing.T) {
 		t.Errorf("file perm = %o, want 0600", perm)
 	}
 }
+
+func TestDeletePairingToken_Exists(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "token")
+	os.WriteFile(path, []byte("rn_tk_TEST\n"), 0600)
+
+	if err := DeletePairingToken(path); err != nil {
+		t.Fatalf("DeletePairingToken: %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("token file should be deleted")
+	}
+}
+
+func TestDeletePairingToken_NotExists(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nonexistent")
+	if err := DeletePairingToken(path); err != nil {
+		t.Fatalf("expected nil error for missing file, got %v", err)
+	}
+}
+
+func TestDeletePairingUsername_Exists(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "username")
+	os.WriteFile(path, []byte("testuser\n"), 0600)
+
+	if err := DeletePairingUsername(path); err != nil {
+		t.Fatalf("DeletePairingUsername: %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("username file should be deleted")
+	}
+}
+
+func TestDeletePairingUsername_NotExists(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nonexistent")
+	if err := DeletePairingUsername(path); err != nil {
+		t.Fatalf("expected nil error for missing file, got %v", err)
+	}
+}
