@@ -130,6 +130,22 @@ func (s *EmbeddedServer) ClientURL() string {
 	return fmt.Sprintf("nats://%s:%d", s.opts.Host, s.opts.Port)
 }
 
+// ReloadAuth rebuilds the NATS auth configuration with the
+// given pairing token and applies it to the running server via
+// ReloadOptions. This is called on SIGHUP after `renotify pair`
+// writes a new token to disk.
+func (s *EmbeddedServer) ReloadAuth(username, internalToken, pairingToken string) error {
+	if s.srv == nil {
+		return fmt.Errorf("server not started")
+	}
+	newOpts := *s.opts
+	newOpts.Users = BuildAuthConfig(username, internalToken, pairingToken)
+	if err := s.srv.ReloadOptions(&newOpts); err != nil {
+		return fmt.Errorf("reload auth: %w", err)
+	}
+	return nil
+}
+
 // Server returns the underlying nats-server instance for testing.
 func (s *EmbeddedServer) Server() *server.Server {
 	return s.srv

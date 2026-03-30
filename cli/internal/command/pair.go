@@ -4,6 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
+	"strconv"
+	"strings"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -91,10 +95,18 @@ Examples:
 
 			switch format {
 			case "json":
-				return writeJSONOutput(out, result)
+				if err := writeJSONOutput(out, result); err != nil {
+					return err
+				}
 			default:
-				return writeTextOutput(out, result)
+				if err := writeTextOutput(out, result); err != nil {
+					return err
+				}
 			}
+
+			// Signal the running daemon to reload auth config.
+			notifyDaemon(cmd)
+			return nil
 		},
 	}
 
@@ -147,4 +159,39 @@ func writeJSONOutput(w interface{ Write([]byte) (int, error) }, result *pairing.
 		CertRegenerated: result.CertRegenerated,
 		Username:        result.Username,
 	})
+}
+
+// notifyDaemon sends SIGHUP to the running daemon (if any) to
+// trigger an auth reload. If the daemon is not running, prints
+// a hint to start it.
+func notifyDaemon(cmd *cobra.Command) {
+	pidPath := xdg.PIDPath()
+	data, err := os.ReadFile(pidPath)
+	if err != nil {
+		fmt.Fprintln(cmd.ErrOrStderr(),
+			"Note: no running daemon detected. "+
+				"Start with: renotify daemon start")
+		return
+	}
+
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		return
+	}
+
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return
+	}
+
+	if err := proc.Signal(syscall.SIGHUP); err != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(),
+			"Note: could not signal daemon (PID %d): %v\n"+
+				"Restart with: renotify daemon stop && "+
+				"renotify daemon start\n", pid, err)
+		return
+	}
+
+	fmt.Fprintf(cmd.ErrOrStderr(),
+		"Daemon (PID %d) notified to reload auth.\n", pid)
 }
