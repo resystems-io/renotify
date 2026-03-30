@@ -104,6 +104,7 @@ Diagnostics (MCP):
 		newDaemonStartCmd(app),
 		newDaemonStopCmd(),
 		newDaemonStatusCmd(),
+		newDaemonReloadCmd(),
 	)
 
 	return cmd
@@ -292,6 +293,46 @@ func newDaemonStatusCmd() *cobra.Command {
 	}
 }
 
+func newDaemonReloadCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "reload",
+		Short: "Reload daemon auth configuration",
+		Long: `Send SIGHUP to the running daemon to reload the pairing
+token and auth configuration from disk. This is the same
+signal that 'renotify pair' sends automatically after
+generating a new token.
+
+Use this to apply configuration changes without restarting
+the daemon.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pid, ok := readPID()
+			if !ok {
+				return exitcode.Errorf(exitcode.Error,
+					"no PID file found (daemon not running?)")
+			}
+			if !processRunning(pid) {
+				os.Remove(xdg.PIDPath())
+				return exitcode.Errorf(exitcode.Error,
+					"daemon not running (stale PID %d removed)", pid)
+			}
+
+			proc, err := os.FindProcess(pid)
+			if err != nil {
+				return exitcode.Errorf(exitcode.Error,
+					"find process %d: %v", pid, err)
+			}
+			if err := proc.Signal(syscall.SIGHUP); err != nil {
+				return exitcode.Errorf(exitcode.Error,
+					"signal process %d: %v", pid, err)
+			}
+
+			fmt.Fprintf(cmd.ErrOrStderr(),
+				"Reload signal sent to daemon (PID %d)\n", pid)
+			return nil
+		},
+	}
+}
+
 // runDaemon runs the daemon in the current process (foreground
 // mode or as the re-exec'd child).
 func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
@@ -321,12 +362,18 @@ func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
 		)
 	}
 
-	// Signal handling.
+	// Signal handling: SIGINT/SIGTERM for shutdown, SIGHUP for
+	// auth reload (triggered by `renotify pair`).
 	ctx, stop := signal.NotifyContext(cmd.Context(),
 		syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	reloadCh := make(chan os.Signal, 1)
+	signal.Notify(reloadCh, syscall.SIGHUP)
+	defer signal.Stop(reloadCh)
+
 	ctrl := daemon.NewController(cfg, opts...)
+	ctrl.ReloadCh = reloadCh
 	if err := ctrl.Run(ctx); err != nil {
 		return exitcode.Errorf(exitcode.Error, "%v", err)
 	}

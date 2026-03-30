@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -24,6 +25,11 @@ type Controller struct {
 	logger         *slog.Logger
 	subsystems     []Subsystem
 	startupTimeout time.Duration
+
+	// ReloadCh receives a signal (e.g., from SIGHUP) to reload
+	// the pairing token and update the embedded broker's auth.
+	// Nil disables reload support.
+	ReloadCh <-chan os.Signal
 
 	// Overridable paths for testing.
 	DaemonIDPath      string
@@ -153,10 +159,58 @@ func (c *Controller) Run(ctx context.Context) error {
 		"username", c.cfg.Username,
 	)
 
-	// 4. Block until context cancelled.
-	<-ctx.Done()
+	// 4. Block until context cancelled, handling reload signals.
+	for {
+		if c.ReloadCh == nil {
+			<-ctx.Done()
+			break
+		}
+		select {
+		case <-ctx.Done():
+			break
+		case <-c.ReloadCh:
+			c.reloadAuth(embeddedSrv)
+			continue
+		}
+		break
+	}
 	c.logger.Info("shutting down")
 	return nil
+}
+
+// reloadAuth re-reads the pairing token from disk and applies
+// the updated auth configuration to the embedded broker.
+func (c *Controller) reloadAuth(srv *broker.EmbeddedServer) {
+	c.logger.Info("reloading auth configuration (SIGHUP)")
+
+	if srv == nil {
+		c.logger.Warn("auth reload skipped: shared broker mode")
+		return
+	}
+
+	// Re-read tokens from disk.
+	internalToken, err := state.LoadOrGenerateToken(c.InternalTokenPath)
+	if err != nil {
+		c.logger.Error("reload: read internal token", "err", err)
+		return
+	}
+	pairingToken, err := state.LoadPairingToken(c.PairingTokenPath)
+	if err != nil {
+		c.logger.Error("reload: read pairing token", "err", err)
+		return
+	}
+
+	if err := srv.ReloadAuth(c.cfg.Username, internalToken, pairingToken); err != nil {
+		c.logger.Error("reload: apply auth config", "err", err)
+		return
+	}
+
+	if pairingToken != "" {
+		c.logger.Info("auth reloaded",
+			"pairing_token", pairingToken[:10]+"...")
+	} else {
+		c.logger.Info("auth reloaded", "pairing_token", "(none)")
+	}
 }
 
 func (c *Controller) startEmbedded(_ context.Context) (*nats.Conn, *broker.EmbeddedServer, error) {
