@@ -36,7 +36,7 @@ func TestRootHelp(t *testing.T) {
 	if !strings.Contains(stdout, "Available Commands") {
 		t.Error("help output missing 'Available Commands'")
 	}
-	for _, cmd := range []string{"daemon", "post", "ask", "history", "pair", "revoke", "extract-apk"} {
+	for _, cmd := range []string{"daemon", "post", "ask", "history", "pair", "revoke", "apk"} {
 		if !strings.Contains(stdout, cmd) {
 			t.Errorf("help output missing command %q", cmd)
 		}
@@ -54,7 +54,8 @@ func TestSubcommandHelp(t *testing.T) {
 		{"history", []string{"--workspace-id", "--flow-id", "--since", "--until", "--limit", "--offset", "--format"}},
 		{"pair", []string{"--ip", "--regenerate-cert", "--format"}},
 		{"revoke", []string{"--format"}},
-		{"extract-apk", []string{"--output"}},
+		{"apk extract", []string{"--output"}},
+		{"apk serve", []string{"--addr", "--port"}},
 	}
 
 	for _, tc := range commands {
@@ -396,9 +397,9 @@ func TestRevoke_JSONOutput_WithToken(t *testing.T) {
 	}
 }
 
-func TestExtractAPKRuns(t *testing.T) {
+func TestAPKExtractRuns(t *testing.T) {
 	t.Setenv("RENOTIFY_USERNAME", "testuser")
-	_, stderr, err := executeCommand("extract-apk",
+	_, stderr, err := executeCommand("apk", "extract",
 		"--output", "/tmp/test.apk",
 	)
 	if err != nil {
@@ -406,6 +407,31 @@ func TestExtractAPKRuns(t *testing.T) {
 	}
 	if !strings.Contains(stderr, "not yet implemented") {
 		t.Error("expected stub message on stderr")
+	}
+}
+
+func TestAPKServeRuns(t *testing.T) {
+	t.Setenv("RENOTIFY_USERNAME", "testuser")
+	_, stderr, err := executeCommand("apk", "serve",
+		"--port", "8080",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(stderr, "not yet implemented") {
+		t.Error("expected stub message on stderr")
+	}
+}
+
+func TestAPKSubcommands(t *testing.T) {
+	stdout, _, err := executeCommand("apk", "--help")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, sub := range []string{"extract", "serve"} {
+		if !strings.Contains(stdout, sub) {
+			t.Errorf("apk help missing subcommand %q", sub)
+		}
 	}
 }
 

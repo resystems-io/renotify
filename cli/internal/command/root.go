@@ -60,7 +60,7 @@ back to the originating pipeline.`,
 		newHistoryCmd(app),
 		newPairCmd(app),
 		newRevokeCmd(app),
-		newExtractAPKCmd(app),
+		newAPKCmd(app),
 	)
 
 	return root
