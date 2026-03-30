@@ -49,7 +49,7 @@ AVD_NAME    ?= renotify-test
 EMULATOR    := $(ANDROID_HOME)/emulator/emulator
 ADB         := $(ANDROID_HOME)/platform-tools/adb
 
-.PHONY: emulator emulator-start emulator-stop emulator-test emulator-install install
+.PHONY: emulator emulator-start emulator-stop emulator-test emulator-install install install-release uninstall
 
 emulator:
 	@echo "Launching emulator $(AVD_NAME) with visible window..."
@@ -84,5 +84,12 @@ emulator-test: emulator-start connected-test
 install: build-debug
 	$(ADB) install -r app/build/outputs/apk/debug/app-debug.apk
 	@echo "Installed. Launch with: $(ADB) shell am start -n io.resystems.renotify/.MainActivity"
+
+install-release: build
+	$(ADB) install -r app/build/outputs/apk/release/app-release.apk
+	@echo "Installed. Launch with: $(ADB) shell am start -n io.resystems.renotify/.MainActivity"
+
+uninstall:
+	$(ADB) uninstall io.resystems.renotify
 
 emulator-install: emulator-start install

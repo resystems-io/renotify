@@ -25,7 +25,7 @@ build-android:
 
 build-cli: build-android
 	@mkdir -p cli/embed
-	cp clients/android/app/build/outputs/apk/release/app-release-unsigned.apk \
+	cp clients/android/app/build/outputs/apk/release/app-release.apk \
 		cli/embed/app-release.apk
 	$(MAKE) -C cli build
 
