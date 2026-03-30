@@ -49,13 +49,42 @@ Diagnostics (NATS):
     nats pub "resystems.renotify.<username>.test" "hello" \
       --user daemon --password "$TOKEN"
 
-  List JetStream streams:
+  List JetStream streams and consumers:
 
     nats stream ls --user daemon --password "$TOKEN"
+    nats consumer ls RENOTIFY --user daemon --password "$TOKEN"
 
   Connection and account info:
 
     nats account info --user daemon --password "$TOKEN"
+
+Diagnostics (WSS — mobile connection path):
+
+  The WSS listener (0.0.0.0:4223) is used by the Android app.
+  Test the mobile connection path from the CLI using the pairing
+  token and the self-signed certificate:
+
+  Read the pairing token:
+
+    PAIRING_TOKEN=$(cat ~/.local/state/renotify/pairing/token)
+
+  Subscribe via WSS (loopback):
+
+    nats sub "resystems.renotify.<username>.>" \
+      --server "wss://127.0.0.1:4223" \
+      --user mobile --password "$PAIRING_TOKEN" \
+      --tlsca ~/.local/state/renotify/tls/cert.pem
+
+  Subscribe via WSS (LAN IP, simulates phone connection):
+
+    nats sub "resystems.renotify.<username>.>" \
+      --server "wss://<lan-ip>:4223" \
+      --user mobile --password "$PAIRING_TOKEN" \
+      --tlsca ~/.local/state/renotify/tls/cert.pem
+
+  If the WSS connection succeeds from the CLI but the Android app
+  fails, the issue is between the phone and the host (firewall,
+  routing, or TLS fingerprint mismatch after cert regeneration).
 
 Diagnostics (MCP):
 

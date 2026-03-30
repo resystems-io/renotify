@@ -7,6 +7,7 @@
 # Standard targets:
 #   make                — build the release APK (default)
 #   make build          — same as above
+#   make build-debug    — build the debug APK
 #   make test           — run JVM unit tests (no device required)
 #   make connected-test — run instrumented tests (requires
 #                         running emulator or connected device)
@@ -18,10 +19,13 @@ GRADLEW := ./gradlew
 
 .DEFAULT_GOAL := build
 
-.PHONY: build test connected-test clean
+.PHONY: build build-debug test connected-test clean
 
 build:
 	$(GRADLEW) assembleRelease
+
+build-debug:
+	$(GRADLEW) assembleDebug
 
 test:
 	$(GRADLEW) test

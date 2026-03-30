@@ -22,7 +22,8 @@ class EncryptedProvisioningStoreTest {
         host = "192.168.1.42",
         port = 4223,
         token = "rn_tk_0A1B2C3D4E5F6G7H8J9K0M1N2P3Q4R5S6T7V8W9X0Y1Z2A3B4C5D",
-        certFingerprint = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        certFingerprint = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+        username = "testuser"
     )
 
     @Before

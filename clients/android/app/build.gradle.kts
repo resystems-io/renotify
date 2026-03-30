@@ -31,6 +31,12 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    packaging {
+        resources {
+            excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+        }
+    }
 }
 
 dependencies {
@@ -49,9 +55,20 @@ dependencies {
     // Encrypted credential storage
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
+    // NATS Java client (WSS, JetStream, token auth)
+    implementation("io.nats:jnats:2.21.1")
+
+    // Kotlin coroutines for Android
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
+
+    // Lifecycle-aware coroutine scopes for Activity and Service
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.0")
+    implementation("androidx.lifecycle:lifecycle-service:2.9.0")
+
     // JVM unit tests
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
 
     // Instrumented tests
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

@@ -36,18 +36,20 @@ $(shell \
 #                            already running); used by CI and
 #                            automated test targets
 #   make emulator-stop     — shut down the emulator
-#   make emulator-install  — build debug APK and install on the
-#                            running emulator or connected device
-#   make emulator-test     — start headless emulator if needed,
+#   make install            — build debug APK and install on any
+#                            connected device or running emulator
+#   make emulator-install   — start emulator if needed, then
+#                            install
+#   make emulator-test      — start headless emulator if needed,
 #                            then run instrumented tests
-#   make connected-test    — run instrumented tests only (assumes
+#   make connected-test     — run instrumented tests only (assumes
 #                            emulator or device already connected)
 
 AVD_NAME    ?= renotify-test
 EMULATOR    := $(ANDROID_HOME)/emulator/emulator
 ADB         := $(ANDROID_HOME)/platform-tools/adb
 
-.PHONY: emulator emulator-start emulator-stop emulator-test emulator-install
+.PHONY: emulator emulator-start emulator-stop emulator-test emulator-install install
 
 emulator:
 	@echo "Launching emulator $(AVD_NAME) with visible window..."
@@ -79,7 +81,8 @@ emulator-stop:
 
 emulator-test: emulator-start connected-test
 
-emulator-install: emulator-start
-	$(GRADLEW) assembleDebug
+install: build-debug
 	$(ADB) install -r app/build/outputs/apk/debug/app-debug.apk
 	@echo "Installed. Launch with: $(ADB) shell am start -n io.resystems.renotify/.MainActivity"
+
+emulator-install: emulator-start install

@@ -95,13 +95,18 @@ username or flow ID to scope their state.
 | `daemon-interject-{username}` | Durable | `resystems.renotify.{username}.flow.*.interject` | Explicit | 3 | 64 | All | 5 minutes | Daemon: routes interjections to flow handlers |
 | `cli-response-{flow_id}` | Ephemeral | `resystems.renotify.{username}.flow.{flow_id}.response` | Explicit | 1 | 1 | New | N/A | CLI `ask`: blocks for exactly one response |
 
-**Mobile consumer:** Durable so the broker remembers its ack position across
-WebSocket reconnections. The 35-minute inactive threshold exceeds the 30-minute
-message TTL to ensure the consumer is not garbage-collected before its messages
-expire. AckExplicit ensures the mobile app positively acknowledges each message
-after rendering; if the app crashes mid-render, the message is redelivered on
-reconnect (up to MaxDeliver=3). MaxAckPending=256 allows the app to process a
-backlog of buffered messages after reconnection without back-pressure stalling.
+**Mobile consumer:** Durable push consumer with a deliver subject
+(`resystems.renotify.{username}.mobile.deliver`). The deliver subject is within
+the user's namespace so it falls under the mobile account's existing subscribe
+ACL. Push delivery is required because the jnats client library's
+`PushSubscribeOptions.bind()` expects a deliver subject to subscribe to; without
+one the consumer would be pull-only and require a different subscription API.
+The 35-minute inactive threshold exceeds the 30-minute message TTL to ensure
+the consumer is not garbage-collected before its messages expire. AckExplicit
+ensures the mobile app positively acknowledges each message after rendering; if
+the app crashes mid-render, the message is redelivered on reconnect (up to
+MaxDeliver=3). MaxAckPending=256 allows the app to process a backlog of
+buffered messages after reconnection without back-pressure stalling.
 
 **Daemon consumers:** Durable for the same ack-position persistence reason. The
 5-minute inactive threshold matches the stale-flow reaping grace period
@@ -412,15 +417,27 @@ practical brute-force threshold.
 
 ### 6.4 NATS Auth Integration (Embedded Broker)
 
-The embedded NATS server is configured with a two-account model:
+The embedded NATS server is configured with a two-account model.
+Both accounts use NATS username/password authentication (not token
+auth):
 
-* **Daemon account:** Uses an internal token for the daemon's own
-  NATS connection and co-located CLI processes connecting via the
-  loopback TCP listener. Full publish/subscribe permissions (see
-  Section 7).
-* **Mobile account:** Uses the pairing token (`rn_tk_...`) for the
-  mobile app connecting via WSS. Scoped publish/subscribe
-  permissions (see Section 7).
+* **Daemon account:** NATS username `daemon`, password = internal
+  token. Used by the daemon's own NATS connection and co-located
+  CLI processes connecting via the loopback TCP listener. Full
+  publish/subscribe permissions scoped to
+  `resystems.renotify.{username}.>` (see Section 7).
+* **Mobile account:** NATS username `mobile`, password = pairing
+  token (`rn_tk_...`). Used by the Android app connecting via
+  WSS. Scoped publish/subscribe permissions within
+  `resystems.renotify.{username}.>` (see Section 7).
+
+The `{username}` in the ACL subject patterns is the daemon
+operator's identity (e.g., `stewart` from `config.Username`), not
+the NATS authentication username. On the embedded broker, the ACL
+is baked at server startup from the daemon's configured username.
+On a shared broker, the operator is responsible for creating
+per-developer accounts with equivalent per-namespace ACL scoping
+(see Section 6.5).
 
 The embedded NATS server API supports runtime auth reconfiguration.
 When `renotify pair` or `renotify revoke` is executed while the
@@ -525,6 +542,7 @@ publish to subjects that represent legitimate user actions:
 | Publish | `resystems.renotify.{username}.svc.*` | Send service requests (active flows, history queries) |
 | Publish | `$JS.ACK.>` | Acknowledge JetStream messages |
 | Publish | `$JS.FC.>` | JetStream flow control |
+| Publish | `$JS.API.CONSUMER.INFO.>` | Look up consumer info for push subscription binding |
 | Subscribe | `_INBOX.>` | Receive Core NATS request-reply responses |
 
 **Security property:** The mobile client cannot publish to `*.request`,

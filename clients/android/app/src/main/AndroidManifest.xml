@@ -12,6 +12,10 @@
     <uses-feature android:name="android.hardware.camera"
         android:required="true" />
 
+    <!-- Foreground service for persistent NATS connection (M-02) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
     <application
         android:label="Renotify"
         android:supportsRtl="true">
@@ -27,6 +31,11 @@
 
         <activity
             android:name=".pairing.ScannerActivity"
+            android:exported="false" />
+
+        <service
+            android:name=".nats.NatsService"
+            android:foregroundServiceType="dataSync"
             android:exported="false" />
 
     </application>

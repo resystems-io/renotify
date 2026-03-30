@@ -121,6 +121,7 @@ func streamConfig(cfg config.JetStreamConfig) natsjs.StreamConfig {
 func mobileConsumerConfig(username string) natsjs.ConsumerConfig {
 	return natsjs.ConsumerConfig{
 		Durable:           MobileConsumerName(username),
+		DeliverSubject:    "resystems.renotify." + username + ".mobile.deliver",
 		FilterSubject:     "resystems.renotify." + username + ".flow.>",
 		AckPolicy:         natsjs.AckExplicitPolicy,
 		MaxDeliver:        3,

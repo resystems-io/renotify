@@ -17,8 +17,9 @@ class ProvisioningPayloadTest {
         h: String = "\"192.168.1.42\"",
         p: String = "4223",
         t: String = "\"$validToken\"",
-        c: String = "\"$validFingerprint\""
-    ): String = """{"v":$v,"h":$h,"p":$p,"t":$t,"c":$c}"""
+        c: String = "\"$validFingerprint\"",
+        u: String = "\"testuser\""
+    ): String = """{"v":$v,"h":$h,"p":$p,"t":$t,"c":$c,"u":$u}"""
 
     // --- Valid parsing ---
 
@@ -30,11 +31,12 @@ class ProvisioningPayloadTest {
         assertEquals(4223, pp.port)
         assertEquals(validToken, pp.token)
         assertEquals(validFingerprint, pp.certFingerprint)
+        assertEquals("testuser", pp.username)
     }
 
     @Test
     fun validPayload_extraFieldsIgnored() {
-        val json = """{"v":1,"h":"10.0.0.1","p":4223,"t":"$validToken","c":"$validFingerprint","extra":"ignored"}"""
+        val json = """{"v":1,"h":"10.0.0.1","p":4223,"t":"$validToken","c":"$validFingerprint","u":"testuser","extra":"ignored"}"""
         val pp = ProvisioningPayload.fromJson(json)
         assertEquals("10.0.0.1", pp.host)
     }
@@ -90,7 +92,7 @@ class ProvisioningPayloadTest {
 
     @Test
     fun invalidVersion_missing_throws() {
-        val json = """{"h":"10.0.0.1","p":4223,"t":"$validToken","c":"$validFingerprint"}"""
+        val json = """{"h":"10.0.0.1","p":4223,"t":"$validToken","c":"$validFingerprint","u":"testuser"}"""
         expectIAE { ProvisioningPayload.fromJson(json) }
     }
 
@@ -108,7 +110,7 @@ class ProvisioningPayloadTest {
 
     @Test
     fun invalidHost_missing_throws() {
-        val json = """{"v":1,"p":4223,"t":"$validToken","c":"$validFingerprint"}"""
+        val json = """{"v":1,"p":4223,"t":"$validToken","c":"$validFingerprint","u":"testuser"}"""
         expectIAE { ProvisioningPayload.fromJson(json) }
     }
 
@@ -131,7 +133,7 @@ class ProvisioningPayloadTest {
 
     @Test
     fun invalidPort_missing_throws() {
-        val json = """{"v":1,"h":"10.0.0.1","t":"$validToken","c":"$validFingerprint"}"""
+        val json = """{"v":1,"h":"10.0.0.1","t":"$validToken","c":"$validFingerprint","u":"testuser"}"""
         expectIAE { ProvisioningPayload.fromJson(json) }
     }
 
@@ -162,7 +164,7 @@ class ProvisioningPayloadTest {
 
     @Test
     fun invalidToken_missing_throws() {
-        val json = """{"v":1,"h":"10.0.0.1","p":4223,"c":"$validFingerprint"}"""
+        val json = """{"v":1,"h":"10.0.0.1","p":4223,"c":"$validFingerprint","u":"testuser"}"""
         expectIAE { ProvisioningPayload.fromJson(json) }
     }
 
@@ -225,7 +227,7 @@ class ProvisioningPayloadTest {
 
     @Test
     fun invalidFingerprint_missing_throws() {
-        val json = """{"v":1,"h":"10.0.0.1","p":4223,"t":"$validToken"}"""
+        val json = """{"v":1,"h":"10.0.0.1","p":4223,"t":"$validToken","u":"testuser"}"""
         expectIAE { ProvisioningPayload.fromJson(json) }
     }
 
@@ -249,6 +251,29 @@ class ProvisioningPayloadTest {
     @Test
     fun malformedJson_array_throws() {
         expectIAE { ProvisioningPayload.fromJson("[]") }
+    }
+
+    // --- Username validation ---
+
+    @Test
+    fun validUsername_withUnderscore() {
+        val pp = ProvisioningPayload.fromJson(
+            validJson(u = "\"test_user\"")
+        )
+        assertEquals("test_user", pp.username)
+    }
+
+    @Test
+    fun invalidUsername_empty_throws() {
+        expectIAE {
+            ProvisioningPayload.fromJson(validJson(u = "\"\""))
+        }
+    }
+
+    @Test
+    fun invalidUsername_missing_throws() {
+        val json = """{"v":1,"h":"10.0.0.1","p":4223,"t":"$validToken","c":"$validFingerprint"}"""
+        expectIAE { ProvisioningPayload.fromJson(json) }
     }
 
     // --- Helper ---

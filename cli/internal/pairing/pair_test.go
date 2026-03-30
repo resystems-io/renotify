@@ -205,10 +205,24 @@ func TestPair_PayloadMinifiedKeys(t *testing.T) {
 	}
 
 	// Verify single-character JSON keys.
-	for _, key := range []string{`"v":`, `"h":`, `"p":`, `"t":`, `"c":`} {
+	for _, key := range []string{`"v":`, `"h":`, `"p":`, `"t":`, `"c":`, `"u":`} {
 		if !strings.Contains(result.PayloadJSON, key) {
 			t.Errorf("payload missing key %s", key)
 		}
+	}
+}
+
+func TestPair_PayloadUsername(t *testing.T) {
+	cfg := testConfig(t)
+	result, err := Pair(cfg)
+	if err != nil {
+		t.Fatalf("Pair: %v", err)
+	}
+
+	var payload ProvisioningPayload
+	json.Unmarshal([]byte(result.PayloadJSON), &payload)
+	if payload.Username != "testuser" {
+		t.Errorf("username = %q, want testuser", payload.Username)
 	}
 }
 

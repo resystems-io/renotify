@@ -13,7 +13,8 @@ data class ProvisioningPayload(
     val host: String,
     val port: Int,
     val token: String,
-    val certFingerprint: String
+    val certFingerprint: String,
+    val username: String
 ) {
     companion object {
         // Crockford Base32 body: excludes I, L, O, U in both cases.
@@ -66,12 +67,18 @@ data class ProvisioningPayload(
                 )
             }
 
+            val username = requireString(obj, "u")
+            if (username.isEmpty()) {
+                throw IllegalArgumentException("username is empty")
+            }
+
             return ProvisioningPayload(
                 version = version,
                 host = host,
                 port = port,
                 token = token,
-                certFingerprint = cert
+                certFingerprint = cert,
+                username = username
             )
         }
 
