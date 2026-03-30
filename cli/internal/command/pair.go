@@ -133,6 +133,7 @@ type pairJSONOutput struct {
 	Token           string `json:"token"`
 	CertFingerprint string `json:"cert_fingerprint"`
 	CertRegenerated bool   `json:"cert_regenerated"`
+	Username        string `json:"username"`
 }
 
 func writeJSONOutput(w interface{ Write([]byte) (int, error) }, result *pairing.Result) error {
@@ -144,5 +145,6 @@ func writeJSONOutput(w interface{ Write([]byte) (int, error) }, result *pairing.
 		Token:           result.Token,
 		CertFingerprint: result.CertFingerprint,
 		CertRegenerated: result.CertRegenerated,
+		Username:        result.Username,
 	})
 }

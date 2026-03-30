@@ -224,15 +224,19 @@ func TestEnsureJetStream_Creates(t *testing.T) {
 		t.Error("stream storage should be memory")
 	}
 
-	// Verify all 3 consumers.
-	for _, name := range []string{
-		"mobile-testuser",
-		"daemon-lifecycle-testuser",
-		"daemon-interject-testuser",
-	} {
-		if _, err := js.Consumer(ctx, StreamName, name); err != nil {
-			t.Errorf("consumer %q not found: %v", name, err)
-		}
+	// Verify all 3 consumers exist. The mobile consumer is push;
+	// lifecycle and interject are pull.
+	if _, err := js.PushConsumer(ctx, StreamName,
+		"mobile-testuser"); err != nil {
+		t.Errorf("mobile consumer not found: %v", err)
+	}
+	if _, err := js.Consumer(ctx, StreamName,
+		"daemon-lifecycle-testuser"); err != nil {
+		t.Errorf("lifecycle consumer not found: %v", err)
+	}
+	if _, err := js.Consumer(ctx, StreamName,
+		"daemon-interject-testuser"); err != nil {
+		t.Errorf("interject consumer not found: %v", err)
 	}
 }
 
@@ -285,36 +289,32 @@ func TestEnsureJetStream_MobileConsumerReceives(t *testing.T) {
 
 	EnsureJetStream(ctx, nc, "testuser", defaultJSConfig(), testLogger())
 
+	// The mobile consumer is push-based with a deliver subject.
+	// Subscribe to the deliver subject to receive messages.
+	deliverSubject := "resystems.renotify.testuser.mobile.deliver"
+	sub, err := nc.SubscribeSync(deliverSubject)
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	nc.Flush()
+
 	// Publish to a flow request subject.
 	js, _ := natsjs.New(nc)
-	_, err := js.Publish(ctx,
+	_, err = js.Publish(ctx,
 		"resystems.renotify.testuser.flow.f001.request",
 		[]byte("hello mobile"))
 	if err != nil {
 		t.Fatalf("publish: %v", err)
 	}
 
-	// Fetch from mobile consumer.
-	consumer, err := js.Consumer(ctx, StreamName,
-		MobileConsumerName("testuser"))
+	// Receive from the push deliver subject.
+	msg, err := sub.NextMsg(2 * time.Second)
 	if err != nil {
-		t.Fatalf("consumer: %v", err)
+		t.Fatalf("receive: %v", err)
 	}
-	msgs, err := consumer.Fetch(1, natsjs.FetchMaxWait(2*time.Second))
-	if err != nil {
-		t.Fatalf("fetch: %v", err)
-	}
-	var received int
-	for msg := range msgs.Messages() {
-		if string(msg.Data()) != "hello mobile" {
-			t.Errorf("data = %q, want 'hello mobile'",
-				string(msg.Data()))
-		}
-		msg.Ack()
-		received++
-	}
-	if received != 1 {
-		t.Errorf("received %d messages, want 1", received)
+	if string(msg.Data) != "hello mobile" {
+		t.Errorf("data = %q, want 'hello mobile'",
+			string(msg.Data))
 	}
 }
 
@@ -411,17 +411,24 @@ func TestEnsureJetStream_ConsumerIsolation(t *testing.T) {
 		t.Fatalf("publish: %v", err)
 	}
 
-	// Mobile consumer should see it (filter: .flow.>).
-	mobile, err := js.Consumer(ctx, StreamName,
-		MobileConsumerName("testuser"))
+	// Mobile consumer should see it (push, filter: .flow.>).
+	deliverSubject := "resystems.renotify.testuser.mobile.deliver"
+	sub, err := nc.SubscribeSync(deliverSubject)
 	if err != nil {
-		t.Fatalf("mobile consumer: %v", err)
+		t.Fatalf("subscribe mobile: %v", err)
 	}
-	msgs, _ := mobile.Fetch(1, natsjs.FetchMaxWait(2*time.Second))
-	var mobileCount int
-	for msg := range msgs.Messages() {
-		msg.Ack()
-		mobileCount++
+	nc.Flush()
+
+	// Re-publish so the push subscriber receives it (the first
+	// publish may have been delivered before we subscribed).
+	js.Publish(ctx,
+		"resystems.renotify.testuser.flow.f001.lifecycle",
+		[]byte("lifecycle event 2"))
+
+	msg, err := sub.NextMsg(2 * time.Second)
+	mobileCount := 0
+	if err == nil && msg != nil {
+		mobileCount = 1
 	}
 	if mobileCount != 1 {
 		t.Errorf("mobile received %d, want 1", mobileCount)
@@ -430,7 +437,7 @@ func TestEnsureJetStream_ConsumerIsolation(t *testing.T) {
 	// Interject consumer should NOT see it (filter: .interject).
 	interject, _ := js.Consumer(ctx, StreamName,
 		InterjectConsumerName("testuser"))
-	msgs, _ = interject.Fetch(1, natsjs.FetchMaxWait(500*time.Millisecond))
+	msgs, _ := interject.Fetch(1, natsjs.FetchMaxWait(500*time.Millisecond))
 	var interjectCount int
 	for msg := range msgs.Messages() {
 		msg.Ack()

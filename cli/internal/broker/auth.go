@@ -55,6 +55,7 @@ func BuildAuthConfig(username, internalToken, pairingToken string) []*server.Use
 						prefix + ".svc.*",
 						"$JS.ACK.>",
 						"$JS.FC.>",
+						"$JS.API.CONSUMER.INFO.>",
 					},
 				},
 				Subscribe: &server.SubjectPermission{

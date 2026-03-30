@@ -136,6 +136,113 @@ replaced. The main screen shows the updated connection details.
 $ANDROID_HOME/platform-tools/adb uninstall io.resystems.renotify
 ```
 
+## 10. Network Connectivity for NATS Testing
+
+After pairing, the app starts a foreground service that connects
+to the daemon's WSS listener. The device must be able to reach
+the daemon over the network.
+
+### 10.1 Firewall rules
+
+The daemon's WSS listener (default port 4223) binds to
+`0.0.0.0` but may be blocked by the host firewall. On
+Ubuntu/Debian with `ufw`:
+
+```bash
+# Allow WSS from local network
+sudo ufw allow from 192.168.0.0/16 to any port 4223 proto tcp
+
+# After testing, revoke the rule:
+sudo ufw delete allow from 192.168.0.0/16 to any port 4223 proto tcp
+```
+
+### 10.2 Emulator networking
+
+The Android emulator routes `10.0.2.2` to the host's loopback
+interface. The WSS listener on `0.0.0.0:4223` is reachable
+without firewall changes. Generate a pairing QR with the
+emulator IP:
+
+```bash
+renotify pair --ip 10.0.2.2
+```
+
+### 10.3 Verifying the connection
+
+After scanning the pairing QR code, a persistent notification
+appears showing the connection state:
+
+- **"Connecting..."** — TLS handshake and auth in progress
+- **"Connected to {ip}:{port}"** — success
+- **"Disconnected — reconnecting..."** — connection lost,
+  exponential backoff active
+- **"Error: ..."** — TLS fingerprint mismatch or auth failure
+
+If the connection fails, check:
+
+1. Daemon is running: `renotify daemon start --foreground`
+2. WSS listener is active (look for `websocket` in daemon logs)
+3. TLS cert exists: `ls ~/.local/state/renotify/tls/`
+4. Firewall allows port 4223 from the device's subnet
+5. Device can reach the host: ping the host IP from the device
+
+### 10.4 Viewing device logs
+
+The app logs connection events, errors, and state transitions
+via Android's `Log` API. Use `adb logcat` to view them in real
+time or retrieve recent entries.
+
+**Real-time log stream** (filtered to Renotify tags):
+
+```bash
+$ANDROID_HOME/platform-tools/adb logcat -s \
+    NatsConnectionManager:* NatsService:* ScannerActivity:*
+```
+
+**Dump recent logs** (non-blocking):
+
+```bash
+$ANDROID_HOME/platform-tools/adb logcat -d -s \
+    NatsConnectionManager:* NatsService:* ScannerActivity:*
+```
+
+**All app logs** (broader filter, includes system messages):
+
+```bash
+$ANDROID_HOME/platform-tools/adb logcat -d | grep -i renotify
+```
+
+**If multiple devices are connected**, specify the target:
+
+```bash
+$ANDROID_HOME/platform-tools/adb -s <SERIAL> logcat -s \
+    NatsConnectionManager:*
+```
+
+Key log messages to look for:
+
+- `NatsConnectionManager: Connected to {ip}:{port}` — success
+- `NatsConnectionManager: Connection failed: ...` — first
+  attempt error with full exception message
+- `NatsConnectionManager: Reconnect attempt N failed: ...` —
+  backoff retry error
+- `NatsService: No provisioning data, stopping` — store is empty
+
+The exception message in the log typically reveals the root
+cause: `SSLHandshakeException` for TLS/fingerprint issues,
+`IOException` for network unreachable, or
+`AuthorizationException` for invalid tokens.
+
+### 10.5 Testing reconnection
+
+1. Verify the app shows "Connected"
+2. Stop the daemon (Ctrl-C in foreground mode)
+3. Verify the notification shows "Disconnected — reconnecting..."
+4. Restart the daemon: `renotify daemon start --foreground`
+5. Verify the app reconnects (exponential backoff: up to 30s)
+
+---
+
 ## Troubleshooting
 
 **"no devices/emulators found"**
@@ -156,3 +263,18 @@ $ANDROID_HOME/platform-tools/adb uninstall io.resystems.renotify
   text or vice versa). Hold the phone 20-30 cm from the screen.
   The QR code uses EC level L which requires minimal error
   recovery — avoid covering any part of the code.
+
+**"Error: Fingerprint mismatch"**
+: The daemon's TLS certificate has changed since pairing (e.g.,
+  `renotify pair --regenerate-cert` was run). Generate a new QR
+  code with `renotify pair` and re-scan.
+
+**"Error: Authorization Violation"**
+: The pairing token has been revoked or replaced. Generate a new
+  QR code with `renotify pair` and re-scan.
+
+**Notification stuck on "Connecting..."**
+: Check that the daemon is running and the WSS listener is
+  reachable. On the emulator, ensure the QR was generated with
+  `--ip 10.0.2.2`. On a physical device, check firewall rules
+  (Section 10.1).

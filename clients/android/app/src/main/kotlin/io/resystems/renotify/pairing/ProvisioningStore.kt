@@ -47,6 +47,7 @@ class EncryptedProvisioningStore(context: Context) :
             .putInt(KEY_PORT, payload.port)
             .putString(KEY_TOKEN, payload.token)
             .putString(KEY_CERT, payload.certFingerprint)
+            .putString(KEY_USERNAME, payload.username)
             .apply()
     }
 
@@ -54,6 +55,8 @@ class EncryptedProvisioningStore(context: Context) :
         val host = prefs.getString(KEY_HOST, null) ?: return null
         val token = prefs.getString(KEY_TOKEN, null) ?: return null
         val cert = prefs.getString(KEY_CERT, null) ?: return null
+        val username = prefs.getString(KEY_USERNAME, null)
+            ?: return null
         val version = prefs.getInt(KEY_VERSION, -1)
         val port = prefs.getInt(KEY_PORT, -1)
         if (version < 0 || port < 0) return null
@@ -63,7 +66,8 @@ class EncryptedProvisioningStore(context: Context) :
             host = host,
             port = port,
             token = token,
-            certFingerprint = cert
+            certFingerprint = cert,
+            username = username
         )
     }
 
@@ -80,5 +84,6 @@ class EncryptedProvisioningStore(context: Context) :
         private const val KEY_PORT = "p"
         private const val KEY_TOKEN = "t"
         private const val KEY_CERT = "c"
+        private const val KEY_USERNAME = "u"
     }
 }

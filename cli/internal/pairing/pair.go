@@ -47,11 +47,12 @@ type Result struct {
 // ProvisioningPayload is the minified JSON encoded into the QR
 // code. Single-character keys minimise QR density (R-API-08).
 type ProvisioningPayload struct {
-	Version int    `json:"v"`
-	Host    string `json:"h"`
-	Port    int    `json:"p"`
-	Token   string `json:"t"`
-	CertSHA string `json:"c"`
+	Version  int    `json:"v"`
+	Host     string `json:"h"`
+	Port     int    `json:"p"`
+	Token    string `json:"t"`
+	CertSHA  string `json:"c"`
+	Username string `json:"u"`
 }
 
 // Pair executes the full pairing flow: load/generate daemon_id,
@@ -135,11 +136,12 @@ func Pair(cfg Config) (*Result, error) {
 
 	// 9. Assemble provisioning payload.
 	payload := ProvisioningPayload{
-		Version: 1,
-		Host:    host,
-		Port:    cfg.WSSPort,
-		Token:   token,
-		CertSHA: fingerprint,
+		Version:  1,
+		Host:     host,
+		Port:     cfg.WSSPort,
+		Token:    token,
+		CertSHA:  fingerprint,
+		Username: cfg.Username,
 	}
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
