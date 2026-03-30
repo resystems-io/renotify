@@ -4,10 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
-	"strconv"
-	"strings"
-	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -35,8 +31,8 @@ code to the terminal containing the provisioning payload. The
 mobile app scans this code to establish a secure connection.
 
 If a prior pairing exists, the old token is replaced by a new one.
-The daemon must be restarted to pick up the new token (automatic
-hot-reload is planned for a future release).
+The running daemon is signalled (SIGHUP) to reload auth, which
+disconnects any mobile client using the old token.
 
 Certificate lifecycle:
 
@@ -105,7 +101,7 @@ Examples:
 			}
 
 			// Signal the running daemon to reload auth config.
-			notifyDaemon(cmd)
+			notifyDaemonAfterPair(cmd)
 			return nil
 		},
 	}
@@ -159,39 +155,4 @@ func writeJSONOutput(w interface{ Write([]byte) (int, error) }, result *pairing.
 		CertRegenerated: result.CertRegenerated,
 		Username:        result.Username,
 	})
-}
-
-// notifyDaemon sends SIGHUP to the running daemon (if any) to
-// trigger an auth reload. If the daemon is not running, prints
-// a hint to start it.
-func notifyDaemon(cmd *cobra.Command) {
-	pidPath := xdg.PIDPath()
-	data, err := os.ReadFile(pidPath)
-	if err != nil {
-		fmt.Fprintln(cmd.ErrOrStderr(),
-			"Note: no running daemon detected. "+
-				"Start with: renotify daemon start")
-		return
-	}
-
-	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
-	if err != nil {
-		return
-	}
-
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return
-	}
-
-	if err := proc.Signal(syscall.SIGHUP); err != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(),
-			"Note: could not signal daemon (PID %d): %v\n"+
-				"Restart with: renotify daemon stop && "+
-				"renotify daemon start\n", pid, err)
-		return
-	}
-
-	fmt.Fprintf(cmd.ErrOrStderr(),
-		"Daemon (PID %d) notified to reload auth.\n", pid)
 }
