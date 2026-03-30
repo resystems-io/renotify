@@ -18,8 +18,10 @@ import (
 	"go.resystems.io/renotify/internal/config"
 	"go.resystems.io/renotify/internal/daemon"
 	"go.resystems.io/renotify/internal/exitcode"
+	"go.resystems.io/renotify/internal/heartbeat"
 	"go.resystems.io/renotify/internal/httpserver"
 	"go.resystems.io/renotify/internal/mcpserver"
+	"go.resystems.io/renotify/internal/state"
 	"go.resystems.io/renotify/internal/xdg"
 )
 
@@ -349,6 +351,15 @@ func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
 	}
 	defer os.Remove(xdg.PIDPath())
 
+	// Load daemon_id early so subsystems that need it (heartbeat)
+	// can be constructed before Run.
+	daemonID, err := state.LoadOrGenerateDaemonID(xdg.DaemonIDPath())
+	if err != nil {
+		return exitcode.Errorf(exitcode.Error, "daemon_id: %v", err)
+	}
+
+	hostname, _ := os.Hostname()
+
 	// Build subsystem list.
 	var opts []daemon.Option
 	opts = append(opts, daemon.WithLogger(logger))
@@ -361,6 +372,11 @@ func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
 			daemon.WithSubsystem(mcpSrv),
 		)
 	}
+
+	// Heartbeat publisher (Section 8.1 step 12).
+	hbPub := heartbeat.New(daemonID, cfg.Username, hostname,
+		cfg.Heartbeat.Interval.Duration, logger)
+	opts = append(opts, daemon.WithSubsystem(hbPub))
 
 	// Signal handling: SIGINT/SIGTERM for shutdown, SIGHUP for
 	// auth reload (triggered by `renotify pair`).
