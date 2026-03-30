@@ -39,6 +39,10 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
+            // Stop the existing service (which holds old
+            // credentials) and start a fresh one with the
+            // newly scanned credentials.
+            stopNatsService()
             startNatsService()
         }
     }
