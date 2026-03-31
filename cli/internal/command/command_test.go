@@ -36,7 +36,7 @@ func TestRootHelp(t *testing.T) {
 	if !strings.Contains(stdout, "Available Commands") {
 		t.Error("help output missing 'Available Commands'")
 	}
-	for _, cmd := range []string{"daemon", "post", "ask", "history", "pair", "revoke", "apk", "config"} {
+	for _, cmd := range []string{"daemon", "post", "ask", "answer", "history", "pair", "revoke", "apk", "config"} {
 		if !strings.Contains(stdout, cmd) {
 			t.Errorf("help output missing command %q", cmd)
 		}
@@ -51,6 +51,7 @@ func TestSubcommandHelp(t *testing.T) {
 		{"daemon start", []string{"--foreground", "--username", "--log-level", "--shared-broker", "--no-mcp"}},
 		{"post", []string{"--title", "--body", "--priority", "--source", "--format"}},
 		{"ask", []string{"--title", "--body", "--priority", "--actions", "--response-types", "--timeout", "--format"}},
+		{"answer", []string{"--flow-id", "--request-id", "--accepted", "--rejected", "--action", "--text", "--format"}},
 		{"history", []string{"--workspace-id", "--flow-id", "--since", "--until", "--limit", "--offset", "--format"}},
 		{"pair", []string{"--ip", "--regenerate-cert", "--format"}},
 		{"revoke", []string{"--format"}},
@@ -202,18 +203,20 @@ func TestAskRequiresResponseTypes(t *testing.T) {
 }
 
 func TestAskAcceptsFlags(t *testing.T) {
+	// Ask now connects to NATS — this test just verifies that
+	// flag parsing works. The connection will fail (no daemon),
+	// which is expected.
 	t.Setenv("RENOTIFY_USERNAME", "testuser")
-	_, stderr, err := executeCommand("ask",
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	_, _, err := executeCommand("ask",
 		"--title", "Deploy?",
 		"--response-types", "boolean,text",
 		"--timeout", "10m",
 		"--priority", "high",
 	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(stderr, "not yet implemented") {
-		t.Error("expected stub message on stderr")
+	// Expected to fail: no daemon running, no internal token.
+	if err == nil {
+		t.Fatal("expected error (no daemon)")
 	}
 }
 
