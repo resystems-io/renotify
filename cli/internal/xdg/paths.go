@@ -58,6 +58,11 @@ func DaemonLogPath() string {
 	return filepath.Join(StateHome(), "daemon.log")
 }
 
+// PIDPath returns the default path to the daemon PID file.
+func PIDPath() string {
+	return filepath.Join(StateHome(), "daemon.pid")
+}
+
 // TLSDir returns the directory containing TLS cert and key.
 func TLSDir() string {
 	return filepath.Join(StateHome(), "tls")

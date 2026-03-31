@@ -1,0 +1,152 @@
+package broker
+
+import (
+	"context"
+	"crypto/tls"
+	"fmt"
+	"log/slog"
+	"os"
+	"time"
+
+	"github.com/nats-io/nats-server/v2/server"
+)
+
+// EmbeddedConfig holds parameters for the in-process NATS server.
+type EmbeddedConfig struct {
+	TCPHost  string
+	TCPPort  int
+	WSSHost  string
+	WSSPort  int
+	TLSCert  string // empty → skip WSS listener
+	TLSKey   string
+	Username string
+
+	InternalToken string
+	PairingToken  string // empty → no mobile account
+
+	JetStreamMaxMem int64
+}
+
+// EmbeddedServer wraps a nats-server with Renotify configuration.
+type EmbeddedServer struct {
+	srv      *server.Server
+	opts     *server.Options
+	logger   *slog.Logger
+	storeDir string // temp dir for JetStream metadata; cleaned on shutdown
+}
+
+// NewEmbeddedServer creates an embedded NATS server from the
+// given configuration. Call Start() to begin listening.
+func NewEmbeddedServer(cfg EmbeddedConfig, logger *slog.Logger) (*EmbeddedServer, error) {
+	// JetStream needs a StoreDir even for memory-only storage
+	// (metadata). Use a unique temp dir to avoid conflicts
+	// between concurrent instances.
+	storeDir, err := os.MkdirTemp("", "renotify-jetstream-*")
+	if err != nil {
+		return nil, fmt.Errorf("create JetStream store dir: %w", err)
+	}
+
+	opts := &server.Options{
+		ServerName:         fmt.Sprintf("renotify-%d", os.Getpid()),
+		Host:               cfg.TCPHost,
+		Port:               cfg.TCPPort,
+		JetStream:          true,
+		JetStreamMaxMemory: cfg.JetStreamMaxMem,
+		StoreDir:           storeDir,
+		NoLog:              true,
+		NoSigs:             true,
+		Users:              BuildAuthConfig(cfg.Username, cfg.InternalToken, cfg.PairingToken),
+	}
+
+	// Configure WSS listener if TLS is available. Load the
+	// certificate directly into the Websocket TLSConfig rather
+	// than using TLSMap (which requires server-level TLS on the
+	// TCP listener, which we don't want for loopback-only TCP).
+	if cfg.TLSCert != "" && cfg.TLSKey != "" {
+		cert, err := tls.LoadX509KeyPair(cfg.TLSCert, cfg.TLSKey)
+		if err != nil {
+			os.RemoveAll(storeDir)
+			return nil, fmt.Errorf("load TLS cert/key: %w", err)
+		}
+		opts.Websocket = server.WebsocketOpts{
+			Host:  cfg.WSSHost,
+			Port:  cfg.WSSPort,
+			NoTLS: false,
+			TLSConfig: &tls.Config{
+				Certificates: []tls.Certificate{cert},
+				MinVersion:   tls.VersionTLS12,
+			},
+		}
+	}
+
+	return &EmbeddedServer{
+		opts:     opts,
+		logger:   logger,
+		storeDir: storeDir,
+	}, nil
+}
+
+// Start creates and starts the embedded NATS server. It blocks
+// until the server is ready for connections or returns an error.
+func (s *EmbeddedServer) Start() error {
+	srv, err := server.NewServer(s.opts)
+	if err != nil {
+		return fmt.Errorf("create NATS server: %w", err)
+	}
+	s.srv = srv
+	s.srv.Start()
+
+	if !s.srv.ReadyForConnections(10 * time.Second) {
+		s.srv.Shutdown()
+		return fmt.Errorf("NATS server failed to become ready")
+	}
+
+	s.logger.Info("embedded NATS server started",
+		"tcp", s.srv.Addr().String(),
+		"jetstream", true,
+	)
+	return nil
+}
+
+// Shutdown gracefully stops the embedded NATS server and cleans
+// up the JetStream metadata directory.
+func (s *EmbeddedServer) Shutdown(_ context.Context) error {
+	if s.srv != nil {
+		s.srv.Shutdown()
+		s.srv.WaitForShutdown()
+		s.logger.Info("embedded NATS server stopped")
+	}
+	if s.storeDir != "" {
+		os.RemoveAll(s.storeDir)
+	}
+	return nil
+}
+
+// ClientURL returns the TCP client URL for the embedded server.
+func (s *EmbeddedServer) ClientURL() string {
+	if s.srv != nil {
+		return s.srv.ClientURL()
+	}
+	return fmt.Sprintf("nats://%s:%d", s.opts.Host, s.opts.Port)
+}
+
+// ReloadAuth rebuilds the NATS auth configuration with the
+// given pairing token and applies it to the running server via
+// ReloadOptions. This is called on SIGHUP after `renotify pair`
+// writes a new token to disk.
+func (s *EmbeddedServer) ReloadAuth(username, internalToken, pairingToken string) error {
+	if s.srv == nil {
+		return fmt.Errorf("server not started")
+	}
+	newOpts := *s.opts
+	newOpts.Users = BuildAuthConfig(username, internalToken, pairingToken)
+	if err := s.srv.ReloadOptions(&newOpts); err != nil {
+		return fmt.Errorf("reload auth: %w", err)
+	}
+	return nil
+}
+
+// Server returns the underlying nats-server instance for testing.
+func (s *EmbeddedServer) Server() *server.Server {
+	return s.srv
+}
