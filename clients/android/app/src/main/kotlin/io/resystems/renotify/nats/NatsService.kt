@@ -74,6 +74,14 @@ class NatsService : Service() {
         flags: Int,
         startId: Int
     ): Int {
+        // Handle response publishing from NotificationActionReceiver
+        // (M-04). This is dispatched while the service is already
+        // running as foreground.
+        if (intent?.action == ACTION_PUBLISH_RESPONSE) {
+            handlePublishResponse(intent)
+            return START_STICKY
+        }
+
         val payload = store.load()
         if (payload == null) {
             Log.w(TAG, "No provisioning data, stopping")
@@ -176,6 +184,66 @@ class NatsService : Service() {
         ack()
     }
 
+    // --- Response publishing (M-04) ---
+
+    /**
+     * Handle a publish-response intent from
+     * [NotificationActionReceiver]. Builds a NotificationResponse
+     * JSON and publishes it to the NATS .response subject.
+     */
+    private fun handlePublishResponse(intent: Intent) {
+        val notificationId = intent.getStringExtra(
+            EXTRA_NOTIFICATION_ID) ?: return
+        val flowId = intent.getStringExtra(
+            EXTRA_FLOW_ID) ?: return
+        val actionType = intent.getStringExtra(
+            EXTRA_ACTION_TYPE) ?: return
+        val actionValue = intent.getStringExtra(
+            EXTRA_ACTION_VALUE) ?: ""
+        val text = intent.getStringExtra(EXTRA_TEXT)
+
+        val payload = store.load()
+        if (payload == null) {
+            Log.w(TAG, "Cannot publish response: not paired")
+            return
+        }
+
+        val nc = manager.connection
+        if (nc == null || nc.status != io.nats.client.Connection.Status.CONNECTED) {
+            Log.w(TAG, "Cannot publish response: not connected")
+            return
+        }
+
+        val responseJson = buildResponseJson(
+            notificationId, actionType, actionValue, text)
+        val subject = "resystems.renotify.${payload.username}" +
+            ".flow.$flowId.response"
+
+        serviceScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val js = nc.jetStream()
+                val headers = io.nats.client.impl.Headers()
+                headers.add("Nats-Msg-Id",
+                    "$notificationId-response")
+                val msg = io.nats.client.impl.NatsMessage
+                    .builder()
+                    .subject(subject)
+                    .headers(headers)
+                    .data(responseJson.toByteArray())
+                    .build()
+                js.publish(msg)
+
+                Log.i(TAG, "Response published for $notificationId")
+
+                // Dismiss the notification.
+                NotificationRenderer.dismiss(
+                    this@NatsService, notificationId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to publish response", e)
+            }
+        }
+    }
+
     // --- Notification management ---
 
     private fun createNotificationChannels() {
@@ -233,6 +301,45 @@ class NatsService : Service() {
         private const val TAG = "NatsService"
         private const val CHANNEL_ID = "renotify_connection"
         private const val NOTIFICATION_ID = 1
+
+        // Intent action and extras for M-04 response publishing.
+        const val ACTION_PUBLISH_RESPONSE =
+            "io.resystems.renotify.PUBLISH_RESPONSE"
+        const val EXTRA_NOTIFICATION_ID = "notification_id"
+        const val EXTRA_FLOW_ID = "flow_id"
+        const val EXTRA_ACTION_TYPE = "action_type"
+        const val EXTRA_ACTION_VALUE = "action_value"
+        const val EXTRA_TEXT = "text"
+
+        /**
+         * Build a NotificationResponse JSON string from the
+         * action type and value. Extracted as a companion
+         * function for testability.
+         */
+        fun buildResponseJson(
+            requestId: String,
+            actionType: String,
+            actionValue: String,
+            text: String?
+        ): String {
+            val obj = JSONObject()
+            obj.put("request_id", requestId)
+
+            when (actionType) {
+                NotificationRenderer.ACTION_TYPE_ACCEPTED ->
+                    obj.put("accepted", true)
+                NotificationRenderer.ACTION_TYPE_REJECTED ->
+                    obj.put("accepted", false)
+                NotificationRenderer.ACTION_TYPE_CHOICE ->
+                    obj.put("action", actionValue)
+                NotificationRenderer.ACTION_TYPE_TEXT ->
+                    if (text != null) obj.put("text", text)
+            }
+
+            obj.put("timestamp",
+                java.time.Instant.now().toString())
+            return obj.toString()
+        }
 
         /**
          * Global state for non-bound observers (e.g.,

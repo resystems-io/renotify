@@ -321,8 +321,8 @@ object NotificationRenderer {
         actionType: String,
         actionValue: String
     ): PendingIntent {
-        val intent = Intent(INTENT_ACTION).apply {
-            setPackage(context.packageName)
+        val intent = Intent(context, NotificationActionReceiver::class.java).apply {
+            action = INTENT_ACTION
             putExtra(EXTRA_NOTIFICATION_ID, payload.id)
             putExtra(EXTRA_FLOW_ID, payload.flowId)
             putExtra(EXTRA_ACTION_TYPE, actionType)
