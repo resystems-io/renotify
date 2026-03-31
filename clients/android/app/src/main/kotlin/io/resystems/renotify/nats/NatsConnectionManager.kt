@@ -73,7 +73,12 @@ class NatsConnectionManager(private val scope: CoroutineScope) {
         if (nc != null) {
             Log.i(TAG, "Disconnecting")
             // Use a standalone coroutine not tied to the service
-            // scope (which may be cancelled in parallel).
+            // scope, which may be cancelled in parallel (called
+            // from onDestroy). GlobalScope is deliberate:
+            // connection.close() does blocking network I/O and a
+            // lifecycle-bound scope would cancel the close before
+            // it completes.
+            @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
             kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
                 try {
                     nc.close()
