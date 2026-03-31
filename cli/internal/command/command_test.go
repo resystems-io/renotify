@@ -36,7 +36,7 @@ func TestRootHelp(t *testing.T) {
 	if !strings.Contains(stdout, "Available Commands") {
 		t.Error("help output missing 'Available Commands'")
 	}
-	for _, cmd := range []string{"daemon", "post", "ask", "history", "pair", "revoke", "apk"} {
+	for _, cmd := range []string{"daemon", "post", "ask", "history", "pair", "revoke", "apk", "config"} {
 		if !strings.Contains(stdout, cmd) {
 			t.Errorf("help output missing command %q", cmd)
 		}
@@ -56,6 +56,8 @@ func TestSubcommandHelp(t *testing.T) {
 		{"revoke", []string{"--format"}},
 		{"apk extract", []string{"--output"}},
 		{"apk serve", []string{"--addr", "--port"}},
+		{"config init", []string{"--full", "--force", "--output"}},
+		{"config list", []string{"--format"}},
 	}
 
 	for _, tc := range commands {
@@ -432,6 +434,154 @@ func TestAPKSubcommands(t *testing.T) {
 		if !strings.Contains(stdout, sub) {
 			t.Errorf("apk help missing subcommand %q", sub)
 		}
+	}
+}
+
+func TestConfigSubcommands(t *testing.T) {
+	stdout, _, err := executeCommand("config", "--help")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, sub := range []string{"init", "list"} {
+		if !strings.Contains(stdout, sub) {
+			t.Errorf("config help missing subcommand %q", sub)
+		}
+	}
+}
+
+func TestConfigListText(t *testing.T) {
+	stdout, _, err := executeCommand("config", "list")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Should contain header and key entries.
+	if !strings.Contains(stdout, "KEY") {
+		t.Error("missing header")
+	}
+	for _, key := range []string{
+		"broker.tcp_port", "heartbeat.interval", "username",
+	} {
+		if !strings.Contains(stdout, key) {
+			t.Errorf("missing key %q in list output", key)
+		}
+	}
+}
+
+func TestConfigListJSON(t *testing.T) {
+	stdout, _, err := executeCommand("config", "list",
+		"--format", "json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var entries []map[string]interface{}
+	if err := json.Unmarshal([]byte(stdout), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, stdout)
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected non-empty JSON array")
+	}
+	// Verify first entry has expected fields.
+	first := entries[0]
+	for _, field := range []string{"key", "type", "default", "env_var", "description"} {
+		if _, ok := first[field]; !ok {
+			t.Errorf("missing field %q in JSON entry", field)
+		}
+	}
+}
+
+func TestConfigInit_Minimal(t *testing.T) {
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "settings.json")
+
+	_, stderr, err := executeCommand("config", "init",
+		"--output", outPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(stderr, "Config written") {
+		t.Error("expected confirmation message")
+	}
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if _, ok := cfg["username"]; !ok {
+		t.Error("minimal config should contain username")
+	}
+	// Minimal config should not contain broker section.
+	if _, ok := cfg["broker"]; ok {
+		t.Error("minimal config should not contain broker section")
+	}
+}
+
+func TestConfigInit_Full(t *testing.T) {
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "settings.json")
+
+	_, _, err := executeCommand("config", "init",
+		"--full", "--output", outPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	// Full config should contain all sections.
+	for _, section := range []string{
+		"username", "broker", "mcp", "jetstream", "heartbeat",
+	} {
+		if _, ok := cfg[section]; !ok {
+			t.Errorf("full config missing section %q", section)
+		}
+	}
+}
+
+func TestConfigInit_NoOverwrite(t *testing.T) {
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "settings.json")
+	os.WriteFile(outPath, []byte("{}"), 0600)
+
+	_, _, err := executeCommand("config", "init",
+		"--output", outPath)
+	if err == nil {
+		t.Fatal("expected error for existing file")
+	}
+	if !strings.Contains(err.Error(), "already exists") {
+		t.Errorf("error = %q, want 'already exists'", err)
+	}
+}
+
+func TestConfigInit_Force(t *testing.T) {
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "settings.json")
+	os.WriteFile(outPath, []byte("{}"), 0600)
+
+	_, _, err := executeCommand("config", "init",
+		"--force", "--output", outPath)
+	if err != nil {
+		t.Fatalf("unexpected error with --force: %v", err)
+	}
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) == "{}" {
+		t.Error("file should have been overwritten")
 	}
 }
 

@@ -94,39 +94,17 @@ func stringToDurationHook() mapstructure.DecodeHookFuncType {
 }
 
 // setDefaults registers compiled defaults with Viper so they
-// participate in the merge.
+// participate in the merge and env var binding. The Registry is
+// the single source of truth for key paths; Default() is the
+// single source of truth for values.
 func setDefaults(v *viper.Viper, cfg *Config) {
-	v.SetDefault("username", cfg.Username)
-
-	v.SetDefault("broker.enabled", cfg.Broker.Enabled)
-	v.SetDefault("broker.tcp_host", cfg.Broker.TCPHost)
-	v.SetDefault("broker.tcp_port", cfg.Broker.TCPPort)
-	v.SetDefault("broker.wss_host", cfg.Broker.WSSHost)
-	v.SetDefault("broker.wss_port", cfg.Broker.WSSPort)
-	v.SetDefault("broker.cert_file", cfg.Broker.CertFile)
-	v.SetDefault("broker.key_file", cfg.Broker.KeyFile)
-
-	v.SetDefault("mcp.enabled", cfg.MCP.Enabled)
-	v.SetDefault("mcp.host", cfg.MCP.Host)
-	v.SetDefault("mcp.port", cfg.MCP.Port)
-
-	v.SetDefault("jetstream.max_age", cfg.JetStream.MaxAge.Duration.String())
-	v.SetDefault("jetstream.max_bytes", cfg.JetStream.MaxBytes)
-	v.SetDefault("jetstream.max_msg_size", cfg.JetStream.MaxMsgSize)
-	v.SetDefault("jetstream.max_msgs_per_subj", cfg.JetStream.MaxMsgsPerSubj)
-	v.SetDefault("jetstream.dup_window", cfg.JetStream.DupWindow.Duration.String())
-
-	v.SetDefault("shared_broker.url", cfg.SharedBroker.URL)
-	v.SetDefault("shared_broker.tls_enabled", cfg.SharedBroker.TLSEnabled)
-
-	v.SetDefault("rate_limit.notifications_per_minute", cfg.RateLimit.NotificationsPerMinute)
-	v.SetDefault("reaping.grace_period", cfg.Reaping.GracePeriod.Duration.String())
-	v.SetDefault("timeout.default_ask_timeout", cfg.Timeout.DefaultAskTimeout.Duration.String())
-	v.SetDefault("heartbeat.interval", cfg.Heartbeat.Interval.Duration.String())
-	v.SetDefault("interjection.debounce_window", cfg.Interjection.DebounceWindow.Duration.String())
-
-	v.SetDefault("daemon.foreground", cfg.Daemon.Foreground)
-	v.SetDefault("daemon.log_level", cfg.Daemon.LogLevel)
-	v.SetDefault("daemon.log_file", cfg.Daemon.LogFile)
-	v.SetDefault("daemon.db_path", cfg.Daemon.DBPath)
+	for _, p := range Registry {
+		val := p.Resolve(cfg)
+		// Viper needs Duration defaults as strings for env var
+		// binding and the mapstructure decode hook.
+		if d, ok := val.(Duration); ok {
+			val = d.Duration.String()
+		}
+		v.SetDefault(p.Key, val)
+	}
 }
