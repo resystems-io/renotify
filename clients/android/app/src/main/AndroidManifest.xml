@@ -38,5 +38,9 @@
             android:foregroundServiceType="dataSync"
             android:exported="false" />
 
+        <receiver
+            android:name=".notification.NotificationActionReceiver"
+            android:exported="false" />
+
     </application>
 </manifest>

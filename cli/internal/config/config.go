@@ -83,6 +83,7 @@ type ReapingConfig struct {
 // TimeoutConfig controls blocking request timeouts.
 type TimeoutConfig struct {
 	DefaultAskTimeout Duration `json:"default_ask_timeout" mapstructure:"default_ask_timeout"`
+	AskGracePeriod    Duration `json:"ask_grace_period"    mapstructure:"ask_grace_period"`
 }
 
 // HeartbeatConfig controls daemon heartbeat publishing.
@@ -143,6 +144,7 @@ func Default() *Config {
 		},
 		Timeout: TimeoutConfig{
 			DefaultAskTimeout: NewDuration(5 * time.Minute),
+			AskGracePeriod:    NewDuration(30 * time.Second),
 		},
 		Heartbeat: HeartbeatConfig{
 			Interval: NewDuration(30 * time.Second),
@@ -225,6 +227,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Timeout.DefaultAskTimeout.Duration <= 0 {
 		return fmt.Errorf("timeout.default_ask_timeout must be positive")
+	}
+	if c.Timeout.AskGracePeriod.Duration <= 0 {
+		return fmt.Errorf("timeout.ask_grace_period must be positive")
 	}
 	if c.Heartbeat.Interval.Duration < 5*time.Second {
 		return fmt.Errorf("heartbeat.interval must be at least 5 seconds")
