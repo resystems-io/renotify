@@ -101,6 +101,7 @@ table — the `HistoryQueryRequest` filters operate against it.
 ```sql
 CREATE TABLE IF NOT EXISTS notification_requests (
     id             TEXT PRIMARY KEY,
+    username       TEXT NOT NULL,
     flow_id        TEXT NOT NULL,
     daemon_id      TEXT NOT NULL,
     workspace_id   TEXT NOT NULL,
@@ -147,6 +148,7 @@ per flow while preserving insertion order.
 ```sql
 CREATE TABLE IF NOT EXISTS flow_lifecycle_events (
     flow_id      TEXT NOT NULL,
+    username     TEXT NOT NULL,
     daemon_id    TEXT NOT NULL,
     workspace_id TEXT NOT NULL,
     status       TEXT NOT NULL
@@ -170,6 +172,7 @@ stale reaping (R-CLI-18).
 ```sql
 CREATE TABLE IF NOT EXISTS active_flows (
     flow_id                 TEXT PRIMARY KEY,
+    username                TEXT NOT NULL,
     daemon_id               TEXT NOT NULL,
     workspace_id            TEXT NOT NULL,
     label                   TEXT,
@@ -194,6 +197,7 @@ receive multiple interjections (e.g., a `note` followed by a
 ```sql
 CREATE TABLE IF NOT EXISTS interjections (
     flow_id   TEXT NOT NULL,
+    username  TEXT NOT NULL,
     action    TEXT NOT NULL
               CHECK (action IN ('stop', 'pause', 'note')),
     context   TEXT,            -- free-form text (for note/pause)
@@ -498,6 +502,7 @@ version 1:
 
 CREATE TABLE IF NOT EXISTS notification_requests (
     id             TEXT PRIMARY KEY,
+    username       TEXT NOT NULL,
     flow_id        TEXT NOT NULL,
     daemon_id      TEXT NOT NULL,
     workspace_id   TEXT NOT NULL,
@@ -524,6 +529,7 @@ CREATE TABLE IF NOT EXISTS notification_responses (
 
 CREATE TABLE IF NOT EXISTS flow_lifecycle_events (
     flow_id      TEXT NOT NULL,
+    username     TEXT NOT NULL,
     daemon_id    TEXT NOT NULL,
     workspace_id TEXT NOT NULL,
     status       TEXT NOT NULL
@@ -536,6 +542,7 @@ CREATE TABLE IF NOT EXISTS flow_lifecycle_events (
 
 CREATE TABLE IF NOT EXISTS active_flows (
     flow_id                 TEXT PRIMARY KEY,
+    username                TEXT NOT NULL,
     daemon_id               TEXT NOT NULL,
     workspace_id            TEXT NOT NULL,
     label                   TEXT,
@@ -570,6 +577,7 @@ CREATE INDEX IF NOT EXISTS idx_fle_workspace_ts
 
 CREATE TABLE IF NOT EXISTS interjections (
     flow_id   TEXT NOT NULL,
+    username  TEXT NOT NULL,
     action    TEXT NOT NULL
               CHECK (action IN ('stop', 'pause', 'note')),
     context   TEXT,
