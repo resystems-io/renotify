@@ -169,6 +169,12 @@ var Registry = []ParamInfo{
 		Resolve:     func(c *Config) any { return c.Timeout.DefaultAskTimeout },
 	},
 	{
+		Key: "timeout.ask_grace_period", Type: "duration",
+		EnvVar:      "RENOTIFY_TIMEOUT_ASK_GRACE_PERIOD",
+		Description: "CLI safety timeout grace period beyond ask timeout",
+		Resolve:     func(c *Config) any { return c.Timeout.AskGracePeriod },
+	},
+	{
 		Key: "heartbeat.interval", Type: "duration",
 		EnvVar:      "RENOTIFY_HEARTBEAT_INTERVAL",
 		Description: "daemon heartbeat publish interval",
