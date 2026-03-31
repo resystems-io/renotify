@@ -850,7 +850,7 @@ WebSockets).*
 *(Goal: Scripts can successfully execute blocking prompts and wait for human
 responses).*
 
-- [ ] **C-03: Local Daemon SQLite State:** Implement local SQLite or file-based
+- [x] **C-03: Local Daemon SQLite State:** Implement local SQLite or file-based
   logging of sent notifications and received responses (the ledger foundation).
 - [ ] **C-04: Single-shot (Post):** Implement payload publishing for simple
   notifications via `renotify post`.
@@ -886,7 +886,9 @@ monitoring).*
 *(Goal: Historical remote look-backs and finalised native UI assets).*
 
 - [ ] **C-09: Daemon Core NATS History API:** Expose the Core NATS endpoint that
-  serves data drawn from the SQLite logs.
+  serves data drawn from the SQLite logs. The history query logic is implemented
+  in the `ledger` package (C-03). C-09 exposes it via the Core NATS
+  `svc.history` endpoint and wires it into `renotify history`.
 - [ ] **M-07: Remote History Viewer UI:** Develop the ledger overview rendering
   queries pushed over Core NATS Request-Reply.
 - [ ] **M-05: UI & Branding:** Apply the resystems.io branding and SVG logo to
@@ -1014,6 +1016,7 @@ Record completed items here with the date.
 | 2026-03-30 | C-12 | Token revocation implemented. `renotify revoke` deletes the pairing token and username files from XDG state and sends SIGHUP to the running daemon. The daemon's `reloadAuthorization()` automatically disconnects clients whose credentials are no longer valid — no separate client-kick API needed. Shared broker mode deletes local token and warns operator must revoke on broker side. Idempotent: reports "no active pairing" when no token exists. Text and JSON output formats. Extracted `signalDaemonReload()` as shared helper in `command/signal.go` (used by both `pair` and `revoke`). Updated `pair` long description to reflect SIGHUP hot-reload (no longer says "daemon must be restarted"). R-SEC-02 already satisfied: `renotify pair` overwrites prior token + SIGHUP disconnects old client. 8 new tests (state deletion + command). |
 | 2026-03-30 | C-13 | Daemon heartbeat publisher implemented. New `heartbeat/` package with `DaemonHeartbeat` and `WorkspaceInfo` payload types matching the analysis schema. `Publisher` implements `daemon.Subsystem`: publishes an immediate heartbeat on Start (Section 8.1 step 12), then periodic at configurable interval (default 30s). `Publish()` for on-change triggers, `SetWorkspaces()` for thread-safe snapshot updates. Workspaces array is empty until the flow registry is implemented (C-03/C-04/C-05). Subject: `resystems.renotify.{username}.daemon.{daemon_id}.heartbeat` via Core NATS Pub/Sub (ephemeral, not JetStream). `daemon_id` loaded in `runDaemon()` before controller startup for publisher construction. 8 new tests (subject, payload serialisation, empty workspaces, immediate/periodic publish, stop, workspace update). |
 | 2026-03-31 | C-14 | Config init and parameter help implemented. New `config.Registry` (`[]ParamInfo`) as single source of truth for key metadata — carries key path, type label, env var, description, and `Resolve func(*Config) any`. Refactored `setDefaults()` from 30 hand-written lines to a 6-line loop iterating the registry, eliminating duplication between Viper key registration and the parameter catalogue. `renotify config init` generates `settings.json` (minimal with username only, or `--full` with all defaults; `--force` to overwrite; `--output` for custom path). `renotify config list` prints tabwriter table of all 27 parameters (key, type, default, env var, description); `--format json` for machine-readable output. `config` parent command overrides `PersistentPreRunE` to skip config loading so commands work without existing settings.json. 12 new tests (5 registry, 7 command). |
+| 2026-03-31 | C-03 | Local daemon SQLite state implemented. New `payload/` package for shared wire-format types (`NotificationRequest`, `NotificationResponse`, `FlowLifecycleEvent`, `InterjectionCommand`, `ErrorResponse`) with typed enums (`ResponseType`, `Priority`, `FlowStatus`, `InterjectionAction`) matching analysis-payload-schemas.md. New `ledger/` package using `modernc.org/sqlite` (pure Go, CGo-free). Five tables with 9 indices; `username TEXT NOT NULL` on 4 record-originating tables for future history aggregation. Ledger accepts payload types for persistence; daemon-side enrichment (username) passed via `WriteContext` struct, keeping wire-format types clean. `ActiveFlow` is a ledger-only storage type (not a wire format). Schema V1 DDL in embedded `schema_v1.sql`. PRAGMA `user_version`-based migration, WAL mode, foreign keys, busy timeout. Full CRUD: INSERT OR IGNORE dedup, transactional flow registration/refresh/termination, stale reaping query, rate-limiting count, LEFT JOIN history query with filters and pagination. Ledger implements `daemon.Subsystem` (registered first). `renotify history` CLI wiring deferred to C-09 (Phase 6). 42 ledger tests. |
 
 ## 6. References
 

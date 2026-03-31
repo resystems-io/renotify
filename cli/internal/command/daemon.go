@@ -20,6 +20,7 @@ import (
 	"go.resystems.io/renotify/internal/exitcode"
 	"go.resystems.io/renotify/internal/heartbeat"
 	"go.resystems.io/renotify/internal/httpserver"
+	"go.resystems.io/renotify/internal/ledger"
 	"go.resystems.io/renotify/internal/mcpserver"
 	"go.resystems.io/renotify/internal/state"
 	"go.resystems.io/renotify/internal/xdg"
@@ -363,6 +364,11 @@ func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
 	// Build subsystem list.
 	var opts []daemon.Option
 	opts = append(opts, daemon.WithLogger(logger))
+
+	// Ledger (SQLite) — registered first so downstream
+	// subsystems can write to the database.
+	ledgerSub := ledger.NewSubsystem(cfg.Daemon.DBPath, logger)
+	opts = append(opts, daemon.WithSubsystem(ledgerSub))
 
 	if cfg.MCP.Enabled {
 		httpSrv := httpserver.New(cfg.MCP.Host, cfg.MCP.Port, logger)
