@@ -578,6 +578,21 @@ in the flow registry within a configurable grace period (default: 5 minutes).
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
+#### R-CLI-19: Hook Dispatcher
+**Statement:** Implement `renotify dispatch` as a universal Claude Code hook
+handler. The command reads hook event JSON from stdin, discriminates on
+`hook_event_name`, and dispatches to the appropriate Renotify flow:
+`PermissionRequest` events are forwarded as interactive ask notifications with
+boolean response; `Notification` events are forwarded as fire-and-forget post
+notifications. Unsupported event types are silently ignored. Non-zero exit on
+error ensures graceful fallback to the local terminal prompt.
+* **Rationale (A1):** Extends Renotify's reach to agent lifecycle events that
+  occur outside the MCP tool loop, enabling remote permission approval and
+  status monitoring for unattended agent sessions.
+* **Trace to Parent (A4):** N-02, N-03
+* **Allocation (A8):** Go CLI Application
+* **V&V Method (A2):** Test
+
 ### 2.4 Android Application
 
 #### R-MOB-01: Programming Language
@@ -867,8 +882,8 @@ responses).*
   buffering, and timeout behaviour.
 
 ### Phase 5: Agent Layer & State Tracking
-*(Goal: Native AI Agent integration and real-time asynchronous workspace
-monitoring).*
+*(Goal: Native AI Agent integration via MCP and hooks, real-time asynchronous
+workspace monitoring).*
 
 - [ ] **C-10: Active Registry Service:** Implement the SQLite-backed flow
   tracker, stale sweeper, and the Core NATS registry presentation endpoint.
@@ -876,6 +891,11 @@ monitoring).*
   capabilities natively to AI agents.
 - [ ] **C-11: MCP Flow Tools:** Wire up the `register_flow`,
   `refresh_flow`, and `terminate_flow` tools on the MCP server.
+- [ ] **C-15: Hook Dispatcher Command:** Implement `renotify dispatch` with
+  stdin/stdout JSON protocol, PermissionRequest→ask and Notification→post
+  mapping, tool input summarisation, and graceful fallback on error. Reuses
+  existing `setupFlow`, JetStream publish, and ephemeral consumer
+  infrastructure.
 - [ ] **M-09: Dashboard Rendering:** Implement the Android landing screen
   capable of fetching and displaying the active flow registry list dynamically,
   grouped by workspace using daemon heartbeat data.
@@ -975,6 +995,7 @@ specifications.
 | D-54 | Heartbeat publisher as daemon `Subsystem`. Publishes an immediate `DaemonHeartbeat` on Start then periodic at configurable interval (default 30s, min 5s). `Publish()` method for on-change triggers. `SetWorkspaces()` for thread-safe snapshot updates. Workspaces empty until flow registry is implemented. | [Payload Schemas](analysis-payload-schemas.md), [NATS Transport](analysis-nats-transport-design.md) | 2026-03-30 |
 | D-55 | Heartbeat payload types (`DaemonHeartbeat`, `WorkspaceInfo`) in `heartbeat/` package. Subject pattern `resystems.renotify.{username}.daemon.{daemon_id}.heartbeat`. Core NATS Pub/Sub (not JetStream) — missed heartbeats are superseded by the next one. | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-30 |
 | D-56 | Parameter registry (`config.Registry`) as single source of truth for key metadata. Each `ParamInfo` carries key path, type label, env var, description, and `Resolve func(*Config) any`. `setDefaults()` rewritten to iterate the registry instead of hand-written per-key lines, eliminating duplication. Default values come from `Default()` via Resolve. | [Configuration Schema](analysis-configuration-schema.md) | 2026-03-31 |
+| D-57 | Hook dispatcher: command hook (`renotify dispatch` via stdio) over HTTP. Reads hook JSON from stdin, discriminates on `hook_event_name`. `PermissionRequest` → `ask` with boolean (Allow/Deny); `Notification` → `post` fire-and-forget. Exit 1 on error for graceful fallback to terminal prompt. Tool input summarised per-tool (Bash→command, Edit/Write/Read→file_path, etc.). Reuses existing `setupFlow` and JetStream infrastructure. | [Hook Integration](analysis-hook-integration.md) | 2026-03-31 |
 
 ---
 
@@ -1024,6 +1045,8 @@ Record completed items here with the date.
 | 2026-03-31 | M-03 | Notification rendering implemented. New `notification/` package: `NotificationPayload` data class parses incoming `NotificationRequest` JSON, `NotificationRenderer` builds and posts native `NotificationCompat` notifications. Renders both fire-and-forget (post, dismissible, no buttons) and interactive (ask, ongoing, with action buttons). Priority differentiation: high → heads-up via `renotify_urgent` channel (IMPORTANCE_HIGH), normal/low → `renotify_notifications` channel (IMPORTANCE_DEFAULT). Action buttons per response type: boolean (Yes/No), choice (per-label), text (RemoteInput inline reply), multi-modal (combination). Android 3-button limit enforced: overflow shows first 2 + "More..." button. PendingIntents carry notification_id/flow_id/action_type extras for M-04 BroadcastReceiver. `NatsConnectionManager` updated: message callback via coroutine pump with `nextMessage()`, dedup set for reconnect redelivery. `NatsService` wires message handler with subject discrimination (`.request` → render, `.lifecycle` completed/failed → dismiss). 14 new JVM tests (payload parsing, channel selection, notification ID determinism). R-MOB-03 satisfied. |
 | 2026-03-31 | M-04 | Action response dispatcher implemented. `NotificationActionReceiver` BroadcastReceiver catches notification action button taps, extracts intent extras (notification_id, flow_id, action_type, action_value), and delegates publishing to `NatsService` via `startService` with `ACTION_PUBLISH_RESPONSE`. Service builds `NotificationResponse` JSON (`buildResponseJson` — static, testable), publishes to `.response` JetStream subject with dedup header, and dismisses the notification. Handles boolean (accepted/rejected), choice (action label), text (RemoteInput extraction), and "More..." (opens app). Registered in AndroidManifest.xml. R-MOB-04 satisfied. 6 new JVM tests. |
 | 2026-03-31 | V-00 | Integration smoke tests implemented. 7 scenarios in `smoke_test.go`: post round-trip (payload fields, lifecycle events), ask with mock response (full round-trip), ask + answer utility (CLI-to-CLI), ask + interject stop, JetStream buffering (publish before subscriber connects, delivered via durable consumer), safety timeout (exit code 3), and payload serialisation (snake_case keys, omitempty, RFC 3339 timestamps). Mock mobile subscriber uses `broker.EnsureJetStream` to create durable consumers. Verifies R-CLI-04, R-CLI-05, R-API-01, R-API-02, R-CLI-12. Phase 4 complete. |
+
+| 2026-03-31 | A-16 | Claude Code hook integration analysis. Mapped `PermissionRequest` hook event to `renotify ask` (boolean Allow/Deny) and `Notification` hook event to `renotify post` (fire-and-forget). Evaluated command (stdio) vs HTTP transport — command preferred for graceful fallback (exit 1 → terminal prompt), no daemon dependency, and negligible latency overhead vs human response time. Designed `renotify dispatch` as universal hook handler: reads JSON from stdin, discriminates on `hook_event_name`, composes notifications from tool-specific input summarisation. New requirement R-CLI-19, implementation item C-15. |
 
 ## 6. References
 
