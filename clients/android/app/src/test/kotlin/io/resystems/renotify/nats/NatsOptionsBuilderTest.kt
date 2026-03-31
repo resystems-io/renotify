@@ -45,6 +45,7 @@ class NatsOptionsBuilderTest {
     @Test
     fun build_setsUserInfo() {
         val opts = NatsOptionsBuilder.build(payload)
+        @Suppress("DEPRECATION")
         assertEquals("mobile", opts.username)
     }
 

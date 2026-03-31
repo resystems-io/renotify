@@ -101,6 +101,7 @@ class ScannerActivity : ComponentActivity() {
         }
     }
 
+    @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
     private fun startCamera() {
         val cameraProviderFuture =
             ProcessCameraProvider.getInstance(this)
@@ -117,7 +118,12 @@ class ScannerActivity : ComponentActivity() {
                     ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
                 )
                 .build()
-                .also { it.setAnalyzer(mainExecutor, ::analyzeImage) }
+                .also {
+                    it.setAnalyzer(
+                        ContextCompat.getMainExecutor(this),
+                        ::analyzeImage
+                    )
+                }
 
             cameraProvider.unbindAll()
             cameraProvider.bindToLifecycle(
