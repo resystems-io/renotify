@@ -164,18 +164,20 @@ func TestPostRequiresTitle(t *testing.T) {
 }
 
 func TestPostAcceptsFlags(t *testing.T) {
+	// Post now connects to NATS — this test just verifies that
+	// flag parsing works. The connection will fail (no daemon),
+	// which is expected.
 	t.Setenv("RENOTIFY_USERNAME", "testuser")
-	_, stderr, err := executeCommand("post",
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	_, _, err := executeCommand("post",
 		"--title", "Build done",
 		"--body", "All tests passed",
 		"--priority", "high",
 		"--source", "ci/pipeline",
 	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(stderr, "not yet implemented") {
-		t.Error("expected stub message on stderr")
+	// Expected to fail: no daemon running, no internal token.
+	if err == nil {
+		t.Fatal("expected error (no daemon)")
 	}
 }
 
