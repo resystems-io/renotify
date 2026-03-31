@@ -3,6 +3,7 @@ package io.resystems.renotify.nats
 import android.util.Log
 import io.nats.client.Connection
 import io.nats.client.JetStream
+import io.nats.client.JetStreamSubscription
 import io.nats.client.Nats
 import io.nats.client.PushSubscribeOptions
 import io.resystems.renotify.pairing.ProvisioningPayload
@@ -29,7 +30,10 @@ import kotlin.math.min
  * See docs/analysis-nats-transport-design.md Sections 8.4 and
  * 8.5.
  */
-class NatsConnectionManager(private val scope: CoroutineScope) {
+class NatsConnectionManager(
+    private val scope: CoroutineScope,
+    private val onMessage: ((subject: String, data: ByteArray, ack: () -> Unit) -> Unit)? = null
+) {
 
     private val _state = MutableStateFlow<ConnectionState>(
         ConnectionState.Idle
@@ -45,6 +49,9 @@ class NatsConnectionManager(private val scope: CoroutineScope) {
 
     private var connectJob: Job? = null
     private var payload: ProvisioningPayload? = null
+
+    /** Tracks rendered notification IDs for deduplication. */
+    private val renderedIds = mutableSetOf<String>()
 
     /**
      * Start a connection attempt. If already connecting or
@@ -91,6 +98,20 @@ class NatsConnectionManager(private val scope: CoroutineScope) {
     }
 
     /**
+     * Check if a notification ID has already been rendered.
+     * Used for deduplication on reconnect when the durable
+     * consumer redelivers unacked messages.
+     */
+    fun isRendered(id: String): Boolean = id in renderedIds
+
+    /**
+     * Mark a notification ID as rendered.
+     */
+    fun markRendered(id: String) {
+        renderedIds.add(id)
+    }
+
+    /**
      * Single connection attempt: build options, connect, bind
      * JetStream consumer. On failure, enter reconnection loop.
      */
@@ -104,16 +125,7 @@ class NatsConnectionManager(private val scope: CoroutineScope) {
             val nc = Nats.connect(opts)
             connection = nc
 
-            // Bind to the pre-existing durable consumer created
-            // by C-08 during daemon startup.
-            val consumerName = "mobile-${payload.username}"
-            val js: JetStream = nc.jetStream()
-            val subOpts = PushSubscribeOptions.bind(
-                STREAM_NAME, consumerName
-            )
-            val subject =
-                "resystems.renotify.${payload.username}.flow.>"
-            js.subscribe(subject, subOpts)
+            subscribeToConsumer(nc, payload)
 
             _state.value = ConnectionState.Connected
             Log.i(TAG, "Connected to " +
@@ -141,6 +153,54 @@ class NatsConnectionManager(private val scope: CoroutineScope) {
     }
 
     /**
+     * Bind to the pre-existing durable consumer created by C-08
+     * and start a coroutine to pump messages to the callback.
+     */
+    private fun subscribeToConsumer(
+        nc: Connection,
+        payload: ProvisioningPayload
+    ) {
+        val consumerName = "mobile-${payload.username}"
+        val js: JetStream = nc.jetStream()
+        val subOpts = PushSubscribeOptions.bind(
+            STREAM_NAME, consumerName
+        )
+        val subject =
+            "resystems.renotify.${payload.username}.flow.>"
+        val sub: JetStreamSubscription =
+            js.subscribe(subject, subOpts)
+
+        val handler = onMessage
+        if (handler != null) {
+            // Pump messages from the subscription to the callback
+            // in a coroutine on the IO dispatcher.
+            scope.launch(Dispatchers.IO) {
+                Log.i(TAG, "Message pump started for $consumerName")
+                try {
+                    while (nc.status == Connection.Status.CONNECTED) {
+                        val msg = sub.nextMessage(1000) ?: continue
+                        handler(
+                            msg.subject,
+                            msg.data,
+                            { msg.ack() }
+                        )
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "Message pump error", e)
+                }
+                Log.i(TAG, "Message pump stopped for $consumerName")
+            }
+            Log.i(TAG, "Subscribed to $consumerName " +
+                "with message handler")
+        } else {
+            Log.i(TAG, "Subscribed to $consumerName " +
+                "(no message handler)")
+        }
+    }
+
+    /**
      * Reconnection loop with exponential backoff: 1s, 2s, 4s,
      * 8s, 16s, 30s (capped). See Section 8.5.
      */
@@ -163,14 +223,7 @@ class NatsConnectionManager(private val scope: CoroutineScope) {
                 val nc = Nats.connect(opts)
                 connection = nc
 
-                val consumerName = "mobile-${payload.username}"
-                val js: JetStream = nc.jetStream()
-                val subOpts = PushSubscribeOptions.bind(
-                    STREAM_NAME, consumerName
-                )
-                val subject =
-                    "resystems.renotify.${payload.username}.flow.>"
-                js.subscribe(subject, subOpts)
+                subscribeToConsumer(nc, payload)
 
                 _state.value = ConnectionState.Connected
                 Log.i(TAG, "Reconnected to " +
