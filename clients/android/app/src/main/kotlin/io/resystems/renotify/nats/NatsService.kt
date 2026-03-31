@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -80,11 +81,17 @@ class NatsService : Service() {
         }
 
         // Start as foreground immediately to avoid ANR.
-        startForeground(
-            NOTIFICATION_ID,
-            buildNotification(ConnectionState.Connecting),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-        )
+        // The 3-arg overload with foregroundServiceType requires
+        // API 29; use the 2-arg version on older devices.
+        val notification = buildNotification(ConnectionState.Connecting)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID, notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
 
         manager.connect(payload)
         return START_STICKY
