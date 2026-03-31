@@ -170,7 +170,7 @@ flowchart TB
 
         scripts["Shell Scripts<br/>CI Pipelines"]
         agents["AI Agents"]
-        cli["renotify CLI<br/>(post, ask, pair,<br/>revoke, history)"]
+        cli["renotify CLI<br/>(post, ask, pair,<br/>revoke, history, apk)"]
 
         subgraph daemon["renotify Daemon"]
             direction TB
@@ -816,29 +816,35 @@ exist.)*
 *(Goal: The devices can discover, verify, and talk to each other securely over
 WebSockets).*
 
-- [ ] **C-02: Daemon Controller:** Implement the daemon orchestrator to run the
+- [x] **C-02: Daemon Controller:** Implement the daemon orchestrator to run the
   NATS server, the MCP server, or both based on configuration.
-- [ ] **C-07: Pairing Generator:** Implement `renotify pair` logic, IP
+- [x] **C-07: Pairing Generator:** Implement `renotify pair` logic, IP
   discovery, TLS cert generation, and ASCII QR output. Use
   [`mdp/qrterminal`][qrterminal] for terminal QR rendering with
   half-block characters at EC level L. See
   [Payload Schemas](analysis-payload-schemas.md) QR Encoding
   Parameters.
-- [ ] **C-08: JetStream Configuration:** Implement the strict memory-backed and
+- [x] **C-08: JetStream Configuration:** Implement the strict memory-backed and
   TTL setup for embedded NATS.
-- [ ] **M-06: Secure Pairing Scanner:** Integrate QR code scanning and TLS
+- [x] **M-06: Secure Pairing Scanner:** Integrate QR code scanning and TLS
   cert pinning for secure connection bootstrapping. Use
   [Google ML Kit Barcode Scanning][mlkit-barcode] for on-device QR
   decoding. See [NATS Transport Design](analysis-nats-transport-design.md)
   Section 5.5 for the `X509TrustManager` fingerprint pinning approach.
-- [ ] **M-02: NATS Client Service:** Integrate the NATS client into a background
+- [x] **M-02: NATS Client Service:** Integrate the NATS client into a background
   service to listen for incoming events configured to the pinned user profile.
-- [ ] **C-12: Token Revocation:** Implement `renotify revoke` to invalidate the
+- [x] **C-12: Token Revocation:** Implement `renotify revoke` to invalidate the
   active pairing token and disconnect the mobile client. Ensure `renotify pair`
   invokes revocation when a prior token exists.
-- [ ] **C-13: Daemon Heartbeat Publisher:** Implement periodic (30s)
+- [x] **C-13: Daemon Heartbeat Publisher:** Implement periodic (30s)
   DaemonHeartbeat publishing on the daemon's heartbeat subject, with immediate
   on-change triggers for flow and workspace state changes.
+- [x] **C-14: Config Init & Parameter Help:** Add `renotify config init` to
+  generate a template `settings.json` at the XDG config path (minimal by
+  default, `--full` for all parameters with defaults), and `renotify config
+  list` to print a table of all configurable parameters with key path, type,
+  default value, and description. Viper does not provide either capability;
+  both require a custom parameter registry.
 
 ### Phase 4: Core Operational Workflows
 *(Goal: Scripts can successfully execute blocking prompts and wait for human
@@ -891,9 +897,10 @@ monitoring).*
 
 - [ ] **P-02: Artifact Embedding:** Update the Go CLI tooling to use `go:embed`
   referencing the Android `app/build/outputs/apk/release/` directory.
-- [ ] **P-03: APK Extraction Command:** Add a new CLI command (e.g., `renotify
-  extract-apk`) to write the embedded APK to disk so the user can easily install
-  it on their device.
+- [ ] **P-03: APK Management Commands:** Add a `renotify apk` command group
+  with two subcommands: `extract` writes the embedded APK to disk, and `serve`
+  starts a temporary HTTP server hosting the APK with a QR code containing the
+  download URL for easy phone-side installation.
 - [ ] **V-01: End-to-End Tests:** Extend V-00 to cover the full CLI -> real
   Android client -> CLI roundtrip, including pairing, notification rendering,
   and response dispatch.
@@ -941,8 +948,31 @@ specifications.
 | D-29 | History pagination: offset-based (`offset` + `limit` fields in `HistoryQueryRequest`); safe for append-only ledger. `total` field enables page calculation. | [Payload Schemas](analysis-payload-schemas.md), [SQLite Ledger](analysis-sqlite-ledger.md) | 2026-03-28 |
 | D-30 | Payload versioning: `ProvisioningPayload` only (`"v": 1`). Other payloads deferred — they are ephemeral and flow between co-deployed components where version mismatches cannot occur at runtime. | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-28 |
 | D-31 | Monorepo layout: `cli/` (Go module `go.resystems.io/renotify`), `clients/android/` (Gradle), `clients/ios/` (future), `lib/make/` (shared .mk includes). `go.mod` in `cli/` not root. APK copied to `cli/embed/` by Makefile before `go:embed`. Standard targets: build, clean, test. | — | 2026-03-28 |
-| D-32 | CLI scaffolding: Cobra root + 7 subcommands with full flag sets. Viper config with RENOTIFY_ env prefix and custom Duration decode hook. App struct pattern (explicit config passing, no global state). Exit codes 0-6. | — | 2026-03-28 |
+| D-32 | CLI scaffolding: Cobra root + 7 subcommands (daemon, post, ask, history, pair, revoke, apk) with full flag sets. `apk` is a command group with `extract` and `serve` subcommands. Viper config with RENOTIFY_ env prefix and custom Duration decode hook. App struct pattern (explicit config passing, no global state). Exit codes 0-6. | — | 2026-03-28 |
 | D-33 | Android scaffolding: Kotlin, namespace `io.resystems.renotify`, compileSdk 36, minSdk 26, Gradle 8.13 wrapper. Permissions: INTERNET, POST_NOTIFICATIONS, CAMERA. APK output: `app-release-unsigned.apk`. | — | 2026-03-29 |
+| D-34 | Daemon controller: subsystem interface with `ready chan<- error` close-signalling for ordered startup and reliable testing. `ctx` handles shutdown; `close(ready)` signals success; `ready <- err; close(ready)` signals failure. | — | 2026-03-29 |
+| D-35 | MCP transport: SSE on shared loopback HTTP server (`127.0.0.1:4224`), not stdio. Enables concurrent multi-agent access without per-session bridge processes. N agents = N SSE connections to one daemon. | — | 2026-03-29 |
+| D-36 | Port architecture: NATS WSS on `0.0.0.0:4223` (TLS, mobile), HTTP on `127.0.0.1:4224` (plain, MCP/dashboard). Separate trust boundaries require separate listeners — NATS needs all-interfaces + self-signed TLS; HTTP needs loopback-only + no TLS. | — | 2026-03-29 |
+| D-37 | Crockford Base32: custom implementation (~100 lines, zero dependencies). Go stdlib lacks Crockford variant. Supports `EncodeBits(src, nBits)` for truncated identifiers (daemon_id 65-bit, workspace_id 80-bit) and confusable mapping on decode (I/L→1, O→0). | — | 2026-03-29 |
+| D-38 | TLS certificate generation in standalone `tlsgen/` package, separating crypto (ECDSA P-256 key gen, X.509 template, fingerprinting) from state file I/O. Produces in-memory artifacts; caller persists. | — | 2026-03-29 |
+| D-39 | IP discovery in `netutil/` package with `PreferredIP` selection: IPv4 private preferred, fallback to any IPv4, then IPv6, then loopback. Independently testable and reusable by future features. | — | 2026-03-29 |
+| D-40 | Pairing orchestration in `pairing/` package with injectable `DiscoverIPs` for testability. Command layer stays thin (flag parsing + output formatting). Matches `daemon/controller.go` pattern. | — | 2026-03-29 |
+| D-41 | QR testing: automated payload assembly + output shape verification; manual scannability check; no QR decoder test dependency. `mdp/qrterminal` is well-tested upstream. | — | 2026-03-29 |
+| D-42 | JetStream setup in `broker/` package (not separate package); uses new `jetstream.New(nc)` API with `CreateOrUpdateStream`/`CreateOrUpdateConsumer` for idempotent startup. Shared broker fallback: verify-only on permission error. All 3 durable consumers created eagerly. | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-29 |
+| D-43 | Android QR scanning via Google ML Kit Barcode Scanning (bundled, no Play Services) + CameraX for camera preview. On-device processing, supports all QR versions and EC levels. | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-29 |
+| D-44 | TLS fingerprint pinning via custom `X509TrustManager` computing SHA-256 of server cert DER. More restrictive than platform default (trusts exactly one leaf cert vs ~150 CAs). `@SuppressLint("CustomX509TrustManager")` suppresses lint for the non-empty `checkServerTrusted`. | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-29 |
+| D-45 | Credential storage via `EncryptedSharedPreferences` (AES-256-GCM via Android Keystore). Interface/implementation split enables mocking in unit tests. | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-29 |
+| D-46 | NATS client: jnats (official Java client) over nats.kt/Ktor. Supports WSS, custom SSLContext, username/password auth, JetStream. No Ktor dependency chain. | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-30 |
+| D-47 | Android Foreground Service (`FOREGROUND_SERVICE_TYPE_DATA_SYNC`) for persistent NATS connection. Persistent notification satisfies R-MOB-10 (visible connectivity status). | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-30 |
+| D-48 | Manual reconnection with exponential backoff (1s, 2s, 4s, 8s, 16s, 30s capped) instead of jnats auto-reconnect. Full TLS + auth + consumer re-bind on each attempt per Section 8.5. | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-30 |
+| D-49 | Added `u` (daemon username) field to `ProvisioningPayload` so mobile app can bind to `mobile-{username}` JetStream consumer. Version stays at 1 (app not shipped). | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-30 |
+| D-50 | Mobile consumer changed from pull to push with `DeliverSubject: resystems.renotify.{username}.mobile.deliver`. Required because jnats `PushSubscribeOptions.bind()` needs a deliver subject. Subject placed within user namespace to reuse existing subscribe ACL. | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-30 |
+| D-51 | Added `$JS.API.CONSUMER.INFO.>` to mobile publish permissions. Required for jnats to look up consumer info when binding a push subscription. Without it, the JetStream API request is silently dropped by the broker, causing a timeout. | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-30 |
+| D-52 | Token revocation via file deletion + SIGHUP. `renotify revoke` deletes the pairing token file and signals the daemon. `reloadAuthorization()` automatically disconnects clients whose credentials are no longer valid. No separate client-kick API needed. | [NATS Transport](analysis-nats-transport-design.md) | 2026-03-30 |
+| D-53 | Extracted `signalDaemonReload()` as shared helper in `command/signal.go`. Used by both `pair` and `revoke` commands. Returns typed result (sent/no-daemon/failed) so callers print context-appropriate messages. | — | 2026-03-30 |
+| D-54 | Heartbeat publisher as daemon `Subsystem`. Publishes an immediate `DaemonHeartbeat` on Start then periodic at configurable interval (default 30s, min 5s). `Publish()` method for on-change triggers. `SetWorkspaces()` for thread-safe snapshot updates. Workspaces empty until flow registry is implemented. | [Payload Schemas](analysis-payload-schemas.md), [NATS Transport](analysis-nats-transport-design.md) | 2026-03-30 |
+| D-55 | Heartbeat payload types (`DaemonHeartbeat`, `WorkspaceInfo`) in `heartbeat/` package. Subject pattern `resystems.renotify.{username}.daemon.{daemon_id}.heartbeat`. Core NATS Pub/Sub (not JetStream) — missed heartbeats are superseded by the next one. | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-30 |
+| D-56 | Parameter registry (`config.Registry`) as single source of truth for key metadata. Each `ParamInfo` carries key path, type label, env var, description, and `Resolve func(*Config) any`. `setDefaults()` rewritten to iterate the registry instead of hand-written per-key lines, eliminating duplication. Default values come from `Default()` via Resolve. | [Configuration Schema](analysis-configuration-schema.md) | 2026-03-31 |
 
 ---
 
@@ -973,9 +1003,17 @@ Record completed items here with the date.
 | 2026-03-28 | A-14 | Added `offset` field to `HistoryQueryRequest` for offset-based pagination. Updated SQLite history query with `OFFSET :offset`. Added `--offset` CLI flag to `renotify history`. |
 | 2026-03-28 | A-15 | Added `"v": 1` version field to `ProvisioningPayload` only. Other payloads deferred — they are ephemeral and flow between co-deployed components. ProvisioningPayload is uniquely at risk because it persists in the mobile app's local storage across daemon upgrades. |
 | 2026-03-28 | P-01 | Root build orchestration implemented. Monorepo layout: `cli/` (Go, `go.resystems.io/renotify`), `clients/android/` (Gradle), `clients/ios/` (future placeholder), `lib/make/` (shared common.mk, go.mk, gradle.mk). Chained Makefiles with standard targets (build, clean, test). `go.mod` in `cli/` for polyglot separation; APK copied to `cli/embed/` by root Makefile. `build-cli-dev` target for fast Go iteration without APK. |
-| 2026-03-28 | C-01 | CLI scaffolding implemented. Cobra root command + 7 subcommands (daemon, post, ask, history, pair, revoke, extract-apk) with full flag sets. Viper config loading with RENOTIFY_ env prefix, settings.json file, and compiled defaults. Custom Duration type with mapstructure decode hook. Config validation (all constraints from A-06). XDG path resolution. Exit code constants 0-6. App struct pattern for explicit config passing. |
+| 2026-03-28 | C-01 | CLI scaffolding implemented. Cobra root command + 7 subcommands (daemon, post, ask, history, pair, revoke, apk) with full flag sets. `apk` is a command group with `extract` and `serve` subcommands. Viper config loading with RENOTIFY_ env prefix, settings.json file, and compiled defaults. Custom Duration type with mapstructure decode hook. Config validation (all constraints from A-06). XDG path resolution. Exit code constants 0-6. App struct pattern for explicit config passing. |
 | 2026-03-29 | M-01 | Android project scaffolding. Kotlin, namespace `io.resystems.renotify`, compileSdk 36, minSdk 26, targetSdk 36, buildToolsVersion 36.1.0. Gradle 8.13 wrapper. Permissions: INTERNET, POST_NOTIFICATIONS, CAMERA. Stub MainActivity. Makefile auto-generates local.properties from ANDROID_HOME. Root Makefile updated for unsigned APK filename. |
 | 2026-03-29 | V-03 | Build verification passed. CLI: `make build-dev` produces 8.1 MB binary, 18 tests pass, `go vet` clean. Android: `assembleRelease` produces 1.8 MB unsigned APK. Full chain: `make build-all` builds Android then CLI with APK copy to `cli/embed/`. `make clean` removes all artifacts. |
+| 2026-03-29 | C-02 | Daemon controller implemented. Embedded NATS server (TCP 4222 + WSS 4223) with JetStream enabled, two-account auth (daemon + mobile ACLs), shared broker connection path. State management: daemon_id (`dn_` + 13 Crockford Base32), internal token (`rn_tk_` + 52 chars), pairing token loading. Subsystem interface with `ready chan<- error` close-signalling for ordered startup. Shared loopback HTTP server (`127.0.0.1:4224`, plain HTTP) with MCP SSE at `/mcp`. Signal handling (SIGINT/SIGTERM), foreground/background logging modes. New packages: `crockford`, `state`, `broker`, `httpserver`, `mcpserver`, `daemon`. Dependencies: nats-server v2.12.6, nats.go v1.50.0, go-sdk v1.4.1. MCPConfig expanded with `host`/`port` fields. 65 tests (unit + integration). |
+| 2026-03-29 | C-07 | Pairing generator implemented. ECDSA P-256 self-signed certificate generation (3-year validity, daemon_id in CN, all discovered IPs + localhost in SANs). Local IP discovery (non-loopback, non-link-local) with IPv4 private preference. Pairing token management (always-new `rn_tk_` token, overwrites prior). ProvisioningPayload assembly with single-char JSON keys (`v`, `h`, `p`, `t`, `c`). ASCII QR rendering via `mdp/qrterminal` half-block at EC level L. Text and JSON output formats. `--ip` override, `--regenerate-cert` flag. Certificate fingerprint: SHA-256 of DER, hex-encoded (64 chars). New packages: `tlsgen`, `netutil`, `pairing`. Extended `state/` with `WriteTLS` (0644/0600), `GenerateToken`, `WriteUsername`. Dependency: qrterminal/v3. 64 tests (unit + integration). |
+| 2026-03-29 | C-08 | JetStream configuration implemented. RENOTIFY stream created at daemon startup with memory storage, limits retention, discard old, 1 replica, and configurable age/bytes/msg-size/msgs-per-subj/dup-window from JetStreamConfig. Three durable consumers created: `mobile-{username}` (AckExplicit, MaxDeliver=3, MaxAckPending=256, InactiveThreshold=35m), `daemon-lifecycle-{username}` and `daemon-interject-{username}` (MaxAckPending=64, InactiveThreshold=5m). Uses new `jetstream.New(nc)` API with idempotent `CreateOrUpdateStream`/`CreateOrUpdateConsumer`. Shared broker permission fallback (verify-only on 403). Fixed WSS TLS to use direct `TLSConfig` instead of `TLSMap`. 13 new tests (config builders + publish/consume + isolation). |
+| 2026-03-29 | M-06 | Secure pairing scanner implemented. QR scanning via Google ML Kit Barcode Scanning (bundled) + CameraX preview with `ImageAnalysis` frame processing. `ProvisioningPayload` data class with `fromJson` parsing and strict validation (version, host, port, Crockford Base32 token format, lowercase hex fingerprint). Custom `FingerprintTrustManager` (`X509TrustManager`) computes SHA-256 of server cert DER for fingerprint pinning (Section 5.5 Approach A). `PinnedSSLContext` factory creates `SSLContext` for M-02's NATS WSS connection. `EncryptedProvisioningStore` using `EncryptedSharedPreferences` (AES-256-GCM via Android Keystore). `ScannerActivity` with CameraX + ML Kit + runtime permission handling. `MainActivity` updated with pair button and status display. Dependencies: CameraX 1.4.2, ML Kit barcode-scanning 17.3.0, security-crypto 1.1.0-alpha06. Test infrastructure: JUnit 4.13.2, org.json 20240303 (JVM), AndroidJUnit4 (instrumented). 46 JVM unit tests + 7 instrumented tests. |
+| 2026-03-30 | M-02 | NATS client service implemented. Added `u` (daemon username) field to `ProvisioningPayload` on both Go and Android sides for JetStream consumer binding. Android Foreground Service (`NatsService`) with persistent notification showing connection state (R-MOB-10). `NatsConnectionManager` with coroutine-driven connect/reconnect and exponential backoff (1s-30s capped, Section 8.5). `NatsOptionsBuilder` builds jnats `Options` from provisioning credentials (WSS URL, `PinnedSSLContext`, `userInfo("mobile", token)`, `noReconnect()`). `ConnectionState` sealed class with `StateFlow` for UI observation. Binds to pre-existing `mobile-{username}` durable JetStream consumer (created by C-08). Dependencies: jnats 2.21.1, kotlinx-coroutines-android 1.10.1, lifecycle-runtime-ktx/lifecycle-service 2.9.0. Clarified Section 6.4 of transport design doc with literal NATS usernames. Updated device-testing.md with firewall, emulator networking (10.0.2.2), and NATS troubleshooting. 16 JVM unit tests (options builder, backoff, state, username). |
+| 2026-03-30 | C-12 | Token revocation implemented. `renotify revoke` deletes the pairing token and username files from XDG state and sends SIGHUP to the running daemon. The daemon's `reloadAuthorization()` automatically disconnects clients whose credentials are no longer valid — no separate client-kick API needed. Shared broker mode deletes local token and warns operator must revoke on broker side. Idempotent: reports "no active pairing" when no token exists. Text and JSON output formats. Extracted `signalDaemonReload()` as shared helper in `command/signal.go` (used by both `pair` and `revoke`). Updated `pair` long description to reflect SIGHUP hot-reload (no longer says "daemon must be restarted"). R-SEC-02 already satisfied: `renotify pair` overwrites prior token + SIGHUP disconnects old client. 8 new tests (state deletion + command). |
+| 2026-03-30 | C-13 | Daemon heartbeat publisher implemented. New `heartbeat/` package with `DaemonHeartbeat` and `WorkspaceInfo` payload types matching the analysis schema. `Publisher` implements `daemon.Subsystem`: publishes an immediate heartbeat on Start (Section 8.1 step 12), then periodic at configurable interval (default 30s). `Publish()` for on-change triggers, `SetWorkspaces()` for thread-safe snapshot updates. Workspaces array is empty until the flow registry is implemented (C-03/C-04/C-05). Subject: `resystems.renotify.{username}.daemon.{daemon_id}.heartbeat` via Core NATS Pub/Sub (ephemeral, not JetStream). `daemon_id` loaded in `runDaemon()` before controller startup for publisher construction. 8 new tests (subject, payload serialisation, empty workspaces, immediate/periodic publish, stop, workspace update). |
+| 2026-03-31 | C-14 | Config init and parameter help implemented. New `config.Registry` (`[]ParamInfo`) as single source of truth for key metadata — carries key path, type label, env var, description, and `Resolve func(*Config) any`. Refactored `setDefaults()` from 30 hand-written lines to a 6-line loop iterating the registry, eliminating duplication between Viper key registration and the parameter catalogue. `renotify config init` generates `settings.json` (minimal with username only, or `--full` with all defaults; `--force` to overwrite; `--output` for custom path). `renotify config list` prints tabwriter table of all 27 parameters (key, type, default, env var, description); `--format json` for machine-readable output. `config` parent command overrides `PersistentPreRunE` to skip config loading so commands work without existing settings.json. 12 new tests (5 registry, 7 command). |
 
 ## 6. References
 
