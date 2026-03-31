@@ -14,8 +14,6 @@ import (
 	"go.resystems.io/renotify/internal/broker"
 	"go.resystems.io/renotify/internal/exitcode"
 	"go.resystems.io/renotify/internal/payload"
-	"go.resystems.io/renotify/internal/state"
-	"go.resystems.io/renotify/internal/xdg"
 )
 
 func newPostCmd(app *App) *cobra.Command {
@@ -71,55 +69,31 @@ posting. The notification is buffered in JetStream for up to
 				}
 			}
 
-			cfg := app.Config
-
-			// Load daemon identity.
-			daemonID, err := state.LoadOrGenerateDaemonID(
-				xdg.DaemonIDPath())
+			fc, err := setupFlow(app.Config)
 			if err != nil {
-				return exitcode.Errorf(exitcode.Error,
-					"daemon_id: %v", err)
+				return err
 			}
+			defer fc.close()
 
-			// Compute workspace identity from cwd.
-			cwd, err := os.Getwd()
-			if err != nil {
-				return exitcode.Errorf(exitcode.Error,
-					"getwd: %v", err)
-			}
-			workspaceID := state.WorkspaceID(daemonID, cwd)
-
-			// Generate flow and notification identifiers.
-			flowID := state.GenerateFlowID()
-			notificationID := state.GenerateNotificationID()
-
-			// Connect to the daemon's NATS broker.
-			nc, err := broker.ConnectCLI(cfg)
-			if err != nil {
-				return exitcode.Errorf(exitcode.Error, "%v", err)
-			}
-			defer nc.Drain()
-
-			js, err := nc.JetStream()
+			js, err := fc.nc.JetStream()
 			if err != nil {
 				return exitcode.Errorf(exitcode.Error,
 					"jetstream: %v", err)
 			}
 
 			now := time.Now().UTC()
-			username := cfg.Username
 
 			// Publish flow-active lifecycle event.
 			activeEvent := &payload.FlowLifecycleEvent{
-				FlowID:      flowID,
-				DaemonID:    daemonID,
-				WorkspaceID: workspaceID,
+				FlowID:      fc.flowID,
+				DaemonID:    fc.daemonID,
+				WorkspaceID: fc.workspaceID,
 				Status:      payload.FlowActive,
 				Timestamp:   now,
 			}
 			if err := publishJSON(js,
-				broker.FlowLifecycleSubject(username, flowID),
-				flowID, activeEvent,
+				broker.FlowLifecycleSubject(fc.username, fc.flowID),
+				fc.flowID, activeEvent,
 			); err != nil {
 				return exitcode.Errorf(exitcode.Error,
 					"publish lifecycle (active): %v", err)
@@ -127,22 +101,22 @@ posting. The notification is buffered in JetStream for up to
 
 			// Publish notification request.
 			req := &payload.NotificationRequest{
-				ID:          notificationID,
-				FlowID:      flowID,
-				DaemonID:    daemonID,
-				WorkspaceID: workspaceID,
+				ID:          fc.notificationID,
+				FlowID:      fc.flowID,
+				DaemonID:    fc.daemonID,
+				WorkspaceID: fc.workspaceID,
 				Title:       title,
 				Body:        body,
 				ResponseTypes: []payload.ResponseType{
 					payload.ResponseNone,
 				},
 				Priority:  p,
-				Source:     source,
+				Source:    source,
 				Timestamp: now,
 			}
 			if err := publishJSON(js,
-				broker.FlowRequestSubject(username, flowID),
-				notificationID, req,
+				broker.FlowRequestSubject(fc.username, fc.flowID),
+				fc.notificationID, req,
 			); err != nil {
 				return exitcode.Errorf(exitcode.Error,
 					"publish notification: %v", err)
@@ -150,15 +124,15 @@ posting. The notification is buffered in JetStream for up to
 
 			// Publish flow-completed lifecycle event.
 			completedEvent := &payload.FlowLifecycleEvent{
-				FlowID:      flowID,
-				DaemonID:    daemonID,
-				WorkspaceID: workspaceID,
+				FlowID:      fc.flowID,
+				DaemonID:    fc.daemonID,
+				WorkspaceID: fc.workspaceID,
 				Status:      payload.FlowCompleted,
 				Timestamp:   now,
 			}
 			if err := publishJSON(js,
-				broker.FlowLifecycleSubject(username, flowID),
-				flowID+"-completed", completedEvent,
+				broker.FlowLifecycleSubject(fc.username, fc.flowID),
+				fc.flowID+"-completed", completedEvent,
 			); err != nil {
 				return exitcode.Errorf(exitcode.Error,
 					"publish lifecycle (completed): %v", err)
@@ -171,7 +145,7 @@ posting. The notification is buffered in JetStream for up to
 					NotificationID string `json:"notification_id"`
 				}{
 					Status:         "sent",
-					NotificationID: notificationID,
+					NotificationID: fc.notificationID,
 				}
 				enc := json.NewEncoder(cmd.OutOrStdout())
 				enc.SetEscapeHTML(false)
