@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import io.resystems.renotify.dashboard.ActiveFlowsResult
 import io.resystems.renotify.dashboard.DaemonHeartbeat
 import io.resystems.renotify.notification.NotificationPayload
 import io.resystems.renotify.notification.NotificationRenderer
@@ -58,7 +59,8 @@ class NatsService : Service() {
         super.onCreate()
         createNotificationChannels()
         manager = NatsConnectionManager(
-            serviceScope, ::handleMessage, ::handleHeartbeat)
+            serviceScope, ::handleMessage, ::handleHeartbeat,
+            ::handleInitialDashboard)
         store = EncryptedProvisioningStore(this)
 
         // Update the persistent notification when state changes.
@@ -202,6 +204,23 @@ class NatsService : Service() {
                 "${heartbeat.workspaces.size} workspace(s)")
         } catch (e: Exception) {
             Log.w(TAG, "Error parsing heartbeat", e)
+        }
+    }
+
+    /**
+     * Callback for the initial svc.flows query on connect.
+     * Converts the flat flow list to a heartbeat for the
+     * dashboard.
+     */
+    private fun handleInitialDashboard(data: ByteArray) {
+        try {
+            val json = String(data, Charsets.UTF_8)
+            val result = ActiveFlowsResult.fromJson(json)
+            _dashboardState.value = result.toDaemonHeartbeat()
+            Log.i(TAG, "Initial dashboard: " +
+                "${result.flows.size} flow(s)")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error parsing initial dashboard", e)
         }
     }
 

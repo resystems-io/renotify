@@ -33,7 +33,8 @@ import kotlin.math.min
 class NatsConnectionManager(
     private val scope: CoroutineScope,
     private val onMessage: ((subject: String, data: ByteArray, ack: () -> Unit) -> Unit)? = null,
-    private val onHeartbeat: ((data: ByteArray) -> Unit)? = null
+    private val onHeartbeat: ((data: ByteArray) -> Unit)? = null,
+    private val onInitialDashboard: ((data: ByteArray) -> Unit)? = null
 ) {
 
     private val _state = MutableStateFlow<ConnectionState>(
@@ -128,6 +129,7 @@ class NatsConnectionManager(
 
             subscribeToConsumer(nc, payload)
             subscribeToHeartbeat(nc, payload)
+            queryInitialDashboard(nc, payload)
 
             _state.value = ConnectionState.Connected
             Log.i(TAG, "Connected to " +
@@ -224,6 +226,30 @@ class NatsConnectionManager(
     }
 
     /**
+     * Query the daemon's svc.flows endpoint for an immediate
+     * dashboard snapshot. Non-fatal on failure — the periodic
+     * heartbeat will populate the dashboard later.
+     */
+    private fun queryInitialDashboard(
+        nc: Connection,
+        payload: ProvisioningPayload
+    ) {
+        val handler = onInitialDashboard ?: return
+        val subject = "resystems.renotify.${payload.username}" +
+            ".svc.flows"
+        try {
+            val resp = nc.request(
+                subject, "{}".toByteArray(),
+                java.time.Duration.ofSeconds(2))
+            handler(resp.data)
+            Log.i(TAG, "Initial dashboard loaded from svc.flows")
+        } catch (e: Exception) {
+            Log.w(TAG, "Initial dashboard query failed: " +
+                "${e.message}")
+        }
+    }
+
+    /**
      * Reconnection loop with exponential backoff: 1s, 2s, 4s,
      * 8s, 16s, 30s (capped). See Section 8.5.
      */
@@ -248,6 +274,7 @@ class NatsConnectionManager(
 
                 subscribeToConsumer(nc, payload)
                 subscribeToHeartbeat(nc, payload)
+                queryInitialDashboard(nc, payload)
 
                 _state.value = ConnectionState.Connected
                 Log.i(TAG, "Reconnected to " +

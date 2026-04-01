@@ -89,13 +89,15 @@ class MainActivity : ComponentActivity() {
         }
 
         // App title.
-        val title = TextView(this).apply {
-            text = "Renotify"
-            textSize = 24f
-            gravity = Gravity.CENTER
-            setPadding(dp(16), dp(8), dp(16), dp(4))
+        if (false) {
+            val title = TextView(this).apply {
+                text = "Renotify"
+                textSize = 24f
+                gravity = Gravity.CENTER
+                setPadding(dp(16), dp(8), dp(16), dp(4))
+            }
+            root.addView(title)
         }
-        root.addView(title)
 
         // Connection status line (R-MOB-10).
         statusText = TextView(this).apply {
@@ -132,8 +134,13 @@ class MainActivity : ComponentActivity() {
         // Pair button (R-MOB-01).
         val pairButton = Button(this).apply {
             text = "Scan Pairing QR Code"
-            setBackgroundColor(0xFF444444.toInt())
+            // rounded corners
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF444444.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
             setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(16), dp(12), dp(16), dp(12))
             setOnClickListener {
                 scanLauncher.launch(
                     Intent(
@@ -147,8 +154,13 @@ class MainActivity : ComponentActivity() {
 
         // Connect/disconnect button (R-MOB-02).
         connectButton = Button(this).apply {
-            setBackgroundColor(0xFF444444.toInt())
+            // rounded corners
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF444444.toInt())
+                cornerRadius = dp(8).toFloat()
+            }
             setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(16), dp(12), dp(16), dp(12))
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
