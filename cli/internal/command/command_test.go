@@ -36,7 +36,7 @@ func TestRootHelp(t *testing.T) {
 	if !strings.Contains(stdout, "Available Commands") {
 		t.Error("help output missing 'Available Commands'")
 	}
-	for _, cmd := range []string{"daemon", "post", "ask", "answer", "interject", "history", "pair", "revoke", "apk", "config"} {
+	for _, cmd := range []string{"daemon", "post", "ask", "answer", "interject", "flow", "flows", "history", "pair", "revoke", "apk", "config"} {
 		if !strings.Contains(stdout, cmd) {
 			t.Errorf("help output missing command %q", cmd)
 		}
@@ -53,6 +53,7 @@ func TestSubcommandHelp(t *testing.T) {
 		{"ask", []string{"--title", "--body", "--priority", "--actions", "--response-types", "--timeout", "--format"}},
 		{"answer", []string{"--flow-id", "--request-id", "--accepted", "--rejected", "--action", "--text", "--format"}},
 		{"interject", []string{"--flow-id", "--message", "--format"}},
+		{"flow", []string{"--format"}},
 		{"history", []string{"--workspace-id", "--flow-id", "--since", "--until", "--limit", "--offset", "--format"}},
 		{"pair", []string{"--ip", "--regenerate-cert", "--format"}},
 		{"revoke", []string{"--format"}},

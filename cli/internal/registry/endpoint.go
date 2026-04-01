@@ -14,13 +14,15 @@ import (
 // Includes fields needed by the CLI flows command (display name,
 // last activity for TTL computation).
 type ActiveFlowEntry struct {
-	FlowID                string    `json:"flow_id"`
-	DaemonID              string    `json:"daemon_id"`
-	WorkspaceID           string    `json:"workspace_id"`
-	DisplayName           string    `json:"display_name,omitempty"`
-	Label                 string    `json:"label,omitempty"`
-	RegisteredAt          time.Time `json:"registered_at"`
-	LastActivityTimestamp time.Time `json:"last_activity_timestamp"`
+	FlowID                string            `json:"flow_id"`
+	DaemonID              string            `json:"daemon_id"`
+	WorkspaceID           string            `json:"workspace_id"`
+	DisplayName           string            `json:"display_name,omitempty"`
+	AbsPath               string            `json:"abs_path,omitempty"`
+	Label                 string            `json:"label,omitempty"`
+	Metadata              map[string]string `json:"metadata,omitempty"`
+	RegisteredAt          time.Time         `json:"registered_at"`
+	LastActivityTimestamp time.Time         `json:"last_activity_timestamp"`
 }
 
 // ActiveFlowsResult is the response payload for the svc.flows
@@ -66,7 +68,9 @@ func (s *Service) handleFlowsQuery(msg *nats.Msg) {
 			DaemonID:              f.DaemonID,
 			WorkspaceID:           f.WorkspaceID,
 			DisplayName:           f.DisplayName,
+			AbsPath:               f.AbsPath,
 			Label:                 f.Label,
+			Metadata:              f.Metadata,
 			RegisteredAt:          f.RegisteredAt,
 			LastActivityTimestamp: f.LastActivityTimestamp,
 		}
