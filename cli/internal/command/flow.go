@@ -19,6 +19,8 @@ type flowContext struct {
 	nc             *nats.Conn
 	daemonID       string
 	workspaceID    string
+	displayName    string
+	absPath        string
 	flowID         string
 	notificationID string
 	username       string
@@ -52,6 +54,8 @@ func setupFlow(cfg *config.Config) (*flowContext, error) {
 		nc:             nc,
 		daemonID:       daemonID,
 		workspaceID:    state.WorkspaceID(daemonID, cwd),
+		displayName:    state.DisplayName(cwd),
+		absPath:        cwd,
 		flowID:         state.GenerateFlowID(),
 		notificationID: state.GenerateNotificationID(),
 		username:       cfg.Username,
@@ -62,5 +66,22 @@ func setupFlow(cfg *config.Config) (*flowContext, error) {
 func (fc *flowContext) close() {
 	if fc.nc != nil {
 		fc.nc.Drain()
+	}
+}
+
+// Well-known metadata keys for workspace context in lifecycle
+// events. The daemon's registry extracts these when registering
+// a flow (C-10).
+const (
+	MetaDisplayName = "workspace_display_name"
+	MetaAbsPath     = "workspace_abs_path"
+)
+
+// workspaceMetadata returns the metadata map carrying workspace
+// display name and absolute path for lifecycle events.
+func (fc *flowContext) workspaceMetadata() map[string]string {
+	return map[string]string{
+		MetaDisplayName: fc.displayName,
+		MetaAbsPath:     fc.absPath,
 	}
 }

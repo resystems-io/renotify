@@ -885,7 +885,7 @@ responses).*
 *(Goal: Native AI Agent integration via MCP and hooks, real-time asynchronous
 workspace monitoring).*
 
-- [ ] **C-10: Active Registry Service:** Implement the SQLite-backed flow
+- [x] **C-10: Active Registry Service:** Implement the SQLite-backed flow
   tracker, stale sweeper, and the Core NATS registry presentation endpoint.
 - [ ] **C-06: MCP Server:** Implement the MCP protocol layer to expose
   capabilities natively to AI agents.
@@ -996,6 +996,8 @@ specifications.
 | D-55 | Heartbeat payload types (`DaemonHeartbeat`, `WorkspaceInfo`) in `heartbeat/` package. Subject pattern `resystems.renotify.{username}.daemon.{daemon_id}.heartbeat`. Core NATS Pub/Sub (not JetStream) — missed heartbeats are superseded by the next one. | [Payload Schemas](analysis-payload-schemas.md) | 2026-03-30 |
 | D-56 | Parameter registry (`config.Registry`) as single source of truth for key metadata. Each `ParamInfo` carries key path, type label, env var, description, and `Resolve func(*Config) any`. `setDefaults()` rewritten to iterate the registry instead of hand-written per-key lines, eliminating duplication. Default values come from `Default()` via Resolve. | [Configuration Schema](analysis-configuration-schema.md) | 2026-03-31 |
 | D-57 | Hook dispatcher: command hook (`renotify dispatch` via stdio) over HTTP. Reads hook JSON from stdin, discriminates on `hook_event_name`. `PermissionRequest` → `ask` with boolean (Allow/Deny); `Notification` → `post` fire-and-forget. Exit 1 on error for graceful fallback to terminal prompt. Tool input summarised per-tool (Bash→command, Edit/Write/Read→file_path, etc.). Reuses existing `setupFlow` and JetStream infrastructure. | [Hook Integration](analysis-hook-integration.md) | 2026-03-31 |
+| D-58 | Schema V2 migration: `display_name TEXT` and `abs_path TEXT` columns added to `active_flows`. Workspace context carried in `FlowLifecycleEvent.Metadata` (keys `workspace_display_name`, `workspace_abs_path`), extracted by daemon lifecycle processor. Wire format unchanged — these are daemon-side enrichment like `username`. | [SQLite Ledger](analysis-sqlite-ledger.md) | 2026-04-01 |
+| D-59 | Registry subsystem ordering: ledger → http → mcp → heartbeat → registry. Registry starts after heartbeat so `SetWorkspaces()` + `Publish()` calls find a ready publisher. Registry binds to `daemon-lifecycle-{username}` JetStream consumer via `consumer.Messages()` iterator. Stale reaper runs on 30s ticker aligned with heartbeat interval. | — | 2026-04-01 |
 
 ---
 
@@ -1047,6 +1049,7 @@ Record completed items here with the date.
 | 2026-03-31 | V-00 | Integration smoke tests implemented. 7 scenarios in `smoke_test.go`: post round-trip (payload fields, lifecycle events), ask with mock response (full round-trip), ask + answer utility (CLI-to-CLI), ask + interject stop, JetStream buffering (publish before subscriber connects, delivered via durable consumer), safety timeout (exit code 3), and payload serialisation (snake_case keys, omitempty, RFC 3339 timestamps). Mock mobile subscriber uses `broker.EnsureJetStream` to create durable consumers. Verifies R-CLI-04, R-CLI-05, R-API-01, R-API-02, R-CLI-12. Phase 4 complete. |
 
 | 2026-03-31 | A-16 | Claude Code hook integration analysis. Mapped `PermissionRequest` hook event to `renotify ask` (boolean Allow/Deny) and `Notification` hook event to `renotify post` (fire-and-forget). Evaluated command (stdio) vs HTTP transport — command preferred for graceful fallback (exit 1 → terminal prompt), no daemon dependency, and negligible latency overhead vs human response time. Designed `renotify dispatch` as universal hook handler: reads JSON from stdin, discriminates on `hook_event_name`, composes notifications from tool-specific input summarisation. New requirement R-CLI-19, implementation item C-15. |
+| 2026-04-01 | C-10 | Active registry service implemented. New `registry/` package as daemon subsystem: lifecycle consumer binds to `daemon-lifecycle-{username}` JetStream consumer via `consumer.Messages()` iterator, processes `FlowLifecycleEvent` messages (active→register, completed/failed→terminate), updates SQLite active_flows table. Stale reaper goroutine (30s ticker) calls `ReapStaleFlows()` and publishes `failed` lifecycle events for expired flows. `svc.flows` Core NATS Request-Reply endpoint serves `ActiveFlowsQuery`/`ActiveFlowsResult`. Workspace snapshot builder groups active flows by workspace_id, feeds `heartbeat.Publisher.SetWorkspaces()` + immediate publish on every state change. Schema V2 migration adds `display_name` and `abs_path` columns to `active_flows`. CLI lifecycle events include workspace metadata (`workspace_display_name`, `workspace_abs_path`) in `FlowLifecycleEvent.Metadata`. Subsystem ordering: ledger → http → mcp → heartbeat → registry. R-CLI-14, R-CLI-18 satisfied. 6 new registry tests, all existing tests pass. |
 
 ## 6. References
 

@@ -89,6 +89,7 @@ posting. The notification is buffered in JetStream for up to
 				DaemonID:    fc.daemonID,
 				WorkspaceID: fc.workspaceID,
 				Status:      payload.FlowActive,
+				Metadata:    fc.workspaceMetadata(),
 				Timestamp:   now,
 			}
 			if err := publishJSON(js,

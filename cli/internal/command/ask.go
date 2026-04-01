@@ -200,6 +200,7 @@ protects against daemon failure.`,
 				DaemonID:    fc.daemonID,
 				WorkspaceID: fc.workspaceID,
 				Status:      payload.FlowActive,
+				Metadata:    fc.workspaceMetadata(),
 				Timestamp:   now,
 			}
 			if err := publishJSON(legacyJS,
