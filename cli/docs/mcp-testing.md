@@ -210,11 +210,17 @@ settings. In `~/.claude/settings.json` or
 {
   "mcpServers": {
     "renotify": {
-      "type": "url",
+      "type": "http",
       "url": "http://127.0.0.1:4224/mcp"
     }
   }
 }
+```
+
+Or add via CLI:
+
+```bash
+claude mcp add --transport http renotify http://127.0.0.1:4224/mcp
 ```
 
 After restarting Claude Code (or running `/mcp`), the five
