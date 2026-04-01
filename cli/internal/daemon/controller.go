@@ -26,6 +26,11 @@ type Controller struct {
 	subsystems     []Subsystem
 	startupTimeout time.Duration
 
+	// Ready is closed when all subsystems have signalled ready.
+	// If nil, no readiness notification is sent. Used by tests
+	// to avoid sleeping after starting the controller.
+	Ready chan struct{}
+
 	// ReloadCh receives a signal (e.g., from SIGHUP) to reload
 	// the pairing token and update the embedded broker's auth.
 	// Nil disables reload support.
@@ -147,6 +152,10 @@ func (c *Controller) Run(ctx context.Context) error {
 		}
 		started = append(started, sub)
 		c.logger.Info("subsystem ready", "name", sub.Name())
+	}
+
+	if c.Ready != nil {
+		close(c.Ready)
 	}
 
 	mode := "embedded"

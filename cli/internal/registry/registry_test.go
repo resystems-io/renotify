@@ -15,6 +15,7 @@ import (
 	"go.resystems.io/renotify/internal/ledger"
 	"go.resystems.io/renotify/internal/payload"
 	"go.resystems.io/renotify/internal/registry"
+	"go.resystems.io/renotify/internal/testutil"
 
 	"log/slog"
 )
@@ -159,15 +160,16 @@ func TestLifecycleProcessor_Register(t *testing.T) {
 	}
 	publishLifecycle(t, nc, event)
 
-	// Wait for the lifecycle consumer to process.
-	time.Sleep(500 * time.Millisecond)
+	if !testutil.WaitFor(t, 2*time.Second, func() bool {
+		flows, _ := db.ListActiveFlows(ledger.ActiveFlowsQuery{})
+		return len(flows) == 1
+	}) {
+		t.Fatal("expected 1 flow after lifecycle event")
+	}
 
 	flows, err := db.ListActiveFlows(ledger.ActiveFlowsQuery{})
 	if err != nil {
 		t.Fatal(err)
-	}
-	if len(flows) != 1 {
-		t.Fatalf("got %d flows, want 1", len(flows))
 	}
 	if flows[0].FlowID != "fl_TEST01" {
 		t.Errorf("flow_id = %q, want %q",
@@ -198,7 +200,12 @@ func TestLifecycleProcessor_Terminate(t *testing.T) {
 		Timestamp:   time.Now().UTC(),
 	}
 	publishLifecycle(t, nc, active)
-	time.Sleep(500 * time.Millisecond)
+	if !testutil.WaitFor(t, 2*time.Second, func() bool {
+		flows, _ := db.ListActiveFlows(ledger.ActiveFlowsQuery{})
+		return len(flows) == 1
+	}) {
+		t.Fatal("expected 1 flow after active event")
+	}
 
 	// Terminate it.
 	completed := &payload.FlowLifecycleEvent{
@@ -209,14 +216,12 @@ func TestLifecycleProcessor_Terminate(t *testing.T) {
 		Timestamp:   time.Now().UTC(),
 	}
 	publishLifecycle(t, nc, completed)
-	time.Sleep(500 * time.Millisecond)
 
-	flows, err := db.ListActiveFlows(ledger.ActiveFlowsQuery{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(flows) != 0 {
-		t.Errorf("got %d flows, want 0 (terminated)", len(flows))
+	if !testutil.WaitFor(t, 2*time.Second, func() bool {
+		flows, _ := db.ListActiveFlows(ledger.ActiveFlowsQuery{})
+		return len(flows) == 0
+	}) {
+		t.Error("expected 0 flows after terminate")
 	}
 }
 
@@ -282,7 +287,12 @@ func TestFlowsEndpoint(t *testing.T) {
 		}
 		publishLifecycle(t, nc, event)
 	}
-	time.Sleep(500 * time.Millisecond)
+	if !testutil.WaitFor(t, 2*time.Second, func() bool {
+		flows, _ := db.ListActiveFlows(ledger.ActiveFlowsQuery{})
+		return len(flows) == 2
+	}) {
+		t.Fatal("expected 2 flows")
+	}
 
 	// Query svc.flows.
 	subject := broker.ServiceFlowsSubject(testUsername)
@@ -348,7 +358,12 @@ func TestWorkspaceSnapshot(t *testing.T) {
 	for i := range events {
 		publishLifecycle(t, nc, &events[i])
 	}
-	time.Sleep(500 * time.Millisecond)
+	if !testutil.WaitFor(t, 2*time.Second, func() bool {
+		flows, _ := db.ListActiveFlows(ledger.ActiveFlowsQuery{})
+		return len(flows) == 3
+	}) {
+		t.Fatal("expected 3 flows")
+	}
 
 	// Subscribe to heartbeat and trigger one.
 	hbSubject := heartbeat.Subject(testUsername, testDaemonID)
@@ -414,19 +429,28 @@ func TestStartupReconciliation(t *testing.T) {
 		Timestamp: time.Now().UTC(),
 	}
 	publishLifecycle(t, nc, event)
-	time.Sleep(200 * time.Millisecond)
+
+	// Brief pause to let NATS buffer the message before registry
+	// starts. This is not a processing wait — it ensures the
+	// message is in JetStream before the consumer binds.
+	time.Sleep(50 * time.Millisecond)
 
 	// Now start the registry — it should process the buffered
 	// event via the lifecycle consumer.
 	startRegistry(t, nc, db, hb)
-	time.Sleep(500 * time.Millisecond)
+
+	if !testutil.WaitFor(t, 2*time.Second, func() bool {
+		flows, _ := db.ListActiveFlows(ledger.ActiveFlowsQuery{})
+		return len(flows) == 1
+	}) {
+		t.Fatal("expected 1 flow after reconciliation")
+	}
 
 	flows, err := db.ListActiveFlows(ledger.ActiveFlowsQuery{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(flows) != 1 {
-		t.Fatalf("got %d flows, want 1 (reconciled)", len(flows))
+	if flows[0].FlowID != "fl_RECON01" {
 	}
 	if flows[0].FlowID != "fl_RECON01" {
 		t.Errorf("flow_id = %q, want %q",
