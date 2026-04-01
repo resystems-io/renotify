@@ -20,6 +20,7 @@ data class NotificationPayload(
     val responseTypes: List<String>,
     val priority: String,
     val source: String,
+    val workspaceName: String,
     val actions: List<String>?,
     val timeoutSec: Int?,
     val timestamp: String
@@ -87,6 +88,7 @@ data class NotificationPayload(
                 responseTypes = responseTypes,
                 priority = obj.optString("priority", PRIORITY_NORMAL),
                 source = obj.optString("source", ""),
+                workspaceName = obj.optString("workspace_name", ""),
                 actions = actions,
                 timeoutSec = if (obj.has("timeout_sec"))
                     obj.getInt("timeout_sec") else null,

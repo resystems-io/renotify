@@ -96,6 +96,7 @@ func (s *Server) handleAsk(
 		ResponseTypes: responseTypes,
 		Priority:      priority,
 		Source:        args.Source,
+		WorkspaceName: flow.DisplayName,
 		Actions:       args.Actions,
 		TimeoutSec:    timeoutSec,
 		Timestamp:     now,

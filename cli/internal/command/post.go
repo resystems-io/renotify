@@ -110,9 +110,10 @@ posting. The notification is buffered in JetStream for up to
 				ResponseTypes: []payload.ResponseType{
 					payload.ResponseNone,
 				},
-				Priority:  p,
-				Source:    source,
-				Timestamp: now,
+				Priority:      p,
+				Source:        source,
+				WorkspaceName: fc.displayName,
+				Timestamp:     now,
 			}
 			if err := broker.PublishJSON(js,
 				broker.FlowRequestSubject(fc.username, fc.flowID),

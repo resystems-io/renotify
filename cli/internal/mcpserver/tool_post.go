@@ -73,9 +73,10 @@ func (s *Server) handlePost(
 		ResponseTypes: []payload.ResponseType{
 			payload.ResponseNone,
 		},
-		Priority:  priority,
-		Source:    args.Source,
-		Timestamp: now,
+		Priority:      priority,
+		Source:        args.Source,
+		WorkspaceName: flow.DisplayName,
+		Timestamp:     now,
 	}
 
 	// Publish to JetStream.
@@ -107,7 +108,9 @@ func (s *Server) handlePost(
 // lookupFlow finds an active flow by ID. Returns an error if the
 // flow is not found.
 func (s *Server) lookupFlow(flowID string) (*ledger.ActiveFlow, error) {
-	flows, err := s.db().ListActiveFlows(ledger.ActiveFlowsQuery{})
+	flows, err := s.db().ListActiveFlows(ledger.ActiveFlowsQuery{
+		FlowID: flowID,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("list flows: %w", err)
 	}

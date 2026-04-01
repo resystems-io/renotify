@@ -260,6 +260,79 @@ class NotificationPayloadTest {
         )
     }
 
+    @Test
+    fun workspaceName_parsedFromJson() {
+        val json = """
+            {
+                "id": "ntf_WS001",
+                "flow_id": "fl_FLOW0001",
+                "daemon_id": "dn_DAEMON01",
+                "workspace_id": "ws_WORK0001",
+                "title": "Test",
+                "response_types": ["none"],
+                "source": "claude-code",
+                "workspace_name": "my-project",
+                "timestamp": "2026-03-31T10:00:00Z"
+            }
+        """.trimIndent()
+
+        val payload = NotificationPayload.fromJson(json)
+        assertEquals("my-project", payload.workspaceName)
+    }
+
+    @Test
+    fun workspaceName_defaultsToEmpty() {
+        val json = """
+            {
+                "id": "ntf_WS002",
+                "flow_id": "fl_FLOW0001",
+                "daemon_id": "dn_DAEMON01",
+                "workspace_id": "ws_WORK0001",
+                "title": "Test",
+                "response_types": ["none"],
+                "timestamp": "2026-03-31T10:00:00Z"
+            }
+        """.trimIndent()
+
+        val payload = NotificationPayload.fromJson(json)
+        assertEquals("", payload.workspaceName)
+    }
+
+    @Test
+    fun composeSubText_both() {
+        assertEquals(
+            "my-project · claude-code",
+            NotificationRenderer.composeSubText(
+                "my-project", "claude-code")
+        )
+    }
+
+    @Test
+    fun composeSubText_workspaceOnly() {
+        assertEquals(
+            "my-project",
+            NotificationRenderer.composeSubText(
+                "my-project", "")
+        )
+    }
+
+    @Test
+    fun composeSubText_sourceOnly() {
+        assertEquals(
+            "ci/pipeline",
+            NotificationRenderer.composeSubText(
+                "", "ci/pipeline")
+        )
+    }
+
+    @Test
+    fun composeSubText_empty() {
+        assertEquals(
+            "",
+            NotificationRenderer.composeSubText("", "")
+        )
+    }
+
     private fun makePayload(
         priority: String = "normal",
         responseTypes: List<String> = listOf("none")
@@ -273,6 +346,7 @@ class NotificationPayloadTest {
         responseTypes = responseTypes,
         priority = priority,
         source = "test",
+        workspaceName = "",
         actions = null,
         timeoutSec = null,
         timestamp = "2026-03-31T10:00:00Z"
