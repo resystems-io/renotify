@@ -56,13 +56,13 @@ func TestController_EmbeddedLifecycle(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	c.Ready = make(chan struct{})
 	done := make(chan error, 1)
 	go func() {
 		done <- c.Run(ctx)
 	}()
 
-	// Wait for startup.
-	time.Sleep(1 * time.Second)
+	waitReady(t, c)
 
 	// Verify state files created.
 	if _, err := os.Stat(filepath.Join(dir, "daemon_id")); err != nil {
@@ -94,7 +94,7 @@ func TestController_EmbeddedLifecycle(t *testing.T) {
 		if err != nil {
 			t.Fatalf("shutdown error: %v", err)
 		}
-	case <-time.After(10 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout waiting for shutdown")
 	}
 }
@@ -109,10 +109,11 @@ func TestController_GeneratesState(t *testing.T) {
 	c.PairingTokenPath = filepath.Join(dir, "pairing", "token")
 
 	ctx, cancel := context.WithCancel(context.Background())
+	c.Ready = make(chan struct{})
 	done := make(chan error, 1)
 	go func() { done <- c.Run(ctx) }()
 
-	time.Sleep(500 * time.Millisecond)
+	waitReady(t, c)
 	cancel()
 	<-done
 
@@ -146,10 +147,11 @@ func TestController_ReusesState(t *testing.T) {
 	c.PairingTokenPath = filepath.Join(dir, "pairing", "token")
 
 	ctx, cancel := context.WithCancel(context.Background())
+	c.Ready = make(chan struct{})
 	done := make(chan error, 1)
 	go func() { done <- c.Run(ctx) }()
 
-	time.Sleep(500 * time.Millisecond)
+	waitReady(t, c)
 	cancel()
 	<-done
 
@@ -171,10 +173,11 @@ func TestController_SkipsWSSWithoutTLS(t *testing.T) {
 	c.PairingTokenPath = filepath.Join(dir, "pairing", "token")
 
 	ctx, cancel := context.WithCancel(context.Background())
+	c.Ready = make(chan struct{})
 	done := make(chan error, 1)
 	go func() { done <- c.Run(ctx) }()
 
-	time.Sleep(500 * time.Millisecond)
+	waitReady(t, c)
 	cancel()
 
 	err := <-done
@@ -212,10 +215,11 @@ func TestController_SubsystemsStarted(t *testing.T) {
 	c.PairingTokenPath = filepath.Join(dir, "pairing", "token")
 
 	ctx, cancel := context.WithCancel(context.Background())
+	c.Ready = make(chan struct{})
 	done := make(chan error, 1)
 	go func() { done <- c.Run(ctx) }()
 
-	time.Sleep(500 * time.Millisecond)
+	waitReady(t, c)
 	cancel()
 	<-done
 
@@ -245,10 +249,11 @@ func TestController_MCPSubsystem(t *testing.T) {
 	c.PairingTokenPath = filepath.Join(dir, "pairing", "token")
 
 	ctx, cancel := context.WithCancel(context.Background())
+	c.Ready = make(chan struct{})
 	done := make(chan error, 1)
 	go func() { done <- c.Run(ctx) }()
 
-	time.Sleep(1 * time.Second)
+	waitReady(t, c)
 
 	// Verify HTTP server is listening.
 	addr := httpSrv.Addr()
@@ -294,11 +299,11 @@ func TestController_MCPToolEndToEnd(t *testing.T) {
 	c.PairingTokenPath = filepath.Join(dir, "pairing", "token")
 
 	ctx, cancel := context.WithCancel(context.Background())
+	c.Ready = make(chan struct{})
 	done := make(chan error, 1)
 	go func() { done <- c.Run(ctx) }()
 
-	// Wait for all subsystems to start.
-	time.Sleep(2 * time.Second)
+	waitReady(t, c)
 
 	addr := httpSrv.Addr()
 	if addr == "" {
@@ -528,10 +533,11 @@ func TestController_SharedBrokerMode(t *testing.T) {
 	c.PairingTokenPath = filepath.Join(dir, "pairing", "token")
 
 	ctx, cancel := context.WithCancel(context.Background())
+	c.Ready = make(chan struct{})
 	done := make(chan error, 1)
 	go func() { done <- c.Run(ctx) }()
 
-	time.Sleep(500 * time.Millisecond)
+	waitReady(t, c)
 	cancel()
 
 	err = <-done
@@ -541,6 +547,14 @@ func TestController_SharedBrokerMode(t *testing.T) {
 }
 
 func TestController_PortInUse(t *testing.T) {
+	// The embedded NATS server's ReadyForConnections(5s) blocks
+	// until the server binds or the timeout expires. When the port
+	// is already in use, the bind fails silently inside NATS and
+	// ReadyForConnections polls for the full 5 seconds before
+	// returning false. No Ready channel is set because the
+	// controller is expected to fail before reaching the
+	// all-subsystems-ready point.
+
 	// Bind a port to simulate "port in use".
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -580,10 +594,11 @@ func TestEmbedded_InternalTokenRequired(t *testing.T) {
 	c.PairingTokenPath = filepath.Join(dir, "pairing", "token")
 
 	ctx, cancel := context.WithCancel(context.Background())
+	c.Ready = make(chan struct{})
 	done := make(chan error, 1)
 	go func() { done <- c.Run(ctx) }()
 
-	time.Sleep(500 * time.Millisecond)
+	waitReady(t, c)
 
 	// Read generated token.
 	tokenBytes, _ := os.ReadFile(filepath.Join(dir, "internal_token"))
@@ -613,10 +628,11 @@ func TestEmbedded_GracefulShutdown(t *testing.T) {
 	c.PairingTokenPath = filepath.Join(dir, "pairing", "token")
 
 	ctx, cancel := context.WithCancel(context.Background())
+	c.Ready = make(chan struct{})
 	done := make(chan error, 1)
 	go func() { done <- c.Run(ctx) }()
 
-	time.Sleep(500 * time.Millisecond)
+	waitReady(t, c)
 	cancel()
 
 	select {
@@ -624,7 +640,7 @@ func TestEmbedded_GracefulShutdown(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected clean shutdown, got: %v", err)
 		}
-	case <-time.After(10 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("shutdown took too long")
 	}
 }
@@ -646,10 +662,11 @@ func TestController_JetStreamReady(t *testing.T) {
 	c.PairingTokenPath = filepath.Join(dir, "pairing", "token")
 
 	ctx, cancel := context.WithCancel(context.Background())
+	c.Ready = make(chan struct{})
 	done := make(chan error, 1)
 	go func() { done <- c.Run(ctx) }()
 
-	time.Sleep(1 * time.Second)
+	waitReady(t, c)
 
 	// Connect as a NATS client using the generated internal token.
 	tokenBytes, err := os.ReadFile(filepath.Join(dir, "internal_token"))

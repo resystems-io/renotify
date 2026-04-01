@@ -11,6 +11,10 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 )
 
+// readyTimeout is how long Start waits for the embedded NATS
+// server to accept connections before returning an error.
+const readyTimeout = 10 * time.Second
+
 // EmbeddedConfig holds parameters for the in-process NATS server.
 type EmbeddedConfig struct {
 	TCPHost  string
@@ -96,7 +100,7 @@ func (s *EmbeddedServer) Start() error {
 	s.srv = srv
 	s.srv.Start()
 
-	if !s.srv.ReadyForConnections(10 * time.Second) {
+	if !s.srv.ReadyForConnections(readyTimeout) {
 		s.srv.Shutdown()
 		return fmt.Errorf("NATS server failed to become ready")
 	}
