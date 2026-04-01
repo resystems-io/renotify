@@ -887,10 +887,13 @@ workspace monitoring).*
 
 - [x] **C-10: Active Registry Service:** Implement the SQLite-backed flow
   tracker, stale sweeper, and the Core NATS registry presentation endpoint.
-- [ ] **C-06: MCP Server:** Implement the MCP protocol layer to expose
-  capabilities natively to AI agents.
-- [ ] **C-11: MCP Flow Tools:** Wire up the `register_flow`,
-  `refresh_flow`, and `terminate_flow` tools on the MCP server.
+- [x] **C-06: MCP Server:** Implement the MCP protocol layer with
+  `register_flow`, `refresh_flow`, `terminate_flow`, `post`, and `ask`
+  tools plus `DecisionResource` for async decision delivery (R-CLI-08,
+  R-CLI-10).
+- [ ] **C-11: MCP Interjections & Timeouts:** Wire up interjection delivery
+  (`InterjectionResource`, daemon-interject consumer) and daemon-side
+  timeout enforcement for MCP `ask` requests (D-26, D-27).
 - [ ] **C-15: Hook Dispatcher Command:** Implement `renotify dispatch` with
   stdin/stdout JSON protocol, PermissionRequest→ask and Notification→post
   mapping, tool input summarisation, and graceful fallback on error. Reuses
@@ -998,6 +1001,11 @@ specifications.
 | D-57 | Hook dispatcher: command hook (`renotify dispatch` via stdio) over HTTP. Reads hook JSON from stdin, discriminates on `hook_event_name`. `PermissionRequest` → `ask` with boolean (Allow/Deny); `Notification` → `post` fire-and-forget. Exit 1 on error for graceful fallback to terminal prompt. Tool input summarised per-tool (Bash→command, Edit/Write/Read→file_path, etc.). Reuses existing `setupFlow` and JetStream infrastructure. | [Hook Integration](analysis-hook-integration.md) | 2026-03-31 |
 | D-58 | Schema V2 migration: `display_name TEXT` and `abs_path TEXT` columns added to `active_flows`. Workspace context carried in `FlowLifecycleEvent.Metadata` (keys `workspace_display_name`, `workspace_abs_path`), extracted by daemon lifecycle processor. Wire format unchanged — these are daemon-side enrichment like `username`. | [SQLite Ledger](analysis-sqlite-ledger.md) | 2026-04-01 |
 | D-59 | Registry subsystem ordering: ledger → http → mcp → heartbeat → registry. Registry starts after heartbeat so `SetWorkspaces()` + `Publish()` calls find a ready publisher. Registry binds to `daemon-lifecycle-{username}` JetStream consumer via `consumer.Messages()` iterator. Stale reaper runs on 30s ticker aligned with heartbeat interval. | — | 2026-04-01 |
+| D-60 | MCP tool scope: C-06 implements all 5 tools (register_flow, refresh_flow, terminate_flow, post, ask) + DecisionResource. C-11 re-scoped to interjection delivery (InterjectionResource, daemon-interject consumer) and daemon-side timeout enforcement (D-27). Avoids implicit-flow workaround and rework. | [Payload Schemas](analysis-payload-schemas.md) | 2026-04-01 |
+| D-61 | DecisionStore: in-memory `map[string]*DecisionResource` with `sync.RWMutex`. Created on `ask`, resolved on response arrival, served via MCP resource template `renotify://decisions/{notification_id}`. Response subscriber goroutines tracked in SubscriberMap for cancellation on Stop or terminate_flow. | [Payload Schemas](analysis-payload-schemas.md) | 2026-04-01 |
+| D-62 | MCP SDK requires `SubscribeHandler` and `UnsubscribeHandler` in `ServerOptions` for `server.ResourceUpdated()` to deliver notifications. Set to no-op accept-all handlers; SDK manages subscription map internally. | — | 2026-04-01 |
+| D-63 | Shared `broker.PublishJSON()` extracted from `command/post.go`. Both CLI commands and MCP server use the same dedup-header JetStream publish pattern. | — | 2026-04-01 |
+| D-64 | Workspace metadata constants (`MetaDisplayName`, `MetaAbsPath`) moved from `command` to `payload` package to avoid circular dependency between `command` and `mcpserver`. | — | 2026-04-01 |
 
 ---
 
@@ -1050,6 +1058,7 @@ Record completed items here with the date.
 
 | 2026-03-31 | A-16 | Claude Code hook integration analysis. Mapped `PermissionRequest` hook event to `renotify ask` (boolean Allow/Deny) and `Notification` hook event to `renotify post` (fire-and-forget). Evaluated command (stdio) vs HTTP transport — command preferred for graceful fallback (exit 1 → terminal prompt), no daemon dependency, and negligible latency overhead vs human response time. Designed `renotify dispatch` as universal hook handler: reads JSON from stdin, discriminates on `hook_event_name`, composes notifications from tool-specific input summarisation. New requirement R-CLI-19, implementation item C-15. |
 | 2026-04-01 | C-10 | Active registry service implemented. New `registry/` package as daemon subsystem: lifecycle consumer binds to `daemon-lifecycle-{username}` JetStream consumer via `consumer.Messages()` iterator, processes `FlowLifecycleEvent` messages (active→register, completed/failed→terminate), updates SQLite active_flows table. Stale reaper goroutine (30s ticker) calls `ReapStaleFlows()` and publishes `failed` lifecycle events for expired flows. `svc.flows` Core NATS Request-Reply endpoint serves `ActiveFlowsQuery`/`ActiveFlowsResult`. Workspace snapshot builder groups active flows by workspace_id, feeds `heartbeat.Publisher.SetWorkspaces()` + immediate publish on every state change. Schema V2 migration adds `display_name` and `abs_path` columns to `active_flows`. CLI lifecycle events include workspace metadata (`workspace_display_name`, `workspace_abs_path`) in `FlowLifecycleEvent.Metadata`. Subsystem ordering: ledger → http → mcp → heartbeat → registry. R-CLI-14, R-CLI-18 satisfied. 6 new registry tests, all existing tests pass. |
+| 2026-04-01 | C-06 | MCP server implemented with all 5 tools and DecisionResource. `register_flow` generates flow_id + workspace_id, registers in ledger, publishes lifecycle event. `refresh_flow` updates label/metadata, resets reaping timer. `terminate_flow` removes flow, publishes terminal lifecycle event. `post` sends fire-and-forget notification to mobile. `ask` sends interactive notification, creates pending `DecisionResource`, starts response subscriber goroutine; on mobile response, resolves resource and emits `notifications/resources/updated` via MCP SDK. DecisionStore: in-memory thread-safe map served via resource template `renotify://decisions/{notification_id}`. Shared `broker.PublishJSON()` extracted from CLI commands. Workspace metadata constants moved to `payload` package. MCP SDK `SubscribeHandler`/`UnsubscribeHandler` configured for resource subscriptions. C-11 re-scoped to interjections + timeout enforcement. Tool descriptions written as agent instructions per project memory. Manual testing playbook in `cli/docs/mcp-testing.md`. R-CLI-08, R-CLI-10, R-CLI-15 satisfied. 17 new tests (5 server, 6 DecisionStore, 4 integration, 2 subscriber). |
 
 ## 6. References
 

@@ -9,7 +9,7 @@ import (
 // by workspace, and pushes the snapshot to the heartbeat
 // publisher. Triggers an immediate heartbeat publish.
 func (s *Service) rebuildWorkspaceSnapshot() {
-	flows, err := s.db.ListActiveFlows(ledger.ActiveFlowsQuery{})
+	flows, err := s.dbFunc().ListActiveFlows(ledger.ActiveFlowsQuery{})
 	if err != nil {
 		s.logger.Error("rebuild workspace snapshot", "err", err)
 		return

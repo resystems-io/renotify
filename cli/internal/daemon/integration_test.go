@@ -227,7 +227,7 @@ func TestController_MCPSubsystem(t *testing.T) {
 
 	logger := integrationLogger()
 	httpSrv := httpserver.New("127.0.0.1", 0, logger)
-	mcpSrv := mcpserver.New(httpSrv, logger)
+	mcpSrv := mcpserver.New(httpSrv, logger, nil, "", "", nil)
 
 	c := NewController(cfg,
 		WithLogger(logger),

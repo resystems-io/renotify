@@ -14,13 +14,6 @@ import (
 	"go.resystems.io/renotify/internal/payload"
 )
 
-// Well-known metadata keys for workspace context, set by the CLI
-// in flow-active lifecycle events. Defined in command/flow.go.
-const (
-	metaDisplayName = "workspace_display_name"
-	metaAbsPath     = "workspace_abs_path"
-)
-
 // startLifecycleConsumer binds to the daemon-lifecycle JetStream
 // consumer and starts a goroutine that processes lifecycle events.
 func (s *Service) startLifecycleConsumer(ctx context.Context) error {
@@ -100,8 +93,8 @@ func (s *Service) processLifecycleEvent(msg natsjs.Msg) {
 
 // handleActive registers a new flow or refreshes an existing one.
 func (s *Service) handleActive(event *payload.FlowLifecycleEvent) {
-	displayName := event.Metadata[metaDisplayName]
-	absPath := event.Metadata[metaAbsPath]
+	displayName := event.Metadata[payload.MetaDisplayName]
+	absPath := event.Metadata[payload.MetaAbsPath]
 
 	flow := &ledger.ActiveFlow{
 		FlowID:                event.FlowID,
@@ -116,11 +109,11 @@ func (s *Service) handleActive(event *payload.FlowLifecycleEvent) {
 		LastActivityTimestamp: event.Timestamp,
 	}
 
-	err := s.db.RegisterFlow(flow)
+	err := s.dbFunc().RegisterFlow(flow)
 	if err != nil {
 		// If the flow already exists (INSERT conflict), treat
 		// as a refresh instead.
-		s.db.RefreshFlow(
+		s.dbFunc().RefreshFlow(
 			event.FlowID,
 			event.Label,
 			event.Metadata,
@@ -135,7 +128,7 @@ func (s *Service) handleActive(event *payload.FlowLifecycleEvent) {
 
 // handleTerminal removes a flow from the active registry.
 func (s *Service) handleTerminal(event *payload.FlowLifecycleEvent) {
-	if err := s.db.TerminateFlow(
+	if err := s.dbFunc().TerminateFlow(
 		event.FlowID,
 		string(event.Status),
 		event.Timestamp,

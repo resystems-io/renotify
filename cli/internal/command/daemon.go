@@ -373,7 +373,8 @@ func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
 
 	if cfg.MCP.Enabled {
 		httpSrv := httpserver.New(cfg.MCP.Host, cfg.MCP.Port, logger)
-		mcpSrv := mcpserver.New(httpSrv, logger)
+		mcpSrv := mcpserver.New(httpSrv, logger,
+			ledgerSub.DB, cfg.Username, daemonID, cfg)
 		opts = append(opts,
 			daemon.WithSubsystem(httpSrv),
 			daemon.WithSubsystem(mcpSrv),
@@ -388,7 +389,7 @@ func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
 	// Active flow registry (C-10). Starts after heartbeat so the
 	// publisher is ready to receive workspace snapshots.
 	regSvc := registry.New(
-		ledgerSub.DB(), hbPub,
+		ledgerSub.DB, hbPub,
 		cfg.Username, daemonID,
 		cfg.Reaping, logger)
 	opts = append(opts, daemon.WithSubsystem(regSvc))
