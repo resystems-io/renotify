@@ -109,6 +109,9 @@ func (s *Server) handleRegisterFlow(
 	meta[payload.MetaDisplayName] = displayName
 	meta[payload.MetaAbsPath] = args.WorkspacePath
 
+	// Register interjection queue for this flow (C-11).
+	s.interjections.Register(flowID)
+
 	// Publish lifecycle event to NATS. The registry's lifecycle
 	// consumer handles the DB write (C-10). MCP tools do not
 	// write to active_flows directly to avoid races.
@@ -194,6 +197,9 @@ func (s *Server) handleTerminateFlow(
 			break
 		}
 	}
+
+	// Clean up interjection queue (C-11).
+	s.interjections.Remove(args.FlowID)
 
 	// Publish lifecycle event to NATS. The registry's lifecycle
 	// consumer handles the DB write (C-10).
