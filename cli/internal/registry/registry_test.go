@@ -94,7 +94,7 @@ func startRegistry(
 	hb *heartbeat.Publisher,
 ) *registry.Service {
 	t.Helper()
-	svc := registry.New(db, hb, testUsername, testDaemonID,
+	svc := registry.New(func() *ledger.DB { return db }, hb, testUsername, testDaemonID,
 		config.ReapingConfig{
 			GracePeriod: config.Duration{Duration: 5 * time.Minute},
 			Interval:    config.Duration{Duration: 30 * time.Second},
@@ -241,7 +241,7 @@ func TestStaleReaper(t *testing.T) {
 
 	// Start registry with a very short grace period so the
 	// reaper fires immediately on startup reconciliation.
-	svc := registry.New(db, hb, testUsername, testDaemonID,
+	svc := registry.New(func() *ledger.DB { return db }, hb, testUsername, testDaemonID,
 		config.ReapingConfig{
 			GracePeriod: config.Duration{Duration: 1 * time.Second},
 			Interval:    config.Duration{Duration: 30 * time.Second},

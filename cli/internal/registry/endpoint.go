@@ -39,7 +39,7 @@ func (s *Service) handleFlowsQuery(msg *nats.Msg) {
 		}
 	}
 
-	flows, err := s.db.ListActiveFlows(query)
+	flows, err := s.dbFunc().ListActiveFlows(query)
 	if err != nil {
 		s.logger.Error("svc.flows query", "err", err)
 		msg.Respond([]byte(`{"flows":[]}`))

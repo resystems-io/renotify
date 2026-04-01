@@ -8,6 +8,7 @@ import (
 	"go.resystems.io/renotify/internal/broker"
 	"go.resystems.io/renotify/internal/config"
 	"go.resystems.io/renotify/internal/exitcode"
+	"go.resystems.io/renotify/internal/payload"
 	"go.resystems.io/renotify/internal/state"
 	"go.resystems.io/renotify/internal/xdg"
 )
@@ -69,19 +70,11 @@ func (fc *flowContext) close() {
 	}
 }
 
-// Well-known metadata keys for workspace context in lifecycle
-// events. The daemon's registry extracts these when registering
-// a flow (C-10).
-const (
-	MetaDisplayName = "workspace_display_name"
-	MetaAbsPath     = "workspace_abs_path"
-)
-
 // workspaceMetadata returns the metadata map carrying workspace
 // display name and absolute path for lifecycle events.
 func (fc *flowContext) workspaceMetadata() map[string]string {
 	return map[string]string{
-		MetaDisplayName: fc.displayName,
-		MetaAbsPath:     fc.absPath,
+		payload.MetaDisplayName: fc.displayName,
+		payload.MetaAbsPath:     fc.absPath,
 	}
 }

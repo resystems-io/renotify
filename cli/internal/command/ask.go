@@ -203,7 +203,7 @@ protects against daemon failure.`,
 				Metadata:    fc.workspaceMetadata(),
 				Timestamp:   now,
 			}
-			if err := publishJSON(legacyJS,
+			if err := broker.PublishJSON(legacyJS,
 				broker.FlowLifecycleSubject(fc.username, fc.flowID),
 				fc.flowID, activeEvent,
 			); err != nil {
@@ -226,7 +226,7 @@ protects against daemon failure.`,
 				TimeoutSec:    timeoutSec,
 				Timestamp:     now,
 			}
-			if err := publishJSON(legacyJS,
+			if err := broker.PublishJSON(legacyJS,
 				broker.FlowRequestSubject(fc.username, fc.flowID),
 				fc.notificationID, req,
 			); err != nil {
@@ -259,7 +259,7 @@ protects against daemon failure.`,
 					Status:      payload.FlowFailed,
 					Timestamp:   time.Now().UTC(),
 				}
-				publishJSON(legacyJS,
+				broker.PublishJSON(legacyJS,
 					broker.FlowLifecycleSubject(fc.username, fc.flowID),
 					fc.flowID+"-failed", failedEvent)
 			}
@@ -369,7 +369,7 @@ func handleResponse(
 		Status:      payload.FlowCompleted,
 		Timestamp:   time.Now().UTC(),
 	}
-	publishJSON(js,
+	broker.PublishJSON(js,
 		broker.FlowLifecycleSubject(fc.username, fc.flowID),
 		fc.flowID+"-completed", completedEvent)
 

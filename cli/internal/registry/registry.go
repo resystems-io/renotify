@@ -22,7 +22,7 @@ import (
 // registry. It depends on the ledger (for SQLite CRUD) and the
 // heartbeat publisher (for workspace snapshot updates).
 type Service struct {
-	db       *ledger.DB
+	dbFunc   func() *ledger.DB
 	hb       *heartbeat.Publisher
 	username string
 	daemonID string
@@ -34,17 +34,18 @@ type Service struct {
 	cancel context.CancelFunc
 }
 
-// New creates a registry Service. Call Start to begin consuming
-// lifecycle events and serving queries.
+// New creates a registry Service. The dbFunc parameter is a lazy
+// accessor that returns the ledger DB after the ledger subsystem
+// has started.
 func New(
-	db *ledger.DB,
+	dbFunc func() *ledger.DB,
 	hb *heartbeat.Publisher,
 	username, daemonID string,
 	cfg config.ReapingConfig,
 	logger *slog.Logger,
 ) *Service {
 	return &Service{
-		db:       db,
+		dbFunc:   dbFunc,
 		hb:       hb,
 		username: username,
 		daemonID: daemonID,
@@ -122,7 +123,7 @@ func (s *Service) Stop(_ context.Context) error {
 // reapOnce runs a single reaping pass. Used at startup and by
 // the periodic reaper.
 func (s *Service) reapOnce() {
-	stale, err := s.db.ReapStaleFlows(s.cfg.GracePeriod.Duration)
+	stale, err := s.dbFunc().ReapStaleFlows(s.cfg.GracePeriod.Duration)
 	if err != nil {
 		s.logger.Error("reap stale flows", "err", err)
 		return
@@ -134,7 +135,7 @@ func (s *Service) reapOnce() {
 			"flow_id", f.FlowID,
 			"last_activity", f.LastActivityTimestamp)
 
-		if err := s.db.TerminateFlow(
+		if err := s.dbFunc().TerminateFlow(
 			f.FlowID, "failed", now); err != nil {
 			s.logger.Error("terminate stale flow",
 				"flow_id", f.FlowID, "err", err)
