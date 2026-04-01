@@ -1,6 +1,9 @@
 package io.resystems.renotify
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.Button
@@ -8,6 +11,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import io.resystems.renotify.nats.ConnectionState
 import io.resystems.renotify.nats.NatsService
@@ -31,6 +35,18 @@ class MainActivity : ComponentActivity() {
     private lateinit var store: EncryptedProvisioningStore
 
     /**
+     * Request notification permission on Android 13+. The result
+     * is informational — the app works without it but
+     * notifications will be silently dropped.
+     */
+    private val notificationPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        // No action needed — if denied, notifications won't
+        // display but the service still runs.
+    }
+
+    /**
      * Activity result callback for [ScannerActivity]. When the
      * scanner returns [RESULT_OK], credentials are stored and we
      * start the NATS service to connect immediately.
@@ -52,6 +68,19 @@ class MainActivity : ComponentActivity() {
 
         // Encrypted store for pairing credentials.
         store = EncryptedProvisioningStore(this)
+
+        // Request notification permission on Android 13+ (API 33).
+        // Without this, notifications are silently suppressed.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this, Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermission.launch(
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
+            }
+        }
 
         // --- Programmatic layout (no XML) ---
         // Matches the M-01 scaffold pattern. Later phases (M-05,
