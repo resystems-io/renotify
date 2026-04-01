@@ -309,9 +309,8 @@ func TestFlowsEndpoint(t *testing.T) {
 		t.Fatalf("got %d flows, want 2", len(result.Flows))
 	}
 	for _, f := range result.Flows {
-		if f.Status != payload.FlowActive {
-			t.Errorf("flow %s status = %q, want %q",
-				f.FlowID, f.Status, payload.FlowActive)
+		if f.FlowID == "" {
+			t.Error("flow entry has empty flow_id")
 		}
 	}
 }

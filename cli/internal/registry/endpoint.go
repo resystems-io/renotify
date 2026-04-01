@@ -2,18 +2,31 @@ package registry
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/nats-io/nats.go"
 
 	"go.resystems.io/renotify/internal/broker"
 	"go.resystems.io/renotify/internal/ledger"
-	"go.resystems.io/renotify/internal/payload"
 )
+
+// ActiveFlowEntry is a single entry in the ActiveFlowsResult.
+// Includes fields needed by the CLI flows command (display name,
+// last activity for TTL computation).
+type ActiveFlowEntry struct {
+	FlowID                string    `json:"flow_id"`
+	DaemonID              string    `json:"daemon_id"`
+	WorkspaceID           string    `json:"workspace_id"`
+	DisplayName           string    `json:"display_name,omitempty"`
+	Label                 string    `json:"label,omitempty"`
+	RegisteredAt          time.Time `json:"registered_at"`
+	LastActivityTimestamp time.Time `json:"last_activity_timestamp"`
+}
 
 // ActiveFlowsResult is the response payload for the svc.flows
 // Core NATS Request-Reply endpoint.
 type ActiveFlowsResult struct {
-	Flows []payload.FlowLifecycleEvent `json:"flows"`
+	Flows []ActiveFlowEntry `json:"flows"`
 }
 
 // subscribeFlowsEndpoint subscribes to the svc.flows subject
@@ -46,20 +59,20 @@ func (s *Service) handleFlowsQuery(msg *nats.Msg) {
 		return
 	}
 
-	events := make([]payload.FlowLifecycleEvent, len(flows))
+	entries := make([]ActiveFlowEntry, len(flows))
 	for i, f := range flows {
-		events[i] = payload.FlowLifecycleEvent{
-			FlowID:      f.FlowID,
-			DaemonID:    f.DaemonID,
-			WorkspaceID: f.WorkspaceID,
-			Status:      payload.FlowActive,
-			Label:       f.Label,
-			Metadata:    f.Metadata,
-			Timestamp:   f.RegisteredAt,
+		entries[i] = ActiveFlowEntry{
+			FlowID:                f.FlowID,
+			DaemonID:              f.DaemonID,
+			WorkspaceID:           f.WorkspaceID,
+			DisplayName:           f.DisplayName,
+			Label:                 f.Label,
+			RegisteredAt:          f.RegisteredAt,
+			LastActivityTimestamp: f.LastActivityTimestamp,
 		}
 	}
 
-	result := ActiveFlowsResult{Flows: events}
+	result := ActiveFlowsResult{Flows: entries}
 	data, err := json.Marshal(result)
 	if err != nil {
 		s.logger.Error("svc.flows marshal", "err", err)
