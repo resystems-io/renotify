@@ -32,7 +32,8 @@ import kotlin.math.min
  */
 class NatsConnectionManager(
     private val scope: CoroutineScope,
-    private val onMessage: ((subject: String, data: ByteArray, ack: () -> Unit) -> Unit)? = null
+    private val onMessage: ((subject: String, data: ByteArray, ack: () -> Unit) -> Unit)? = null,
+    private val onHeartbeat: ((data: ByteArray) -> Unit)? = null
 ) {
 
     private val _state = MutableStateFlow<ConnectionState>(
@@ -126,6 +127,7 @@ class NatsConnectionManager(
             connection = nc
 
             subscribeToConsumer(nc, payload)
+            subscribeToHeartbeat(nc, payload)
 
             _state.value = ConnectionState.Connected
             Log.i(TAG, "Connected to " +
@@ -201,6 +203,27 @@ class NatsConnectionManager(
     }
 
     /**
+     * Subscribe to daemon heartbeat messages over Core NATS
+     * Pub/Sub. Heartbeats are ephemeral snapshots — missed ones
+     * are superseded by the next. No ACK needed.
+     */
+    private fun subscribeToHeartbeat(
+        nc: Connection,
+        payload: ProvisioningPayload
+    ) {
+        val handler = onHeartbeat ?: return
+        val subject = "resystems.renotify.${payload.username}" +
+            ".daemon.*.heartbeat"
+
+        val dispatcher = nc.createDispatcher { msg ->
+            handler(msg.data)
+        }
+        dispatcher.subscribe(subject)
+
+        Log.i(TAG, "Subscribed to heartbeat: $subject")
+    }
+
+    /**
      * Reconnection loop with exponential backoff: 1s, 2s, 4s,
      * 8s, 16s, 30s (capped). See Section 8.5.
      */
@@ -224,6 +247,7 @@ class NatsConnectionManager(
                 connection = nc
 
                 subscribeToConsumer(nc, payload)
+                subscribeToHeartbeat(nc, payload)
 
                 _state.value = ConnectionState.Connected
                 Log.i(TAG, "Reconnected to " +
