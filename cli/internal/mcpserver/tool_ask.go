@@ -121,6 +121,9 @@ func (s *Server) handleAsk(
 	// Start response subscriber goroutine.
 	s.startResponseSubscriber(args.FlowID, notificationID)
 
+	// Start daemon-side timeout timer (D-27, C-11).
+	s.startTimeoutTimer(args.FlowID, notificationID, timeoutSec)
+
 	// Update flow activity.
 	if s.db != nil && s.db() != nil {
 		s.db().UpdateFlowActivity(args.FlowID, now)

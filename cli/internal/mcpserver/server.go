@@ -1,7 +1,8 @@
 // Package mcpserver implements the MCP server that exposes
-// Renotify's capabilities to AI agents (C-06). Tools:
-// register_flow, refresh_flow, terminate_flow, post, ask.
-// Resources: DecisionResource for async ask responses.
+// Renotify's capabilities to AI agents (C-06, C-11). Tools:
+// register_flow, refresh_flow, terminate_flow, post, ask,
+// await_decision, check_interjections, await_interjection.
+// Resources: DecisionResource, InterjectionResource.
 package mcpserver
 
 import (
@@ -38,7 +39,11 @@ type Server struct {
 	// Decision tracking for async ask responses.
 	decisions   *DecisionStore
 	subscribers *SubscriberMap
-	cancelMu    sync.Mutex
+
+	// Interjection tracking for mobile user signals.
+	interjections *InterjectionStore
+
+	cancelMu sync.Mutex
 }
 
 // New creates an MCP server that will register its handler on
@@ -77,16 +82,17 @@ func New(
 		}, nil)
 
 	return &Server{
-		httpSrv:     httpSrv,
-		logger:      logger,
-		mcpServer:   mcpSrv,
-		handler:     handler,
-		db:          dbFunc,
-		username:    username,
-		daemonID:    daemonID,
-		cfg:         cfg,
-		decisions:   NewDecisionStore(),
-		subscribers: NewSubscriberMap(),
+		httpSrv:       httpSrv,
+		logger:        logger,
+		mcpServer:     mcpSrv,
+		handler:       handler,
+		db:            dbFunc,
+		username:      username,
+		daemonID:      daemonID,
+		cfg:           cfg,
+		decisions:     NewDecisionStore(),
+		subscribers:   NewSubscriberMap(),
+		interjections: NewInterjectionStore(),
 	}
 }
 
@@ -114,10 +120,24 @@ func (s *Server) Start(_ context.Context, nc *nats.Conn, ready chan<- error) err
 		s.registerPostTool()
 		s.registerAskTool()
 		s.registerAwaitDecisionTool()
+		s.registerInterjectionTools()
 		s.registerDecisionTemplate()
+		s.registerInterjectionTemplate()
+
+		// Start interjection consumer (C-11). Skipped when db is
+		// nil (lightweight test mode without ledger).
+		if s.db != nil {
+			if err := s.startInterjectConsumer(context.Background()); err != nil {
+				if ready != nil {
+					ready <- err
+					close(ready)
+				}
+				return err
+			}
+		}
 
 		s.logger.Info("MCP tools registered",
-			"tools", "register_flow, refresh_flow, terminate_flow, post, ask, await_decision")
+			"tools", "register_flow, refresh_flow, terminate_flow, post, ask, await_decision, check_interjections, await_interjection")
 	}
 
 	s.httpSrv.Handle("/mcp", s.handler)
