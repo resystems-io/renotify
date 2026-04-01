@@ -13,6 +13,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import io.resystems.renotify.dashboard.DashboardAdapter
 import io.resystems.renotify.nats.ConnectionState
 import io.resystems.renotify.nats.NatsService
 import io.resystems.renotify.pairing.EncryptedProvisioningStore
@@ -20,19 +23,16 @@ import io.resystems.renotify.pairing.ScannerActivity
 import kotlinx.coroutines.launch
 
 /**
- * Minimal launcher activity. This stub is replaced with the full
- * UI in later phases (M-05 branding, M-09 dashboard).
- *
- * Current responsibilities:
- * - Display connection status (R-MOB-10)
- * - Launch [ScannerActivity] to scan a pairing QR code
- * - Start/stop [NatsService] via connect/disconnect toggle
+ * Launcher activity showing the Renotify dashboard. Displays
+ * connection status (R-MOB-10) and active workspaces with their
+ * flows (R-MOB-09) using daemon heartbeat data.
  */
 class MainActivity : ComponentActivity() {
 
     private lateinit var statusText: TextView
     private lateinit var connectButton: Button
     private lateinit var store: EncryptedProvisioningStore
+    private lateinit var dashboardAdapter: DashboardAdapter
 
     /**
      * Request notification permission on Android 13+. The result
@@ -70,7 +70,6 @@ class MainActivity : ComponentActivity() {
         store = EncryptedProvisioningStore(this)
 
         // Request notification permission on Android 13+ (API 33).
-        // Without this, notifications are silently suppressed.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this, Manifest.permission.POST_NOTIFICATIONS
@@ -82,15 +81,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // --- Programmatic layout (no XML) ---
-        // Matches the M-01 scaffold pattern. Later phases (M-05,
-        // M-09) will replace this with a full Compose or
-        // fragment-based UI.
+        // --- Programmatic layout ---
 
-        val layout = LinearLayout(this).apply {
+        val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(48, 48, 48, 48)
+            fitsSystemWindows = true
         }
 
         // App title.
@@ -98,23 +93,47 @@ class MainActivity : ComponentActivity() {
             text = "Renotify"
             textSize = 24f
             gravity = Gravity.CENTER
+            setPadding(dp(16), dp(8), dp(16), dp(4))
         }
-        layout.addView(title)
+        root.addView(title)
 
-        // Connection status line — updated by observing
-        // NatsService.state (R-MOB-10).
+        // Connection status line (R-MOB-10).
         statusText = TextView(this).apply {
             textSize = 14f
             gravity = Gravity.CENTER
-            setPadding(0, 24, 0, 24)
+            setTextColor(0xFF333333.toInt())
+            setPadding(dp(16), dp(8), dp(16), dp(12))
+            // Show provisioning details immediately if paired,
+            // before the first state update arrives.
+            val p = store.load()
+            text = if (p != null) "Paired: ${p.host}:${p.port}"
+                else "Not paired"
         }
-        layout.addView(statusText)
+        root.addView(statusText)
 
-        // Launches the camera-based QR scanner. On success the
-        // scanner stores credentials and finishes with RESULT_OK,
-        // which starts the NATS service automatically.
+        // Dashboard RecyclerView (M-09).
+        dashboardAdapter = DashboardAdapter()
+        val recycler = RecyclerView(this).apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = dashboardAdapter
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+        }
+        root.addView(recycler)
+
+        // Bottom bar with pair and connect buttons.
+        val bottomBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(12), dp(16), dp(32))
+        }
+
+        // Pair button (R-MOB-01).
         val pairButton = Button(this).apply {
             text = "Scan Pairing QR Code"
+            setBackgroundColor(0xFF444444.toInt())
+            setTextColor(0xFFFFFFFF.toInt())
             setOnClickListener {
                 scanLauncher.launch(
                     Intent(
@@ -124,21 +143,27 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
-        layout.addView(pairButton)
+        bottomBar.addView(pairButton)
 
-        // Connect/disconnect toggle. Visible only when paired.
-        // Allows the user to stop connection attempts (e.g.,
-        // when the daemon is known to be unreachable) and
-        // reconnect later.
+        // Connect/disconnect button (R-MOB-02).
         connectButton = Button(this).apply {
+            setBackgroundColor(0xFF444444.toInt())
+            setTextColor(0xFFFFFFFF.toInt())
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            lp.marginStart = dp(8)
+            layoutParams = lp
             setOnClickListener { toggleConnection() }
         }
-        layout.addView(connectButton)
+        bottomBar.addView(connectButton)
 
-        setContentView(layout)
+        root.addView(bottomBar)
 
-        // Observe the NATS connection state and update both the
-        // status text and the connect/disconnect button label.
+        setContentView(root)
+
+        // Observe connection state.
         lifecycleScope.launch {
             NatsService.state.collect { state ->
                 statusText.text = formatState(state)
@@ -146,17 +171,21 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // On app relaunch, auto-start the service if already
-        // paired and the service is not running.
+        // Observe dashboard heartbeat (M-09).
+        lifecycleScope.launch {
+            NatsService.dashboardState.collect { heartbeat ->
+                dashboardAdapter.update(heartbeat)
+            }
+        }
+
+        // Auto-start service if already paired.
         if (store.isPaired() && !isServiceActive()) {
             startNatsService()
         }
     }
 
-    /**
-     * Start [NatsService]. The service reads credentials from
-     * [EncryptedProvisioningStore] and connects to the daemon.
-     */
+    // --- Service management ---
+
     private fun startNatsService() {
         if (store.isPaired()) {
             startForegroundService(
@@ -165,19 +194,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Stop [NatsService], cancelling any connection or
-     * reconnection attempts.
-     */
     private fun stopNatsService() {
         stopService(Intent(this, NatsService::class.java))
     }
 
-    /**
-     * Toggle the NATS service based on current state. If
-     * connected or connecting, disconnect. If idle or
-     * disconnected, reconnect.
-     */
     private fun toggleConnection() {
         val state = NatsService.state.value
         if (isServiceActive(state)) {
@@ -187,13 +207,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Update the connect/disconnect button text and visibility
-     * based on the current connection state.
-     */
     private fun updateConnectButton(state: ConnectionState) {
         if (!store.isPaired()) {
-            // Not paired — hide the button.
             connectButton.visibility = Button.GONE
             return
         }
@@ -206,10 +221,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Check whether the service is in an active state
-     * (connecting, connected, or reconnecting).
-     */
     private fun isServiceActive(
         state: ConnectionState = NatsService.state.value
     ): Boolean = when (state) {
@@ -219,10 +230,6 @@ class MainActivity : ComponentActivity() {
         else -> false
     }
 
-    /**
-     * Format the [ConnectionState] for display in the status
-     * text.
-     */
     private fun formatState(state: ConnectionState): String {
         return when (state) {
             is ConnectionState.Idle -> {
@@ -232,8 +239,8 @@ class MainActivity : ComponentActivity() {
             is ConnectionState.Unpaired -> "Not paired"
             is ConnectionState.Connecting -> {
                 val p = store.load()
-                if (p != null) "Connecting to ${p.host}:${p.port}..."
-                else "Connecting..."
+                if (p != null) "Connecting to ${p.host}:${p.port}\u2026"
+                else "Connecting\u2026"
             }
             is ConnectionState.Connected -> {
                 val p = store.load()
@@ -241,9 +248,13 @@ class MainActivity : ComponentActivity() {
                 else "Connected"
             }
             is ConnectionState.Disconnected ->
-                "Disconnected \u2014 reconnecting..."
+                "Disconnected \u2014 reconnecting\u2026"
             is ConnectionState.Error ->
                 "Error: ${state.message}"
         }
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density).toInt()
     }
 }

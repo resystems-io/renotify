@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import io.resystems.renotify.dashboard.DaemonHeartbeat
 import io.resystems.renotify.notification.NotificationPayload
 import io.resystems.renotify.notification.NotificationRenderer
 import io.resystems.renotify.pairing.EncryptedProvisioningStore
@@ -56,7 +57,8 @@ class NatsService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
-        manager = NatsConnectionManager(serviceScope, ::handleMessage)
+        manager = NatsConnectionManager(
+            serviceScope, ::handleMessage, ::handleHeartbeat)
         store = EncryptedProvisioningStore(this)
 
         // Update the persistent notification when state changes.
@@ -182,6 +184,25 @@ class NatsService : Service() {
         }
 
         ack()
+    }
+
+    // --- Heartbeat handling (M-09) ---
+
+    /**
+     * Callback invoked by [NatsConnectionManager] for each
+     * Core NATS heartbeat message. Runs on jnats' dispatcher
+     * thread.
+     */
+    private fun handleHeartbeat(data: ByteArray) {
+        try {
+            val json = String(data, Charsets.UTF_8)
+            val heartbeat = DaemonHeartbeat.fromJson(json)
+            _dashboardState.value = heartbeat
+            Log.d(TAG, "Heartbeat: ${heartbeat.hostname} " +
+                "${heartbeat.workspaces.size} workspace(s)")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error parsing heartbeat", e)
+        }
     }
 
     // --- Response publishing (M-04) ---
@@ -351,5 +372,14 @@ class NatsService : Service() {
                 ConnectionState.Idle
             )
         val state: StateFlow<ConnectionState> = _state
+
+        /**
+         * Latest daemon heartbeat for the dashboard (M-09).
+         * Null before the first heartbeat arrives.
+         */
+        private val _dashboardState = kotlinx.coroutines.flow
+            .MutableStateFlow<DaemonHeartbeat?>(null)
+        val dashboardState: StateFlow<DaemonHeartbeat?> =
+            _dashboardState
     }
 }
