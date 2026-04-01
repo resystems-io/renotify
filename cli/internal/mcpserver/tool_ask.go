@@ -34,22 +34,23 @@ func (s *Server) registerAskTool() {
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name: "ask",
 		Description: `Send an interactive notification that requires a human response.
-Returns immediately with a notification_id and a resource_uri.
-The human's decision arrives asynchronously — subscribe to
-notifications/resources/updated and read the DecisionResource at
-the returned URI to obtain the result.
+Returns immediately with a notification_id. To wait for the
+user's response, call await_decision with the notification_id.
+
+Usage:
+  result = ask(flow_id=..., title=..., response_types=["boolean"])
+  decision = await_decision(notification_id=result.notification_id)
 
 Common patterns:
 - Remote approval: response_types ["boolean"] for approve/reject
-- Remote choice: response_types ["choice"] with actions list
+- Remote choice: response_types ["choice"] with actions ["A","B"]
 - Remote input: response_types ["text"] for free-form feedback
-- Multi-modal: combine types (e.g. ["boolean", "text"])
+- Multi-modal: combine types e.g. ["boolean", "text"]
 
-Reading the decision:
-1. Call ask — receive resource_uri
-2. Wait for notifications/resources/updated event for that URI
-3. Read the resource — decided:true means the user responded
-4. If decided:true with no response fields, the request timed out
+Alternatively, MCP clients that support resource subscriptions
+can subscribe to the returned resource_uri and receive a
+notifications/resources/updated event when the decision arrives,
+then read the DecisionResource directly.
 
 Requires a flow_id from a prior register_flow call.`,
 	}, s.handleAsk)

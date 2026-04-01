@@ -17,16 +17,20 @@ import (
 type DecisionStore struct {
 	mu        sync.RWMutex
 	resources map[string]*payload.DecisionResource
+	resolved  map[string]chan struct{}
 }
 
 // NewDecisionStore creates an empty DecisionStore.
 func NewDecisionStore() *DecisionStore {
 	return &DecisionStore{
 		resources: make(map[string]*payload.DecisionResource),
+		resolved:  make(map[string]chan struct{}),
 	}
 }
 
-// Register creates a pending (undecided) DecisionResource.
+// Register creates a pending (undecided) DecisionResource with
+// a notification channel that is closed when the decision is
+// resolved.
 func (ds *DecisionStore) Register(notificationID string, ts time.Time) {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
@@ -35,6 +39,7 @@ func (ds *DecisionStore) Register(notificationID string, ts time.Time) {
 		Decided:   false,
 		Timestamp: ts,
 	}
+	ds.resolved[notificationID] = make(chan struct{})
 }
 
 // Resolve marks a DecisionResource as decided and copies the
@@ -54,6 +59,9 @@ func (ds *DecisionStore) Resolve(
 	r.Action = resp.Action
 	r.Text = resp.Text
 	r.Timestamp = resp.Timestamp
+	if ch, ok := ds.resolved[notificationID]; ok {
+		close(ch)
+	}
 	return true
 }
 
@@ -70,6 +78,9 @@ func (ds *DecisionStore) ResolveTimeout(
 	}
 	r.Decided = true
 	r.Timestamp = ts
+	if ch, ok := ds.resolved[notificationID]; ok {
+		close(ch)
+	}
 	return true
 }
 
@@ -86,11 +97,21 @@ func (ds *DecisionStore) Get(notificationID string) *payload.DecisionResource {
 	return &copy
 }
 
+// Resolved returns a channel that is closed when the decision
+// for the given notification ID is resolved. Returns nil if the
+// notification is not found.
+func (ds *DecisionStore) Resolved(notificationID string) <-chan struct{} {
+	ds.mu.RLock()
+	defer ds.mu.RUnlock()
+	return ds.resolved[notificationID]
+}
+
 // Remove deletes a DecisionResource from the store.
 func (ds *DecisionStore) Remove(notificationID string) {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 	delete(ds.resources, notificationID)
+	delete(ds.resolved, notificationID)
 }
 
 // DecisionResourceURI returns the MCP resource URI for a
