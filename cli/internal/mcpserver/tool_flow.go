@@ -146,26 +146,46 @@ func (s *Server) handleRefreshFlow(
 	// Publish lifecycle event to NATS. The registry's lifecycle
 	// consumer handles the DB write (C-10).
 	// Read flow context from ledger for the event fields.
-	flows, _ := s.db().ListActiveFlows(ledger.ActiveFlowsQuery{})
+	flows, _ := s.db().ListActiveFlows(ledger.ActiveFlowsQuery{
+		FlowID: args.FlowID,
+	})
 	var event payload.FlowLifecycleEvent
 	for _, f := range flows {
 		if f.FlowID == args.FlowID {
+			// Merge new metadata with existing. New keys
+			// overwrite, existing keys are preserved.
+			merged := make(map[string]string)
+			for k, v := range f.Metadata {
+				merged[k] = v
+			}
+			for k, v := range args.Metadata {
+				merged[k] = v
+			}
+
+			// Preserve existing label when not provided.
+			label := args.Label
+			if label == "" {
+				label = f.Label
+			}
+
 			event = payload.FlowLifecycleEvent{
 				FlowID:      args.FlowID,
 				DaemonID:    f.DaemonID,
 				WorkspaceID: f.WorkspaceID,
 				Status:      payload.FlowActive,
-				Label:       args.Label,
-				Metadata:    args.Metadata,
+				Label:       label,
+				Metadata:    merged,
 				Timestamp:   now,
 			}
 			break
 		}
 	}
 	if event.FlowID != "" {
+		msgID := fmt.Sprintf("%s-refresh-%d",
+			args.FlowID, now.UnixMilli())
 		broker.PublishJSON(s.js,
 			broker.FlowLifecycleSubject(s.username, args.FlowID),
-			args.FlowID+"-refresh", &event)
+			msgID, &event)
 	}
 
 	result := &refreshFlowResult{
