@@ -113,10 +113,11 @@ func (s *Server) Start(_ context.Context, nc *nats.Conn, ready chan<- error) err
 		s.registerFlowTools()
 		s.registerPostTool()
 		s.registerAskTool()
+		s.registerAwaitDecisionTool()
 		s.registerDecisionTemplate()
 
 		s.logger.Info("MCP tools registered",
-			"tools", "register_flow, refresh_flow, terminate_flow, post, ask")
+			"tools", "register_flow, refresh_flow, terminate_flow, post, ask, await_decision")
 	}
 
 	s.httpSrv.Handle("/mcp", s.handler)

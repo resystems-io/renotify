@@ -419,6 +419,59 @@ func TestAskTool_DecisionResolvedOnResponse(t *testing.T) {
 	}
 }
 
+// --- Await decision tests ---
+
+func TestAwaitDecision_ResolvesOnResponse(t *testing.T) {
+	ds := mcpserver.NewDecisionStore()
+	ds.Register("ntf_AWAIT01", time.Now().UTC())
+
+	// Resolve after a short delay in a goroutine.
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		accepted := true
+		ds.Resolve("ntf_AWAIT01", &payload.NotificationResponse{
+			RequestID: "ntf_AWAIT01",
+			Accepted:  &accepted,
+			Action:    "Yes",
+			Timestamp: time.Now().UTC(),
+		})
+	}()
+
+	// Poll like await_decision does.
+	deadline := time.After(2 * time.Second)
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+
+	var result *payload.DecisionResource
+	for {
+		r := ds.Get("ntf_AWAIT01")
+		if r != nil && r.Decided {
+			result = r
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("timeout waiting for decision")
+		case <-ticker.C:
+		}
+	}
+
+	if !result.Decided {
+		t.Error("expected decided=true")
+	}
+	if result.Accepted == nil || !*result.Accepted {
+		t.Error("expected accepted=true")
+	}
+}
+
+func TestAwaitDecision_NotFound(t *testing.T) {
+	ds := mcpserver.NewDecisionStore()
+	r := ds.Get("ntf_MISSING")
+	if r != nil {
+		t.Error("expected nil for unknown notification_id")
+	}
+}
+
 // --- Subscriber map tests ---
 
 func TestSubscriberMap_CancelAll(t *testing.T) {

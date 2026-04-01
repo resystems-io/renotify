@@ -57,18 +57,18 @@ type terminateFlowResult struct {
 func (s *Server) registerFlowTools() {
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name: "register_flow",
-		Description: `Begin a new Renotify flow for this workspace. Call this FIRST
-before using post or ask. Returns a flow_id that you must pass to
-all subsequent tool calls. The flow tracks your agent session on
-the mobile dashboard and prevents stale-flow reaping.
+		Description: `Begin a new Renotify flow. Call this FIRST — before post, ask,
+or any other tool. Returns a flow_id you must pass to all
+subsequent calls.
 
-Call terminate_flow when your work is complete. If you forget,
-the flow will be automatically reaped after 5 minutes of
-inactivity.
+workspace_path must be an absolute filesystem path (e.g.
+"/home/user/project", not "." or "project").
 
-For long-running tasks, call refresh_flow periodically (every
-few minutes) to prevent reaping and optionally update the
-dashboard label with your current progress.`,
+Always call terminate_flow when done. Flows are automatically
+reaped after 5 minutes of inactivity if you forget.
+
+For long-running tasks (> 5 min between tool calls), call
+refresh_flow periodically to prevent reaping.`,
 	}, s.handleRegisterFlow)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
