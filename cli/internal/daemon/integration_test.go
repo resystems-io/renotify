@@ -4,12 +4,15 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,8 +21,11 @@ import (
 
 	"go.resystems.io/renotify/internal/broker"
 	"go.resystems.io/renotify/internal/config"
+	"go.resystems.io/renotify/internal/heartbeat"
 	"go.resystems.io/renotify/internal/httpserver"
+	"go.resystems.io/renotify/internal/ledger"
 	"go.resystems.io/renotify/internal/mcpserver"
+	"go.resystems.io/renotify/internal/registry"
 )
 
 func integrationLogger() *slog.Logger {
@@ -254,6 +260,244 @@ func TestController_MCPSubsystem(t *testing.T) {
 	<-done
 }
 
+// TestController_MCPToolEndToEnd exercises the full daemon
+// lifecycle with MCP tools invoked via HTTP JSON-RPC. This is
+// the integration test that would have caught the lazy-DB nil
+// dereference.
+func TestController_MCPToolEndToEnd(t *testing.T) {
+	dir := t.TempDir()
+	cfg := integrationConfig(dir)
+
+	logger := integrationLogger()
+
+	// Build subsystem chain mirroring runDaemon().
+	ledgerSub := ledger.NewSubsystem(cfg.Daemon.DBPath, logger)
+	httpSrv := httpserver.New("127.0.0.1", 0, logger)
+	mcpSrv := mcpserver.New(httpSrv, logger,
+		ledgerSub.DB, cfg.Username, "dn_INTEGTEST01", cfg)
+	hbPub := heartbeat.New("dn_INTEGTEST01", cfg.Username,
+		"test-host", 30*time.Second, logger)
+	regSvc := registry.New(ledgerSub.DB, hbPub,
+		cfg.Username, "dn_INTEGTEST01",
+		cfg.Reaping, logger)
+
+	c := NewController(cfg,
+		WithLogger(logger),
+		WithSubsystem(ledgerSub),
+		WithSubsystem(httpSrv),
+		WithSubsystem(mcpSrv),
+		WithSubsystem(hbPub),
+		WithSubsystem(regSvc),
+	)
+	c.DaemonIDPath = filepath.Join(dir, "daemon_id")
+	c.InternalTokenPath = filepath.Join(dir, "internal_token")
+	c.PairingTokenPath = filepath.Join(dir, "pairing", "token")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- c.Run(ctx) }()
+
+	// Wait for all subsystems to start.
+	time.Sleep(2 * time.Second)
+
+	addr := httpSrv.Addr()
+	if addr == "" {
+		cancel()
+		t.Fatal("HTTP server addr is empty")
+	}
+	mcpURL := "http://" + addr + "/mcp"
+
+	// 1. Initialize MCP session.
+	initResp := mcpPost(t, mcpURL, "", `{
+		"jsonrpc": "2.0", "id": 1,
+		"method": "initialize",
+		"params": {
+			"protocolVersion": "2025-06-18",
+			"capabilities": {},
+			"clientInfo": {"name": "test", "version": "1.0"}
+		}
+	}`)
+	initResp.Body.Close()
+	sessionID := initResp.Header.Get("Mcp-Session-Id")
+	if sessionID == "" {
+		cancel()
+		t.Fatal("no Mcp-Session-Id header")
+	}
+
+	// Send initialized notification.
+	mcpPost(t, mcpURL, sessionID, `{
+		"jsonrpc": "2.0",
+		"method": "notifications/initialized"
+	}`)
+
+	// 2. List tools — verify all 5 are present.
+	toolsBody := mcpPostBody(t, mcpURL, sessionID, `{
+		"jsonrpc": "2.0", "id": 2,
+		"method": "tools/list"
+	}`)
+	for _, tool := range []string{
+		"register_flow", "refresh_flow", "terminate_flow",
+		"post", "ask",
+	} {
+		if !strings.Contains(toolsBody, tool) {
+			t.Errorf("tools/list missing %q", tool)
+		}
+	}
+
+	// 3. Call register_flow.
+	regBody := mcpPostBody(t, mcpURL, sessionID, `{
+		"jsonrpc": "2.0", "id": 3,
+		"method": "tools/call",
+		"params": {
+			"name": "register_flow",
+			"arguments": {
+				"workspace_path": "/tmp/e2e-test",
+				"label": "E2E Test"
+			}
+		}
+	}`)
+
+	// Extract flow_id from the response.
+	var regResult struct {
+		Result struct {
+			StructuredContent json.RawMessage `json:"structuredContent"`
+			Content           []struct {
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"result"`
+	}
+	json.Unmarshal([]byte(regBody), &regResult)
+
+	// The structured content or text content contains the
+	// flow_id. Parse it.
+	var flowResult struct {
+		FlowID string `json:"flow_id"`
+	}
+	if len(regResult.Result.StructuredContent) > 0 {
+		json.Unmarshal(regResult.Result.StructuredContent, &flowResult)
+	} else if len(regResult.Result.Content) > 0 {
+		json.Unmarshal(
+			[]byte(regResult.Result.Content[0].Text), &flowResult)
+	}
+	if flowResult.FlowID == "" {
+		cancel()
+		t.Fatalf("register_flow returned no flow_id: %s", regBody)
+	}
+	flowID := flowResult.FlowID
+
+	// 4. Call post with the flow_id.
+	postBody := mcpPostBody(t, mcpURL, sessionID, fmt.Sprintf(`{
+		"jsonrpc": "2.0", "id": 4,
+		"method": "tools/call",
+		"params": {
+			"name": "post",
+			"arguments": {
+				"flow_id": %q,
+				"title": "E2E Test Notification",
+				"body": "Integration test"
+			}
+		}
+	}`, flowID))
+	if strings.Contains(postBody, `"error"`) {
+		t.Errorf("post returned error: %s", postBody)
+	}
+
+	// 5. Call terminate_flow.
+	termBody := mcpPostBody(t, mcpURL, sessionID, fmt.Sprintf(`{
+		"jsonrpc": "2.0", "id": 5,
+		"method": "tools/call",
+		"params": {
+			"name": "terminate_flow",
+			"arguments": {
+				"flow_id": %q,
+				"status": "completed"
+			}
+		}
+	}`, flowID))
+	if strings.Contains(termBody, `"error"`) {
+		t.Errorf("terminate_flow returned error: %s", termBody)
+	}
+
+	// 6. Verify the flow is eventually gone from the ledger.
+	// The terminate_flow tool deletes directly, but the registry's
+	// lifecycle consumer may re-insert from the active event then
+	// delete from the completed event. Poll until settled.
+	db := ledgerSub.DB()
+	var flows []ledger.ActiveFlow
+	for range 20 {
+		time.Sleep(200 * time.Millisecond)
+		var listErr error
+		flows, listErr = db.ListActiveFlows(ledger.ActiveFlowsQuery{})
+		if listErr != nil {
+			t.Fatal(listErr)
+		}
+		if len(flows) == 0 {
+			break
+		}
+	}
+	if len(flows) != 0 {
+		t.Errorf("expected 0 active flows after terminate, got %d",
+			len(flows))
+	}
+
+	cancel()
+	if shutErr := <-done; shutErr != nil {
+		t.Fatalf("daemon error: %v", shutErr)
+	}
+}
+
+// mcpPost sends a JSON-RPC POST to the MCP endpoint and returns
+// the HTTP response.
+func mcpPost(
+	t *testing.T,
+	url, sessionID, body string,
+) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest("POST", url,
+		strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	if sessionID != "" {
+		req.Header.Set("Mcp-Session-Id", sessionID)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp
+}
+
+// mcpPostBody sends a JSON-RPC POST and returns the JSON payload
+// extracted from the SSE response envelope.
+func mcpPostBody(
+	t *testing.T,
+	url, sessionID, body string,
+) string {
+	t.Helper()
+	resp := mcpPost(t, url, sessionID, body)
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return extractSSEData(string(data))
+}
+
+// extractSSEData extracts the JSON from an SSE "data:" line.
+// SSE format: "event: message\ndata: {json}\n\n"
+func extractSSEData(body string) string {
+	for _, line := range strings.Split(body, "\n") {
+		if strings.HasPrefix(line, "data: ") {
+			return strings.TrimPrefix(line, "data: ")
+		}
+	}
+	return body // fallback: return as-is if not SSE
+}
+
 func TestController_SharedBrokerMode(t *testing.T) {
 	// Start a standalone embedded server as the "shared broker".
 	shared, err := broker.NewEmbeddedServer(broker.EmbeddedConfig{
@@ -464,6 +708,15 @@ func TestController_JetStreamMobileReceives(t *testing.T) {
 		t.Fatalf("EnsureJetStream: %v", err)
 	}
 
+	// Subscribe to the mobile consumer's push deliver subject.
+	deliverSubject := fmt.Sprintf(
+		"resystems.renotify.%s.mobile.deliver", cfg.Username)
+	sub, subErr := nc.SubscribeSync(deliverSubject)
+	if subErr != nil {
+		t.Fatalf("subscribe deliver: %v", subErr)
+	}
+	nc.Flush()
+
 	// Publish a message to a flow request subject.
 	js, _ := natsjs.New(nc)
 	_, err = js.Publish(ctx,
@@ -473,27 +726,13 @@ func TestController_JetStreamMobileReceives(t *testing.T) {
 		t.Fatalf("publish: %v", err)
 	}
 
-	// Fetch from the mobile consumer.
-	consumer, err := js.Consumer(ctx, broker.StreamName,
-		broker.MobileConsumerName("testuser"))
-	if err != nil {
-		t.Fatalf("consumer: %v", err)
+	// Receive from the push deliver subject.
+	msg, msgErr := sub.NextMsg(2 * time.Second)
+	if msgErr != nil {
+		t.Fatalf("receive: %v", msgErr)
 	}
-	msgs, err := consumer.Fetch(1,
-		natsjs.FetchMaxWait(2*time.Second))
-	if err != nil {
-		t.Fatalf("fetch: %v", err)
-	}
-	var received int
-	for msg := range msgs.Messages() {
-		if string(msg.Data()) != "mobile test payload" {
-			t.Errorf("data = %q, want 'mobile test payload'",
-				string(msg.Data()))
-		}
-		msg.Ack()
-		received++
-	}
-	if received != 1 {
-		t.Errorf("received %d messages, want 1", received)
+	if string(msg.Data) != "mobile test payload" {
+		t.Errorf("data = %q, want 'mobile test payload'",
+			string(msg.Data))
 	}
 }

@@ -109,24 +109,9 @@ func (s *Server) handleRegisterFlow(
 	meta[payload.MetaDisplayName] = displayName
 	meta[payload.MetaAbsPath] = args.WorkspacePath
 
-	flow := &ledger.ActiveFlow{
-		FlowID:                flowID,
-		Username:              s.username,
-		DaemonID:              s.daemonID,
-		WorkspaceID:           workspaceID,
-		DisplayName:           displayName,
-		AbsPath:               args.WorkspacePath,
-		Label:                 args.Label,
-		Metadata:              meta,
-		RegisteredAt:          now,
-		LastActivityTimestamp: now,
-	}
-
-	if err := s.db().RegisterFlow(flow); err != nil {
-		return nil, nil, fmt.Errorf("register flow: %w", err)
-	}
-
-	// Publish lifecycle event to NATS.
+	// Publish lifecycle event to NATS. The registry's lifecycle
+	// consumer handles the DB write (C-10). MCP tools do not
+	// write to active_flows directly to avoid races.
 	event := &payload.FlowLifecycleEvent{
 		FlowID:      flowID,
 		DaemonID:    s.daemonID,
@@ -155,13 +140,8 @@ func (s *Server) handleRefreshFlow(
 ) (*mcp.CallToolResult, *refreshFlowResult, error) {
 	now := time.Now().UTC()
 
-	if err := s.db().RefreshFlow(
-		args.FlowID, args.Label, args.Metadata, now,
-	); err != nil {
-		return nil, nil, fmt.Errorf("refresh flow: %w", err)
-	}
-
-	// Publish lifecycle event.
+	// Publish lifecycle event to NATS. The registry's lifecycle
+	// consumer handles the DB write (C-10).
 	// Read flow context from ledger for the event fields.
 	flows, _ := s.db().ListActiveFlows(ledger.ActiveFlowsQuery{})
 	var event payload.FlowLifecycleEvent
@@ -205,7 +185,7 @@ func (s *Server) handleTerminateFlow(
 
 	now := time.Now().UTC()
 
-	// Read flow context before termination.
+	// Look up flow context for the lifecycle event.
 	flows, _ := s.db().ListActiveFlows(ledger.ActiveFlowsQuery{})
 	var workspaceID string
 	for _, f := range flows {
@@ -215,13 +195,8 @@ func (s *Server) handleTerminateFlow(
 		}
 	}
 
-	if err := s.db().TerminateFlow(
-		args.FlowID, args.Status, now,
-	); err != nil {
-		return nil, nil, fmt.Errorf("terminate flow: %w", err)
-	}
-
-	// Publish lifecycle event.
+	// Publish lifecycle event to NATS. The registry's lifecycle
+	// consumer handles the DB write (C-10).
 	event := &payload.FlowLifecycleEvent{
 		FlowID:      args.FlowID,
 		DaemonID:    s.daemonID,
