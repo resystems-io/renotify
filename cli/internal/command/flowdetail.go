@@ -3,6 +3,7 @@ package command
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"text/tabwriter"
 	"time"
 
@@ -111,9 +112,14 @@ Examples:
 			fmt.Fprintf(w, "TTL:\t%s\n", formatTTL(ttl))
 
 			if len(f.Metadata) > 0 {
+				keys := make([]string, 0, len(f.Metadata))
+				for k := range f.Metadata {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
 				fmt.Fprintf(w, "\nMetadata:\n")
-				for k, v := range f.Metadata {
-					fmt.Fprintf(w, "  %s:\t%s\n", k, v)
+				for _, k := range keys {
+					fmt.Fprintf(w, "  %s:\t%s\n", k, f.Metadata[k])
 				}
 			}
 
