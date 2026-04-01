@@ -201,9 +201,11 @@ func (d *DB) ListActiveFlows(q ActiveFlowsQuery) ([]ActiveFlow, error) {
 		       display_name, abs_path, label, metadata,
 		       registered_at, last_activity_timestamp
 		FROM active_flows
-		WHERE (? = '' OR daemon_id = ?)
+		WHERE (? = '' OR flow_id = ?)
+		  AND (? = '' OR daemon_id = ?)
 		  AND (? = '' OR workspace_id = ?)
 		ORDER BY registered_at DESC`,
+		q.FlowID, q.FlowID,
 		q.DaemonID, q.DaemonID,
 		q.WorkspaceID, q.WorkspaceID,
 	)

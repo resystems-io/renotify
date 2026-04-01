@@ -141,7 +141,7 @@ func Default() *Config {
 			NotificationsPerMinute: 60,
 		},
 		Reaping: ReapingConfig{
-			GracePeriod: NewDuration(5 * time.Minute),
+			GracePeriod: NewDuration(15 * time.Minute),
 			Interval:    NewDuration(30 * time.Second),
 		},
 		Timeout: TimeoutConfig{

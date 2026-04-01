@@ -57,6 +57,7 @@ type HistoryResult struct {
 // ActiveFlowsQuery holds the filter parameters for
 // ListActiveFlows.
 type ActiveFlowsQuery struct {
+	FlowID      string
 	DaemonID    string
 	WorkspaceID string
 }
