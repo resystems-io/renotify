@@ -78,6 +78,7 @@ type RateLimitConfig struct {
 // ReapingConfig controls stale flow detection.
 type ReapingConfig struct {
 	GracePeriod Duration `json:"grace_period" mapstructure:"grace_period"`
+	Interval    Duration `json:"interval"     mapstructure:"interval"`
 }
 
 // TimeoutConfig controls blocking request timeouts.
@@ -141,6 +142,7 @@ func Default() *Config {
 		},
 		Reaping: ReapingConfig{
 			GracePeriod: NewDuration(5 * time.Minute),
+			Interval:    NewDuration(30 * time.Second),
 		},
 		Timeout: TimeoutConfig{
 			DefaultAskTimeout: NewDuration(5 * time.Minute),
@@ -224,6 +226,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Reaping.GracePeriod.Duration < time.Minute {
 		return fmt.Errorf("reaping.grace_period must be at least 1 minute")
+	}
+	if c.Reaping.Interval.Duration < 5*time.Second {
+		return fmt.Errorf("reaping.interval must be at least 5 seconds")
 	}
 	if c.Timeout.DefaultAskTimeout.Duration <= 0 {
 		return fmt.Errorf("timeout.default_ask_timeout must be positive")

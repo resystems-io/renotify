@@ -21,6 +21,8 @@ type ActiveFlow struct {
 	Username              string
 	DaemonID              string
 	WorkspaceID           string
+	DisplayName           string
+	AbsPath               string
 	Label                 string
 	Metadata              map[string]string
 	RegisteredAt          time.Time

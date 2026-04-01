@@ -22,10 +22,12 @@ func (d *DB) RegisterFlow(f *ActiveFlow) error {
 
 	if _, err := tx.Exec(`
 		INSERT INTO active_flows
-		    (flow_id, username, daemon_id, workspace_id, label,
+		    (flow_id, username, daemon_id, workspace_id,
+		     display_name, abs_path, label,
 		     metadata, registered_at, last_activity_timestamp)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		f.FlowID, f.Username, f.DaemonID, f.WorkspaceID,
+		nullString(f.DisplayName), nullString(f.AbsPath),
 		nullString(f.Label), metadata, ts, ts,
 	); err != nil {
 		tx.Rollback()
@@ -195,7 +197,8 @@ func (d *DB) InsertLifecycleEvent(wc WriteContext, e *payload.FlowLifecycleEvent
 // filters (Section 4.2).
 func (d *DB) ListActiveFlows(q ActiveFlowsQuery) ([]ActiveFlow, error) {
 	rows, err := d.db.Query(`
-		SELECT flow_id, daemon_id, workspace_id, label, metadata,
+		SELECT flow_id, daemon_id, workspace_id,
+		       display_name, abs_path, label, metadata,
 		       registered_at, last_activity_timestamp
 		FROM active_flows
 		WHERE (? = '' OR daemon_id = ?)
@@ -212,14 +215,17 @@ func (d *DB) ListActiveFlows(q ActiveFlowsQuery) ([]ActiveFlow, error) {
 	var flows []ActiveFlow
 	for rows.Next() {
 		var f ActiveFlow
-		var label, metadata sql.NullString
+		var displayName, absPath, label, metadata sql.NullString
 		var regAt, lastAct string
 		if err := rows.Scan(
 			&f.FlowID, &f.DaemonID, &f.WorkspaceID,
-			&label, &metadata, &regAt, &lastAct,
+			&displayName, &absPath, &label, &metadata,
+			&regAt, &lastAct,
 		); err != nil {
 			return nil, fmt.Errorf("ledger: scan active flow: %w", err)
 		}
+		f.DisplayName = displayName.String
+		f.AbsPath = absPath.String
 		f.Label = label.String
 		f.Metadata = unmarshalMetadata(metadata)
 		f.RegisteredAt, _ = time.Parse(time.RFC3339, regAt)
@@ -236,7 +242,8 @@ func (d *DB) ListActiveFlows(q ActiveFlowsQuery) ([]ActiveFlow, error) {
 func (d *DB) ReapStaleFlows(gracePeriod time.Duration) ([]ActiveFlow, error) {
 	cutoff := time.Now().UTC().Add(-gracePeriod).Format(time.RFC3339)
 	rows, err := d.db.Query(`
-		SELECT flow_id, daemon_id, workspace_id, label, metadata,
+		SELECT flow_id, daemon_id, workspace_id,
+		       display_name, abs_path, label, metadata,
 		       registered_at, last_activity_timestamp
 		FROM active_flows
 		WHERE last_activity_timestamp < ?`,
@@ -250,14 +257,17 @@ func (d *DB) ReapStaleFlows(gracePeriod time.Duration) ([]ActiveFlow, error) {
 	var flows []ActiveFlow
 	for rows.Next() {
 		var f ActiveFlow
-		var label, metadata sql.NullString
+		var displayName, absPath, label, metadata sql.NullString
 		var regAt, lastAct string
 		if err := rows.Scan(
 			&f.FlowID, &f.DaemonID, &f.WorkspaceID,
-			&label, &metadata, &regAt, &lastAct,
+			&displayName, &absPath, &label, &metadata,
+			&regAt, &lastAct,
 		); err != nil {
 			return nil, fmt.Errorf("ledger: scan stale flow: %w", err)
 		}
+		f.DisplayName = displayName.String
+		f.AbsPath = absPath.String
 		f.Label = label.String
 		f.Metadata = unmarshalMetadata(metadata)
 		f.RegisteredAt, _ = time.Parse(time.RFC3339, regAt)

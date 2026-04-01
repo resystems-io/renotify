@@ -79,6 +79,25 @@ func (d *DB) migrate() error {
 		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("ledger: commit migration: %w", err)
 		}
+		version = 1
+	}
+
+	if version < 2 {
+		tx, err := d.db.Begin()
+		if err != nil {
+			return fmt.Errorf("ledger: begin migration v2: %w", err)
+		}
+		if _, err := tx.Exec(schemaV2); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("ledger: apply schema v2: %w", err)
+		}
+		if _, err := tx.Exec("PRAGMA user_version = 2"); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("ledger: set user_version: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("ledger: commit migration v2: %w", err)
+		}
 	}
 
 	return nil

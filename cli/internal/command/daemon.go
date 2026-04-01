@@ -22,6 +22,7 @@ import (
 	"go.resystems.io/renotify/internal/httpserver"
 	"go.resystems.io/renotify/internal/ledger"
 	"go.resystems.io/renotify/internal/mcpserver"
+	"go.resystems.io/renotify/internal/registry"
 	"go.resystems.io/renotify/internal/state"
 	"go.resystems.io/renotify/internal/xdg"
 )
@@ -383,6 +384,14 @@ func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
 	hbPub := heartbeat.New(daemonID, cfg.Username, hostname,
 		cfg.Heartbeat.Interval.Duration, logger)
 	opts = append(opts, daemon.WithSubsystem(hbPub))
+
+	// Active flow registry (C-10). Starts after heartbeat so the
+	// publisher is ready to receive workspace snapshots.
+	regSvc := registry.New(
+		ledgerSub.DB(), hbPub,
+		cfg.Username, daemonID,
+		cfg.Reaping, logger)
+	opts = append(opts, daemon.WithSubsystem(regSvc))
 
 	// Signal handling: SIGINT/SIGTERM for shutdown, SIGHUP for
 	// auth reload (triggered by `renotify pair`).
