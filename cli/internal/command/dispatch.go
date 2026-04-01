@@ -200,6 +200,7 @@ func dispatchPermissionRequest(
 		ResponseTypes: []payload.ResponseType{payload.ResponseBoolean},
 		Priority:      payload.PriorityHigh,
 		Source:        hookSource(input.SessionID),
+		WorkspaceName: fc.displayName,
 		Actions:       []string{"Allow", "Deny"},
 		TimeoutSec:    timeoutSec,
 		Timestamp:     now,
@@ -373,6 +374,7 @@ func dispatchNotification(
 		ResponseTypes: []payload.ResponseType{payload.ResponseNone},
 		Priority:      p,
 		Source:        hookSource(input.SessionID),
+		WorkspaceName: fc.displayName,
 		Timestamp:     now,
 	}
 	if err := broker.PublishJSON(legacyJS,

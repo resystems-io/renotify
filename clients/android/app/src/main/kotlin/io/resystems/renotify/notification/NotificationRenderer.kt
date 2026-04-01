@@ -72,9 +72,11 @@ object NotificationRenderer {
             )
         }
 
-        // Sub-text: source identifier.
-        if (payload.source.isNotEmpty()) {
-            builder.setSubText(payload.source)
+        // Sub-text: workspace name and/or source identifier.
+        val subText = composeSubText(
+            payload.workspaceName, payload.source)
+        if (subText.isNotEmpty()) {
+            builder.setSubText(subText)
         }
 
         // Priority mapping.
@@ -179,6 +181,23 @@ object NotificationRenderer {
         // notification (ID = 1). Use absolute value to ensure
         // positive, and add an offset.
         return (id.hashCode() and Int.MAX_VALUE) or 0x1000
+    }
+
+    /**
+     * Compose notification sub-text from workspace name and
+     * source. Returns "{workspace} · {source}" when both are
+     * present, or whichever is non-empty.
+     */
+    internal fun composeSubText(
+        workspace: String,
+        source: String
+    ): String {
+        return when {
+            workspace.isNotEmpty() && source.isNotEmpty() ->
+                "$workspace · $source"
+            workspace.isNotEmpty() -> workspace
+            else -> source
+        }
     }
 
     // --- Action button builders ---
