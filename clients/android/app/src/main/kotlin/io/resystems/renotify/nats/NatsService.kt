@@ -63,6 +63,10 @@ class NatsService : Service() {
             ::handleInitialDashboard)
         store = EncryptedProvisioningStore(this)
 
+        // Load silent mode from preferences.
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        _silentMode.value = prefs.getBoolean(KEY_SILENT, false)
+
         // Update the persistent notification when state changes.
         serviceScope.launch {
             manager.connectionState.collect { state ->
@@ -159,7 +163,11 @@ class NatsService : Service() {
             return
         }
 
-        NotificationRenderer.render(this, payload)
+        if (!_silentMode.value) {
+            NotificationRenderer.render(this, payload)
+        } else {
+            Log.d(TAG, "Silent: suppressed ${payload.id}")
+        }
         manager.markRendered(payload.id)
         ack()
     }
@@ -400,5 +408,29 @@ class NatsService : Service() {
             .MutableStateFlow<DaemonHeartbeat?>(null)
         val dashboardState: StateFlow<DaemonHeartbeat?> =
             _dashboardState
+
+        /**
+         * Silent mode suppresses notification rendering while
+         * still receiving and ACKing messages.
+         */
+        private val _silentMode = kotlinx.coroutines.flow
+            .MutableStateFlow(false)
+        val silentMode: StateFlow<Boolean> = _silentMode
+
+        private const val PREFS_NAME = "renotify_settings"
+        private const val KEY_SILENT = "silent_mode"
+
+        /**
+         * Toggle silent mode and persist to SharedPreferences.
+         */
+        fun setSilentMode(
+            context: android.content.Context,
+            silent: Boolean
+        ) {
+            _silentMode.value = silent
+            context.getSharedPreferences(PREFS_NAME,
+                MODE_PRIVATE)
+                .edit().putBoolean(KEY_SILENT, silent).apply()
+        }
     }
 }

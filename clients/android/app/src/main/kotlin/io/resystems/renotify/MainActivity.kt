@@ -31,6 +31,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var statusText: TextView
     private lateinit var connectButton: Button
+    private lateinit var silentButton: Button
     private lateinit var store: EncryptedProvisioningStore
     private lateinit var dashboardAdapter: DashboardAdapter
 
@@ -131,16 +132,30 @@ class MainActivity : ComponentActivity() {
             setPadding(dp(16), dp(12), dp(16), dp(32))
         }
 
-        // Pair button (R-MOB-01).
-        val pairButton = Button(this).apply {
-            text = "Scan Pairing QR Code"
-            // rounded corners
+        // Shared button style for the bottom bar.
+        fun styledButton(marginStart: Int = 0) = Button(this).apply {
+            textSize = 12f
             background = android.graphics.drawable.GradientDrawable().apply {
                 setColor(0xFF444444.toInt())
-                cornerRadius = dp(8).toFloat()
+                cornerRadius = dp(6).toFloat()
             }
             setTextColor(0xFFFFFFFF.toInt())
-            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            minWidth = 0
+            minimumWidth = 0
+            if (marginStart > 0) {
+                val lp = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                lp.marginStart = dp(marginStart)
+                layoutParams = lp
+            }
+        }
+
+        // Pair button (R-MOB-01).
+        val pairButton = styledButton().apply {
+            text = "Pair"
             setOnClickListener {
                 scanLauncher.launch(
                     Intent(
@@ -153,23 +168,19 @@ class MainActivity : ComponentActivity() {
         bottomBar.addView(pairButton)
 
         // Connect/disconnect button (R-MOB-02).
-        connectButton = Button(this).apply {
-            // rounded corners
-            background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(0xFF444444.toInt())
-                cornerRadius = dp(8).toFloat()
-            }
-            setTextColor(0xFFFFFFFF.toInt())
-            setPadding(dp(16), dp(12), dp(16), dp(12))
-            val lp = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            lp.marginStart = dp(8)
-            layoutParams = lp
+        connectButton = styledButton(marginStart = 6).apply {
             setOnClickListener { toggleConnection() }
         }
         bottomBar.addView(connectButton)
+
+        // Silent mode toggle.
+        silentButton = styledButton(marginStart = 6).apply {
+            setOnClickListener {
+                val newState = !NatsService.silentMode.value
+                NatsService.setSilentMode(this@MainActivity, newState)
+            }
+        }
+        bottomBar.addView(silentButton)
 
         root.addView(bottomBar)
 
@@ -187,6 +198,15 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             NatsService.dashboardState.collect { heartbeat ->
                 dashboardAdapter.update(heartbeat)
+            }
+        }
+
+        // Observe silent mode.
+        lifecycleScope.launch {
+            NatsService.silentMode.collect { silent ->
+                silentButton.text = if (silent) "Unmute" else "Silent"
+                // Update status text to reflect silent state.
+                statusText.text = formatState(NatsService.state.value)
             }
         }
 
@@ -243,7 +263,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun formatState(state: ConnectionState): String {
-        return when (state) {
+        val base = when (state) {
             is ConnectionState.Idle -> {
                 if (store.isPaired()) "Paired (disconnected)"
                 else "Not paired"
@@ -264,6 +284,8 @@ class MainActivity : ComponentActivity() {
             is ConnectionState.Error ->
                 "Error: ${state.message}"
         }
+        return if (NatsService.silentMode.value)
+            "$base (silent)" else base
     }
 
     private fun dp(value: Int): Int {
