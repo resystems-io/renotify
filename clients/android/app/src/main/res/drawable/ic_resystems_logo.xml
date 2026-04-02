@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Resystems logo converted from assets/resystems.svg.
+  SVG viewBox="-55 -55 110 110" translated to 0,0 origin
+  by offsetting all coordinates by +55.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="110dp"
+    android:height="110dp"
+    android:viewportWidth="110"
+    android:viewportHeight="110">
+
+    <!-- Central bar (red) -->
+    <path
+        android:fillColor="#993333"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 49.2,11 C 49.2,7.799 51.799,5.2 55,5.2 S 60.8,7.799 60.8,11 L 60.8,47 C 60.8,50.201 58.201,52.8 55,52.8 S 49.2,50.201 49.2,47 L 49.2,11 z" />
+
+    <!-- Arrow 0 (grey) -->
+    <path
+        android:fillColor="#555555"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 77.167,28.956 C 74.729,26.881 74.548,23.822 76.248,21.110 S 82.248,18.048 84.685,20.123 A 45.8,45.8 0 0,1 99.731,64.837 L 108.795,66.830 C 108.795,66.830 89.396,75.419 89.396,75.419 S 79.338,60.352 79.338,60.352 L 88.402,62.345 A 34.2,34.2 0 0,0 77.167,28.956 z" />
+
+    <!-- Arrow 1 (grey) -->
+    <path
+        android:fillColor="#555555"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 75.097,82.672 C 77.687,80.791 80.703,81.335 82.939,83.626 S 84.504,90.177 81.914,92.058 A 45.8,45.8 0 0,1 34.915,96.161 L 30.845,104.501 C 30.845,104.501 27.061,83.626 27.061,83.626 S 44.072,77.396 44.072,77.396 L 40.002,85.736 A 34.2,34.2 0 0,0 75.097,82.672 z" />
+
+    <!-- Arrow 2 (red) -->
+    <path
+        android:fillColor="#993333"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 23.376,68.022 C 24.595,70.982 23.357,73.785 20.604,75.419 S 13.869,75.399 12.650,72.439 A 45.8,45.8 0 0,1 19.720,25.794 L 12.572,19.876 C 12.572,19.876 33.752,21.110 33.752,21.110 S 35.804,39.109 35.804,39.109 L 28.656,33.191 A 34.2,34.2 0 0,0 23.376,68.022 z" />
+
+</vector>

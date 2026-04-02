@@ -11,6 +11,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import io.resystems.renotify.Brand
 
 /**
  * RecyclerView adapter for the dashboard. Renders a flat list
@@ -103,7 +104,7 @@ class DashboardAdapter :
             addView(TextView(context).apply {
                 tag = TAG_WS_DETAIL
                 textSize = 12f
-                setTextColor(0xFF888888.toInt())
+                setTextColor(Brand.TEXT_SECONDARY)
             })
         }
     }
@@ -127,7 +128,7 @@ class DashboardAdapter :
                 // Status dot.
                 addView(View(context).apply {
                     tag = TAG_FLOW_DOT
-                    setBackgroundColor(0xFF4CAF50.toInt())
+                    setBackgroundColor(Brand.STATUS_ACTIVE)
                     layoutParams = LinearLayout.LayoutParams(
                         dp(8), dp(8)
                     ).apply {
@@ -153,7 +154,7 @@ class DashboardAdapter :
                     addView(TextView(context).apply {
                         tag = TAG_FLOW_META
                         textSize = 11f
-                        setTextColor(0xFF888888.toInt())
+                        setTextColor(Brand.TEXT_SECONDARY)
                     })
                 })
             })
@@ -171,10 +172,10 @@ class DashboardAdapter :
                     text = "Stop"
                     textSize = 12f
                     background = GradientDrawable().apply {
-                        setColor(0xFFB71C1C.toInt())
+                        setColor(Brand.ACTION_STOP)
                         cornerRadius = dp(6).toFloat()
                     }
-                    setTextColor(0xFFFFFFFF.toInt())
+                    setTextColor(Brand.BUTTON_TEXT)
                     setPadding(dp(12), dp(6), dp(12), dp(6))
                     minWidth = 0
                     minimumWidth = 0
@@ -185,10 +186,10 @@ class DashboardAdapter :
                     text = "Note"
                     textSize = 12f
                     background = GradientDrawable().apply {
-                        setColor(0xFF444444.toInt())
+                        setColor(Brand.BUTTON_BG)
                         cornerRadius = dp(6).toFloat()
                     }
-                    setTextColor(0xFFFFFFFF.toInt())
+                    setTextColor(Brand.BUTTON_TEXT)
                     setPadding(dp(12), dp(6), dp(12), dp(6))
                     minWidth = 0
                     minimumWidth = 0
@@ -209,7 +210,7 @@ class DashboardAdapter :
         return TextView(parent.context).apply {
             tag = TAG_EMPTY
             textSize = 14f
-            setTextColor(0xFF888888.toInt())
+            setTextColor(Brand.TEXT_SECONDARY)
             gravity = Gravity.CENTER
             setPadding(dp(16), dp(48), dp(16), dp(48))
             layoutParams = RecyclerView.LayoutParams(
