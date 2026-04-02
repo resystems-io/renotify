@@ -61,7 +61,7 @@ class NatsService : Service() {
         createNotificationChannels()
         manager = NatsConnectionManager(
             serviceScope, ::handleMessage, ::handleHeartbeat,
-            ::handleInitialDashboard)
+            ::handleInitialDashboard, ::handleDeviceControl)
         store = EncryptedProvisioningStore(this)
 
         // Load silent mode from preferences.
@@ -289,6 +289,32 @@ class NatsService : Service() {
             } else {
                 Log.w(TAG, "History query returned null")
             }
+        }
+    }
+
+    // --- Device control (C-16) ---
+
+    /**
+     * Callback invoked by [NatsConnectionManager] for device
+     * control messages. Runs on jnats' dispatcher thread.
+     */
+    private fun handleDeviceControl(data: ByteArray) {
+        try {
+            val json = String(data, Charsets.UTF_8)
+            val obj = JSONObject(json)
+            val command = obj.optString("command", "")
+
+            when (command) {
+                "set_silent" -> {
+                    val value = obj.getBoolean("value")
+                    setSilentMode(this, value)
+                    Log.i(TAG, "Remote silent mode: $value")
+                }
+                else -> Log.w(TAG,
+                    "Unknown device control: $command")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error parsing device control", e)
         }
     }
 

@@ -115,7 +115,7 @@ class MainActivity : ComponentActivity() {
             textSize = 14f
             gravity = Gravity.CENTER
             setTextColor(0xFF333333.toInt())
-            setPadding(dp(16), dp(8), dp(16), dp(12))
+            setPadding(dp(16), dp(8), dp(16), dp(4))
             // Show provisioning details immediately if paired,
             // before the first state update arrives.
             val p = store.load()
@@ -123,6 +123,22 @@ class MainActivity : ComponentActivity() {
                 else "Not paired"
         }
         root.addView(statusText)
+
+        // Device ID line (C-16) — small grey text so the user
+        // knows which device to target with 'renotify silent'.
+        val provisioning = store.load()
+        if (provisioning != null &&
+            provisioning.deviceId.isNotEmpty()
+        ) {
+            val deviceIdText = TextView(this).apply {
+                text = "Device: ${provisioning.deviceId}"
+                textSize = 11f
+                gravity = Gravity.CENTER
+                setTextColor(0xFF999999.toInt())
+                setPadding(dp(16), dp(0), dp(16), dp(8))
+            }
+            root.addView(deviceIdText)
+        }
 
         // Tab strip: Dashboard | History (M-07).
         val tabBar = LinearLayout(this).apply {
