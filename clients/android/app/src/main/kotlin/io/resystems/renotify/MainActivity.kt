@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
@@ -94,27 +95,49 @@ class MainActivity : ComponentActivity() {
 
         // --- Programmatic layout ---
 
+        // Hide the system ActionBar — we use a custom branded
+        // header instead. If menus or navigation are needed in
+        // future, replace this with a Toolbar.
+        actionBar?.hide()
+
+        // Brand the status bar.
+        window.statusBarColor = Brand.HEADER_BG
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             fitsSystemWindows = true
         }
 
-        // App title.
-        if (false) {
-            val title = TextView(this).apply {
-                text = "Renotify"
-                textSize = 24f
-                gravity = Gravity.CENTER
-                setPadding(dp(16), dp(8), dp(16), dp(4))
-            }
-            root.addView(title)
+        // Branded header (M-05): logo + "Renotify" on dark bg.
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(Brand.HEADER_BG)
+            setPadding(dp(16), dp(10), dp(16), dp(10))
         }
+
+        val logo = ImageView(this).apply {
+            setImageResource(R.drawable.ic_resystems_logo)
+            val size = dp(32)
+            layoutParams = LinearLayout.LayoutParams(size, size)
+        }
+        header.addView(logo)
+
+        val brandTitle = TextView(this).apply {
+            text = Brand.brandedName(this@MainActivity,
+                "Renotify")
+            textSize = 20f
+            setPadding(dp(10), 0, 0, 0)
+        }
+        header.addView(brandTitle)
+
+        root.addView(header)
 
         // Connection status line (R-MOB-10).
         statusText = TextView(this).apply {
             textSize = 14f
             gravity = Gravity.CENTER
-            setTextColor(0xFF333333.toInt())
+            setTextColor(Brand.TEXT_DARK)
             setPadding(dp(16), dp(8), dp(16), dp(4))
             // Show provisioning details immediately if paired,
             // before the first state update arrives.
@@ -134,7 +157,7 @@ class MainActivity : ComponentActivity() {
                 text = "Device: ${provisioning.deviceId}"
                 textSize = 11f
                 gravity = Gravity.CENTER
-                setTextColor(0xFF999999.toInt())
+                setTextColor(Brand.TEXT_SECONDARY)
                 setPadding(dp(16), dp(0), dp(16), dp(8))
             }
             root.addView(deviceIdText)
@@ -158,7 +181,7 @@ class MainActivity : ComponentActivity() {
         val tabSep = TextView(this).apply {
             text = " · "
             textSize = 13f
-            setTextColor(0xFF999999.toInt())
+            setTextColor(Brand.TEXT_SECONDARY)
         }
         tabBar.addView(tabSep)
 
@@ -212,17 +235,17 @@ class MainActivity : ComponentActivity() {
         val bottomBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(dp(16), dp(12), dp(16), dp(32))
+            setPadding(dp(16), dp(12), dp(16), dp(8))
         }
 
         // Shared button style for the bottom bar.
         fun styledButton(marginStart: Int = 0) = Button(this).apply {
             textSize = 12f
             background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(0xFF444444.toInt())
+                setColor(Brand.BUTTON_BG)
                 cornerRadius = dp(6).toFloat()
             }
-            setTextColor(0xFFFFFFFF.toInt())
+            setTextColor(Brand.BUTTON_TEXT)
             setPadding(dp(10), dp(8), dp(10), dp(8))
             minWidth = 0
             minimumWidth = 0
@@ -266,6 +289,18 @@ class MainActivity : ComponentActivity() {
         bottomBar.addView(silentButton)
 
         root.addView(bottomBar)
+
+        // Footer branding (M-05): small "Resystems" right-justified
+        // on a background matching the dashboard surface.
+        val footer = TextView(this).apply {
+            text = Brand.brandedName(this@MainActivity,
+                "Resystems")
+            textSize = 10f
+            gravity = Gravity.END
+            if (false) setBackgroundColor(0xFFFFFFFF.toInt())
+            setPadding(dp(16), dp(0), dp(16), dp(16))
+        }
+        root.addView(footer)
 
         setContentView(root)
 
@@ -418,8 +453,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateTabStyles() {
-        val active = 0xFF111111.toInt()
-        val inactive = 0xFF999999.toInt()
+        val active = Brand.TEXT_DARK
+        val inactive = Brand.TEXT_SECONDARY
 
         tabDashboard.setTextColor(
             if (activeTab == TAB_DASHBOARD) active else inactive)

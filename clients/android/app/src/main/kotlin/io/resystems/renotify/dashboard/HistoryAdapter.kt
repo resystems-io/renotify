@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import io.resystems.renotify.Brand
 
 /**
  * RecyclerView adapter for the notification history viewer
@@ -86,13 +87,13 @@ class HistoryAdapter :
 
                 val detail = TextView(ctx).apply {
                     textSize = 12f
-                    setTextColor(0xFF666666.toInt())
+                    setTextColor(Brand.TEXT_PRIMARY)
                 }
                 root.addView(detail)
 
                 val response = TextView(ctx).apply {
                     textSize = 12f
-                    setTextColor(0xFF888888.toInt())
+                    setTextColor(Brand.TEXT_SECONDARY)
                 }
                 root.addView(response)
 
@@ -104,7 +105,7 @@ class HistoryAdapter :
                     text = "Load more\u2026"
                     textSize = 14f
                     gravity = Gravity.CENTER
-                    setTextColor(0xFF1A73E8.toInt())
+                    setTextColor(Brand.LINK)
                     setPadding(dp(16), dp(16), dp(16), dp(16))
                     layoutParams = RecyclerView.LayoutParams(
                         RecyclerView.LayoutParams.MATCH_PARENT,
@@ -121,7 +122,7 @@ class HistoryAdapter :
                     text = "No history records."
                     textSize = 14f
                     gravity = Gravity.CENTER
-                    setTextColor(0xFF999999.toInt())
+                    setTextColor(Brand.TEXT_SECONDARY)
                     setPadding(dp(16), dp(32), dp(16), dp(32))
                     layoutParams = RecyclerView.LayoutParams(
                         RecyclerView.LayoutParams.MATCH_PARENT,
