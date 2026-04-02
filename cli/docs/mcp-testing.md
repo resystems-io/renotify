@@ -276,3 +276,14 @@ The mobile response may not have reached the daemon. Check the
 daemon logs for "decision resolved" messages. If the mobile app
 shows the notification but tapping a button does nothing, check
 the Android logcat for `ActionReceiver` or `NatsService` errors.
+
+---
+
+## 5. Google Antigravity Configuration
+
+Antigravity (Google's AI agent) supports MCP servers via a
+local config file using either `stdio` or Standard SSE transport.
+
+However, the Renotify daemon uses Streamable HTTP transport.
+
+See: [Antigravity MCP Integration Analysis](mcp-antigravity-integration.md)
