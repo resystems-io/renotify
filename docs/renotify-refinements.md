@@ -691,6 +691,17 @@ connectivity status indicator at all times.
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Demonstration
 
+#### R-MOB-11: Multi-Device Support
+**Statement:** The system must support multiple mobile devices paired to the same
+daemon simultaneously. Each device receives all notifications independently via
+its own JetStream consumer. Device identity is established at pairing time and
+carried in the provisioning payload.
+* **Rationale (A1):** Developers may use multiple devices (phone + tablet) or
+  share a daemon with a colleague for pair programming.
+* **Trace to Parent (A4):** N-01, N-02
+* **Allocation (A8):** Go CLI Application, Android Application
+* **V&V Method (A2):** Test
+
 ### 2.5 Security Lifecycle
 
 #### R-SEC-01: Token Revocation
@@ -704,13 +715,15 @@ implementation: a manual CLI command `renotify revoke`.
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
-#### R-SEC-02: Re-Pairing Supersedes Prior Token
-**Statement:** Running `renotify pair` when a valid pairing already exists must
-revoke the prior token before issuing a new one. Only one active mobile pairing
-is permitted per daemon instance at any time.
-* **Rationale (A1):** Prevents credential accumulation and ensures a single
-  authoritative mobile endpoint.
-* **Trace to Parent (A4):** R-SEC-01
+#### R-SEC-02: Per-Device Pairing
+**Statement:** Each `renotify pair` invocation generates a unique device identity
+and per-device auth token, stored in a device registry (`devices.json`). Multiple
+devices may be paired simultaneously (R-MOB-11). Individual devices can be
+revoked via `renotify revoke --device <id>` or all devices via `renotify revoke
+--all`.
+* **Rationale (A1):** Supports multi-device workflows while maintaining per-device
+  credential isolation and revocability.
+* **Trace to Parent (A4):** R-SEC-01, R-MOB-11
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
@@ -1009,6 +1022,7 @@ specifications.
 | D-65 | InterjectionStore accumulates per flow (queue, not latest-only). `Drain()` returns and clears all. `check_interjections` (non-blocking) and `await_interjection` (blocking with timeout) consume the queue. Mirrors DecisionStore channel pattern for event-driven wake. | [Payload Schemas](analysis-payload-schemas.md) | 2026-04-01 |
 | D-66 | Interjection consumer lives in `mcpserver` (not `registry`) — its primary job is MCP agent delivery. Debounce via in-memory map keyed by `flow_id:action`, configurable window (default 5s). `pause` treated as `note` for MVP. | [NATS Transport](analysis-nats-transport-design.md) | 2026-04-01 |
 | D-67 | Daemon-side timeout: goroutine per ask, `select` on `time.After(timeoutSec)` vs `DecisionStore.Resolved` channel. On timeout: publishes `ErrorResponse(code:"timeout")` to `.response` subject. Response subscriber resolves DecisionResource with decided=true, no response fields. | [NATS Transport](analysis-nats-transport-design.md) | 2026-04-01 |
+| D-68 | Multi-device pairing: per-device `device_id` (`mb_` + 13 Crockford Base32), per-device auth token, per-device NATS account (`mobile-{device_id}`), per-device JetStream push consumer (`mobile-{username}-{device_id}`). Device registry stored in `devices.json`. Provisioning payload v2 adds `"d"` (device_id) and `"n"` (NATS username). Legacy v1 single-token migrated on daemon startup. Daemon creates consumers at startup from registry; SIGHUP reloads auth from registry. R-SEC-02 updated from single-device to multi-device model. | [NATS Transport](analysis-nats-transport-design.md) | 2026-04-02 |
 
 ---
 
@@ -1064,6 +1078,8 @@ Record completed items here with the date.
 | 2026-04-01 | C-06 | MCP server implemented with all 5 tools and DecisionResource. `register_flow` generates flow_id + workspace_id, registers in ledger, publishes lifecycle event. `refresh_flow` updates label/metadata, resets reaping timer. `terminate_flow` removes flow, publishes terminal lifecycle event. `post` sends fire-and-forget notification to mobile. `ask` sends interactive notification, creates pending `DecisionResource`, starts response subscriber goroutine; on mobile response, resolves resource and emits `notifications/resources/updated` via MCP SDK. DecisionStore: in-memory thread-safe map served via resource template `renotify://decisions/{notification_id}`. Shared `broker.PublishJSON()` extracted from CLI commands. Workspace metadata constants moved to `payload` package. MCP SDK `SubscribeHandler`/`UnsubscribeHandler` configured for resource subscriptions. C-11 re-scoped to interjections + timeout enforcement. Tool descriptions written as agent instructions per project memory. Manual testing playbook in `cli/docs/mcp-testing.md`. R-CLI-08, R-CLI-10, R-CLI-15 satisfied. 17 new tests (5 server, 6 DecisionStore, 4 integration, 2 subscriber). |
 | 2026-04-01 | C-11 | MCP interjections and timeouts implemented. New `InterjectionStore` accumulates interjections per flow with queue + notification channel. Interjection consumer binds to `daemon-interject-{username}` JetStream consumer, debounces per flow+action (5s window), dispatches: `stop` → publish failed lifecycle + resolve pending decisions; `note` → update store + emit resource notification; `pause` → treat as note. Two new tools: `check_interjections` (non-blocking drain) and `await_interjection` (blocking with timeout). `InterjectionResource` template at `renotify://interjections/{flow_id}`. Daemon-side timeout timer per `ask`: goroutine selects on timeout vs DecisionStore.Resolved channel, publishes `ErrorResponse(code:"timeout")` on `.response` on expiry. `InterjectionResource` payload type added. R-CLI-08, R-CLI-17, R-API-09 satisfied. |
 | 2026-04-01 | C-15 | Hook dispatcher command implemented. `renotify dispatch` reads Claude Code hook JSON from stdin, discriminates on `hook_event_name`. `PermissionRequest` → interactive `ask` with boolean Allow/Deny response, blocks until mobile user responds, writes hook decision JSON to stdout. `Notification` → fire-and-forget `post`, exits immediately. Unsupported events → silent no-op (exit 0). Exit 1 on error for graceful fallback to terminal prompt. Tool input summarisation extracts human-readable body per tool (Bash→command, Edit/Write/Read→file_path, Glob→pattern in path, Grep→/pattern/ in path, Agent→type: description, WebFetch→url, WebSearch→query, MCP→tool name, fallback→compact JSON truncated to 200 chars). Source field: `claude-code/{session_id}`. Refactored `setupFlow` into `setupFlowFromDir` for hook's cwd. Testing playbook in `cli/docs/hooks-testing.md`. R-CLI-19 satisfied. 23 new tests (13 summarisation, 2 source, 3 command-level, 5 integration). |
+| 2026-04-01 | M-09 | Dashboard rendering implemented. Android app subscribes to daemon heartbeat via Core NATS Pub/Sub (`daemon.*.heartbeat` wildcard). `DaemonHeartbeat` and `WorkspaceInfo` Kotlin data classes parse heartbeat JSON. `DashboardAdapter` renders a flat `RecyclerView` with workspace headers and flow items. `NatsService` exposes `dashboardState: StateFlow<DaemonHeartbeat?>` for `MainActivity` observation. Immediate dashboard load on connect via `svc.flows` Request-Reply query. `workspace_name` field added to `NotificationRequest` for mobile subtext rendering. RecyclerView 1.4.0 dependency. R-MOB-09 satisfied. |
+| 2026-04-02 | — | Multi-device pairing implemented (R-MOB-11). Per-device `device_id` (`mb_` prefix), per-device auth token, per-device NATS account and JetStream consumer. Device registry in `devices.json` replaces single-token `pairing/token` file. Provisioning payload bumped to v2 with `"d"` (device_id) and `"n"` (NATS username). Legacy v1 migrated on daemon startup. New `renotify pairings` command. Updated `renotify revoke` with `--device` and `--all` flags. Android app parses v2 payload, authenticates with device-specific username, binds to device-specific consumer. R-SEC-02 updated from single-device to multi-device model. D-68 records design. |
 
 ## 6. References
 
