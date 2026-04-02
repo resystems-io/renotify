@@ -21,10 +21,11 @@ import (
 
 // Server is the MCP server implementing daemon.Subsystem.
 type Server struct {
-	httpSrv   *httpserver.Server
-	logger    *slog.Logger
-	mcpServer *mcp.Server
-	handler   http.Handler
+	httpSrv    *httpserver.Server
+	logger     *slog.Logger
+	mcpServer  *mcp.Server
+	handler    http.Handler
+	sseHandler http.Handler
 
 	// Dependencies set via constructor — available after New().
 	db       func() *ledger.DB
@@ -81,11 +82,17 @@ func New(
 			return mcpSrv
 		}, nil)
 
+	sseHandler := mcp.NewSSEHandler(
+		func(req *http.Request) *mcp.Server {
+			return mcpSrv
+		}, nil)
+
 	return &Server{
 		httpSrv:       httpSrv,
 		logger:        logger,
 		mcpServer:     mcpSrv,
 		handler:       handler,
+		sseHandler:    sseHandler,
 		db:            dbFunc,
 		username:      username,
 		daemonID:      daemonID,
@@ -141,7 +148,9 @@ func (s *Server) Start(_ context.Context, nc *nats.Conn, ready chan<- error) err
 	}
 
 	s.httpSrv.Handle("/mcp", s.handler)
-	s.logger.Info("MCP server registered", "path", "/mcp")
+	s.httpSrv.Handle("/sse", s.sseHandler)
+	s.logger.Info("MCP server registered",
+		"streamable_path", "/mcp", "sse_path", "/sse")
 
 	if ready != nil {
 		close(ready)
@@ -156,7 +165,12 @@ func (s *Server) Stop(_ context.Context) error {
 	return nil
 }
 
-// Handler returns the MCP HTTP handler for testing.
+// Handler returns the Streamable HTTP handler for testing.
 func (s *Server) Handler() http.Handler {
 	return s.handler
+}
+
+// SSEHandler returns the Standard SSE handler for testing.
+func (s *Server) SSEHandler() http.Handler {
+	return s.sseHandler
 }
