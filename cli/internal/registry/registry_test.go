@@ -2,6 +2,7 @@ package registry_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -407,6 +408,236 @@ func TestWorkspaceSnapshot(t *testing.T) {
 		default:
 			t.Errorf("unexpected workspace: %s", ws.WorkspaceID)
 		}
+	}
+}
+
+// --- History endpoint tests (C-09) ---
+
+func TestHistoryEndpoint_Empty(t *testing.T) {
+	_, nc := startTestNATS(t)
+	db := openTestLedger(t)
+	hb := newTestHeartbeat(t, nc)
+	startRegistry(t, nc, db, hb)
+
+	subject := broker.ServiceHistorySubject(testUsername)
+	resp, err := nc.Request(subject, []byte(`{}`), 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result registry.HistoryQueryResult
+	if err := json.Unmarshal(resp.Data, &result); err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Records) != 0 {
+		t.Errorf("got %d records, want 0", len(result.Records))
+	}
+	if result.Total != 0 {
+		t.Errorf("total = %d, want 0", result.Total)
+	}
+}
+
+func TestHistoryEndpoint_WithRecords(t *testing.T) {
+	_, nc := startTestNATS(t)
+	db := openTestLedger(t)
+	hb := newTestHeartbeat(t, nc)
+	startRegistry(t, nc, db, hb)
+
+	// Insert test records directly into the ledger.
+	now := time.Now().UTC()
+	wc := ledger.WriteContext{Username: testUsername}
+
+	req1 := &payload.NotificationRequest{
+		ID:            "ntf_HIST01",
+		FlowID:        "fl_HIST01",
+		DaemonID:      testDaemonID,
+		WorkspaceID:   "ws_HISTWS",
+		Title:         "First notification",
+		Body:          "Body one",
+		ResponseTypes: []payload.ResponseType{payload.ResponseBoolean},
+		Priority:      payload.PriorityNormal,
+		Source:        "test",
+		Timestamp:     now.Add(-2 * time.Minute),
+	}
+	req2 := &payload.NotificationRequest{
+		ID:            "ntf_HIST02",
+		FlowID:        "fl_HIST01",
+		DaemonID:      testDaemonID,
+		WorkspaceID:   "ws_HISTWS",
+		Title:         "Second notification",
+		ResponseTypes: []payload.ResponseType{payload.ResponseChoice},
+		Priority:      payload.PriorityHigh,
+		Source:        "test",
+		Actions:       []string{"Yes", "No"},
+		Timestamp:     now.Add(-1 * time.Minute),
+	}
+
+	db.InsertRequest(wc, req1)
+	db.InsertRequest(wc, req2)
+
+	// Add a response for the first request.
+	accepted := true
+	resp1 := &payload.NotificationResponse{
+		RequestID: "ntf_HIST01",
+		Accepted:  &accepted,
+		Timestamp: now.Add(-90 * time.Second),
+	}
+	db.InsertResponse(resp1)
+
+	// Query all history.
+	subject := broker.ServiceHistorySubject(testUsername)
+	resp, err := nc.Request(subject, []byte(`{}`), 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result registry.HistoryQueryResult
+	if err := json.Unmarshal(resp.Data, &result); err != nil {
+		t.Fatal(err)
+	}
+
+	if result.Total != 2 {
+		t.Fatalf("total = %d, want 2", result.Total)
+	}
+	if len(result.Records) != 2 {
+		t.Fatalf("got %d records, want 2", len(result.Records))
+	}
+
+	// Most recent first.
+	if result.Records[0].Request.ID != "ntf_HIST02" {
+		t.Errorf("records[0].id = %q, want ntf_HIST02",
+			result.Records[0].Request.ID)
+	}
+	if result.Records[1].Request.ID != "ntf_HIST01" {
+		t.Errorf("records[1].id = %q, want ntf_HIST01",
+			result.Records[1].Request.ID)
+	}
+
+	// First record has a response.
+	if result.Records[1].Response == nil {
+		t.Error("records[1] should have a response")
+	} else if result.Records[1].Response.Accepted == nil ||
+		!*result.Records[1].Response.Accepted {
+		t.Error("records[1].response should be accepted=true")
+	}
+
+	// Second record has no response.
+	if result.Records[0].Response != nil {
+		t.Error("records[0] should have no response")
+	}
+}
+
+func TestHistoryEndpoint_WorkspaceFilter(t *testing.T) {
+	_, nc := startTestNATS(t)
+	db := openTestLedger(t)
+	hb := newTestHeartbeat(t, nc)
+	startRegistry(t, nc, db, hb)
+
+	now := time.Now().UTC()
+	wc := ledger.WriteContext{Username: testUsername}
+
+	for i, ws := range []string{"ws_A", "ws_A", "ws_B"} {
+		req := &payload.NotificationRequest{
+			ID:            fmt.Sprintf("ntf_WS%d", i),
+			FlowID:        "fl_WS01",
+			DaemonID:      testDaemonID,
+			WorkspaceID:   ws,
+			Title:         fmt.Sprintf("Notification %d", i),
+			ResponseTypes: []payload.ResponseType{payload.ResponseNone},
+			Priority:      payload.PriorityNormal,
+			Timestamp:     now.Add(time.Duration(-i) * time.Minute),
+		}
+		db.InsertRequest(wc, req)
+	}
+
+	// Filter by workspace_id = ws_A.
+	query := `{"workspace_id":"ws_A"}`
+	subject := broker.ServiceHistorySubject(testUsername)
+	resp, err := nc.Request(subject, []byte(query), 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result registry.HistoryQueryResult
+	json.Unmarshal(resp.Data, &result)
+
+	if result.Total != 2 {
+		t.Errorf("total = %d, want 2 (ws_A only)", result.Total)
+	}
+	for _, rec := range result.Records {
+		if rec.Request.WorkspaceID != "ws_A" {
+			t.Errorf("got workspace %q, want ws_A",
+				rec.Request.WorkspaceID)
+		}
+	}
+}
+
+func TestHistoryEndpoint_Pagination(t *testing.T) {
+	_, nc := startTestNATS(t)
+	db := openTestLedger(t)
+	hb := newTestHeartbeat(t, nc)
+	startRegistry(t, nc, db, hb)
+
+	now := time.Now().UTC()
+	wc := ledger.WriteContext{Username: testUsername}
+
+	for i := 0; i < 5; i++ {
+		req := &payload.NotificationRequest{
+			ID:            fmt.Sprintf("ntf_PAGE%02d", i),
+			FlowID:        "fl_PAGE01",
+			DaemonID:      testDaemonID,
+			WorkspaceID:   "ws_PAGE",
+			Title:         fmt.Sprintf("Page notification %d", i),
+			ResponseTypes: []payload.ResponseType{payload.ResponseNone},
+			Priority:      payload.PriorityNormal,
+			Timestamp:     now.Add(time.Duration(-i) * time.Minute),
+		}
+		db.InsertRequest(wc, req)
+	}
+
+	// Page 1: limit=2, offset=0.
+	query := `{"limit":2,"offset":0}`
+	subject := broker.ServiceHistorySubject(testUsername)
+	resp, err := nc.Request(subject, []byte(query), 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result registry.HistoryQueryResult
+	json.Unmarshal(resp.Data, &result)
+
+	if result.Total != 5 {
+		t.Errorf("total = %d, want 5", result.Total)
+	}
+	if len(result.Records) != 2 {
+		t.Errorf("page 1: got %d records, want 2",
+			len(result.Records))
+	}
+
+	// Page 2: limit=2, offset=2.
+	query = `{"limit":2,"offset":2}`
+	resp, err = nc.Request(subject, []byte(query), 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	json.Unmarshal(resp.Data, &result)
+
+	if len(result.Records) != 2 {
+		t.Errorf("page 2: got %d records, want 2",
+			len(result.Records))
+	}
+
+	// Page 3: limit=2, offset=4 — only 1 remaining.
+	query = `{"limit":2,"offset":4}`
+	resp, err = nc.Request(subject, []byte(query), 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	json.Unmarshal(resp.Data, &result)
+
+	if len(result.Records) != 1 {
+		t.Errorf("page 3: got %d records, want 1",
+			len(result.Records))
 	}
 }
 
