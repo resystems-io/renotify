@@ -9,13 +9,22 @@ import (
 	"time"
 )
 
+// FlowInfo describes an active flow within a workspace
+// heartbeat snapshot.
+type FlowInfo struct {
+	FlowID       string            `json:"flow_id"`
+	Label        string            `json:"label,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	LastActivity time.Time         `json:"last_activity,omitempty"`
+}
+
 // WorkspaceInfo describes a single workspace within the
 // daemon's heartbeat snapshot.
 type WorkspaceInfo struct {
-	WorkspaceID string   `json:"workspace_id"`
-	DisplayName string   `json:"display_name"`
-	AbsPath     string   `json:"abs_path"`
-	ActiveFlows []string `json:"active_flows"`
+	WorkspaceID string     `json:"workspace_id"`
+	DisplayName string     `json:"display_name"`
+	AbsPath     string     `json:"abs_path"`
+	ActiveFlows []FlowInfo `json:"active_flows"`
 }
 
 // DaemonHeartbeat is the periodic structural context published

@@ -47,7 +47,11 @@ class DashboardItemTest {
                     workspaceId = "ws_01",
                     displayName = "myproject",
                     absPath = "/home/test/myproject",
-                    activeFlows = listOf("fl_A", "fl_B")
+                    activeFlows = listOf(
+                        FlowInfo("fl_A", "Build",
+                            mapOf("branch" to "main"), "2026-04-01T10:00:00Z"),
+                        FlowInfo("fl_B", "Test", emptyMap(), "")
+                    )
                 )
             ),
             timestamp = "2026-04-01T10:00:00Z"
@@ -61,10 +65,14 @@ class DashboardItemTest {
         assertEquals("myproject", header.displayName)
         assertEquals(2, header.flowCount)
 
-        assertEquals("fl_A",
-            (items[1] as DashboardItem.FlowItem).flowId)
-        assertEquals("fl_B",
-            (items[2] as DashboardItem.FlowItem).flowId)
+        val flow1 = items[1] as DashboardItem.FlowItem
+        assertEquals("fl_A", flow1.flowId)
+        assertEquals("Build", flow1.label)
+        assertEquals("main", flow1.metadata["branch"])
+
+        val flow2 = items[2] as DashboardItem.FlowItem
+        assertEquals("fl_B", flow2.flowId)
+        assertEquals("Test", flow2.label)
     }
 
     @Test
@@ -78,13 +86,16 @@ class DashboardItemTest {
                     workspaceId = "ws_01",
                     displayName = "project-a",
                     absPath = "/a",
-                    activeFlows = listOf("fl_1")
+                    activeFlows = listOf(
+                        FlowInfo("fl_1", "Deploy", emptyMap(), ""))
                 ),
                 WorkspaceInfo(
                     workspaceId = "ws_02",
                     displayName = "project-b",
                     absPath = "/b",
-                    activeFlows = listOf("fl_2", "fl_3")
+                    activeFlows = listOf(
+                        FlowInfo("fl_2", "", emptyMap(), ""),
+                        FlowInfo("fl_3", "CI", emptyMap(), ""))
                 )
             ),
             timestamp = "2026-04-01T10:00:00Z"

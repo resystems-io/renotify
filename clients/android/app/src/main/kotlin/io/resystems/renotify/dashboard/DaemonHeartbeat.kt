@@ -3,6 +3,17 @@ package io.resystems.renotify.dashboard
 import org.json.JSONObject
 
 /**
+ * Describes an active flow within a workspace heartbeat
+ * snapshot. Mirrors Go `heartbeat.FlowInfo`.
+ */
+data class FlowInfo(
+    val flowId: String,
+    val label: String,
+    val metadata: Map<String, String>,
+    val lastActivity: String
+)
+
+/**
  * Kotlin representation of the Go `heartbeat.WorkspaceInfo`
  * type. Describes a single workspace within a daemon heartbeat
  * snapshot.
@@ -11,7 +22,7 @@ data class WorkspaceInfo(
     val workspaceId: String,
     val displayName: String,
     val absPath: String,
-    val activeFlows: List<String>
+    val activeFlows: List<FlowInfo>
 )
 
 /**
@@ -50,13 +61,29 @@ data class DaemonHeartbeat(
                 val arr = obj.getJSONArray("workspaces")
                 for (i in 0 until arr.length()) {
                     val ws = arr.getJSONObject(i)
-                    val flows = mutableListOf<String>()
+                    val flows = mutableListOf<FlowInfo>()
                     if (ws.has("active_flows") &&
                         !ws.isNull("active_flows")
                     ) {
                         val fa = ws.getJSONArray("active_flows")
                         for (j in 0 until fa.length()) {
-                            flows.add(fa.getString(j))
+                            val fo = fa.getJSONObject(j)
+                            val meta = mutableMapOf<String, String>()
+                            if (fo.has("metadata") &&
+                                !fo.isNull("metadata")
+                            ) {
+                                val mo = fo.getJSONObject("metadata")
+                                for (key in mo.keys()) {
+                                    meta[key] = mo.optString(key, "")
+                                }
+                            }
+                            flows.add(FlowInfo(
+                                flowId = fo.getString("flow_id"),
+                                label = fo.optString("label", ""),
+                                metadata = meta,
+                                lastActivity = fo.optString(
+                                    "last_activity", "")
+                            ))
                         }
                     }
                     workspaces.add(

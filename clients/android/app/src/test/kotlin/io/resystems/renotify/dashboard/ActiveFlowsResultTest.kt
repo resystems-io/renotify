@@ -7,7 +7,7 @@ import org.junit.Test
 class ActiveFlowsResultTest {
 
     @Test
-    fun parsesFlowsInTwoWorkspaces() {
+    fun parsesFlowsWithMetadata() {
         val json = """
             {
                 "flows": [
@@ -18,37 +18,19 @@ class ActiveFlowsResultTest {
                         "display_name": "project-a",
                         "abs_path": "/home/user/a",
                         "label": "Build",
+                        "metadata": {"branch": "main", "step": "3/5"},
                         "registered_at": "2026-04-01T10:00:00Z",
                         "last_activity_timestamp": "2026-04-01T10:01:00Z"
-                    },
-                    {
-                        "flow_id": "fl_B",
-                        "daemon_id": "dn_D1",
-                        "workspace_id": "ws_W1",
-                        "display_name": "project-a",
-                        "abs_path": "/home/user/a",
-                        "label": "Test",
-                        "registered_at": "2026-04-01T10:00:00Z",
-                        "last_activity_timestamp": "2026-04-01T10:02:00Z"
-                    },
-                    {
-                        "flow_id": "fl_C",
-                        "daemon_id": "dn_D1",
-                        "workspace_id": "ws_W2",
-                        "display_name": "project-b",
-                        "abs_path": "/home/user/b",
-                        "label": "Deploy",
-                        "registered_at": "2026-04-01T10:00:00Z",
-                        "last_activity_timestamp": "2026-04-01T10:03:00Z"
                     }
                 ]
             }
         """.trimIndent()
 
         val result = ActiveFlowsResult.fromJson(json)
-        assertEquals(3, result.flows.size)
-        assertEquals("fl_A", result.flows[0].flowId)
-        assertEquals("project-a", result.flows[0].displayName)
+        assertEquals(1, result.flows.size)
+        assertEquals("Build", result.flows[0].label)
+        assertEquals("main", result.flows[0].metadata["branch"])
+        assertEquals("3/5", result.flows[0].metadata["step"])
     }
 
     @Test
@@ -70,32 +52,29 @@ class ActiveFlowsResultTest {
         val result = ActiveFlowsResult(
             flows = listOf(
                 ActiveFlowEntry(
-                    flowId = "fl_A",
-                    daemonId = "dn_D1",
+                    flowId = "fl_A", daemonId = "dn_D1",
                     workspaceId = "ws_W1",
-                    displayName = "project-a",
-                    absPath = "/a",
+                    displayName = "project-a", absPath = "/a",
                     label = "Build",
+                    metadata = mapOf("branch" to "main"),
                     registeredAt = "2026-04-01T10:00:00Z",
                     lastActivityTimestamp = "2026-04-01T10:01:00Z"
                 ),
                 ActiveFlowEntry(
-                    flowId = "fl_B",
-                    daemonId = "dn_D1",
+                    flowId = "fl_B", daemonId = "dn_D1",
                     workspaceId = "ws_W1",
-                    displayName = "project-a",
-                    absPath = "/a",
+                    displayName = "project-a", absPath = "/a",
                     label = "Test",
+                    metadata = emptyMap(),
                     registeredAt = "2026-04-01T10:00:00Z",
                     lastActivityTimestamp = "2026-04-01T10:02:00Z"
                 ),
                 ActiveFlowEntry(
-                    flowId = "fl_C",
-                    daemonId = "dn_D1",
+                    flowId = "fl_C", daemonId = "dn_D1",
                     workspaceId = "ws_W2",
-                    displayName = "project-b",
-                    absPath = "/b",
+                    displayName = "project-b", absPath = "/b",
                     label = "Deploy",
+                    metadata = mapOf("env" to "staging"),
                     registeredAt = "2026-04-01T10:00:00Z",
                     lastActivityTimestamp = "2026-04-01T10:03:00Z"
                 )
@@ -106,14 +85,18 @@ class ActiveFlowsResultTest {
         assertEquals("dn_D1", hb.daemonId)
         assertEquals(2, hb.workspaces.size)
 
-        val ws1 = hb.workspaces.find { it.workspaceId == "ws_W1" }!!
+        val ws1 = hb.workspaces.find {
+            it.workspaceId == "ws_W1" }!!
         assertEquals("project-a", ws1.displayName)
-        assertEquals("/a", ws1.absPath)
-        assertEquals(listOf("fl_A", "fl_B"), ws1.activeFlows)
+        assertEquals(2, ws1.activeFlows.size)
+        assertEquals("Build", ws1.activeFlows[0].label)
+        assertEquals("main",
+            ws1.activeFlows[0].metadata["branch"])
 
-        val ws2 = hb.workspaces.find { it.workspaceId == "ws_W2" }!!
-        assertEquals("project-b", ws2.displayName)
-        assertEquals(listOf("fl_C"), ws2.activeFlows)
+        val ws2 = hb.workspaces.find {
+            it.workspaceId == "ws_W2" }!!
+        assertEquals("staging",
+            ws2.activeFlows[0].metadata["env"])
     }
 
     @Test
@@ -122,5 +105,25 @@ class ActiveFlowsResultTest {
         val hb = result.toDaemonHeartbeat()
         assertEquals("", hb.daemonId)
         assertTrue(hb.workspaces.isEmpty())
+    }
+
+    @Test
+    fun metadataDefaultsToEmpty() {
+        val json = """
+            {
+                "flows": [
+                    {
+                        "flow_id": "fl_NOMETA",
+                        "daemon_id": "dn_D1",
+                        "workspace_id": "ws_W1",
+                        "registered_at": "2026-04-01T10:00:00Z",
+                        "last_activity_timestamp": "2026-04-01T10:00:00Z"
+                    }
+                ]
+            }
+        """.trimIndent()
+
+        val result = ActiveFlowsResult.fromJson(json)
+        assertTrue(result.flows[0].metadata.isEmpty())
     }
 }

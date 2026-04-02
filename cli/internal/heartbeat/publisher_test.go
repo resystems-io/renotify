@@ -64,7 +64,10 @@ func TestPayload_JSON(t *testing.T) {
 				WorkspaceID: "ws_TEST",
 				DisplayName: "myproject",
 				AbsPath:     "/home/test/myproject",
-				ActiveFlows: []string{"fl_A", "fl_B"},
+				ActiveFlows: []FlowInfo{
+					{FlowID: "fl_A", Label: "Build"},
+					{FlowID: "fl_B", Label: "Test"},
+				},
 			},
 		},
 		Timestamp: time.Date(2026, 3, 30, 12, 0, 0, 0, time.UTC),
@@ -268,7 +271,7 @@ func TestPublisher_SetWorkspaces(t *testing.T) {
 			WorkspaceID: "ws_NEW",
 			DisplayName: "new-project",
 			AbsPath:     "/home/test/new-project",
-			ActiveFlows: []string{"fl_X"},
+			ActiveFlows: []FlowInfo{{FlowID: "fl_X"}},
 		},
 	})
 	p.Publish()

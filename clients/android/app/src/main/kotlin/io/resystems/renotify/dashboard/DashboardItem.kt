@@ -19,10 +19,14 @@ sealed class DashboardItem {
     ) : DashboardItem()
 
     /**
-     * Individual flow row within a workspace group.
+     * Individual flow row within a workspace group showing
+     * label and metadata.
      */
     data class FlowItem(
-        val flowId: String
+        val flowId: String,
+        val label: String,
+        val metadata: Map<String, String>,
+        val lastActivity: String
     ) : DashboardItem()
 
     /**
@@ -60,8 +64,13 @@ sealed class DashboardItem {
                         flowCount = ws.activeFlows.size
                     )
                 )
-                for (flowId in ws.activeFlows) {
-                    items.add(FlowItem(flowId))
+                for (flow in ws.activeFlows) {
+                    items.add(FlowItem(
+                        flowId = flow.flowId,
+                        label = flow.label,
+                        metadata = flow.metadata,
+                        lastActivity = flow.lastActivity
+                    ))
                 }
             }
             return items

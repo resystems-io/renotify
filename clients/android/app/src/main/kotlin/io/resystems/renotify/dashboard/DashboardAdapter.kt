@@ -99,7 +99,6 @@ class DashboardAdapter :
         return LinearLayout(parent.context).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(32), dp(6), dp(16), dp(6))
-            gravity = Gravity.CENTER_VERTICAL
             layoutParams = RecyclerView.LayoutParams(
                 RecyclerView.LayoutParams.MATCH_PARENT,
                 RecyclerView.LayoutParams.WRAP_CONTENT
@@ -113,13 +112,27 @@ class DashboardAdapter :
                     dp(8), dp(8)
                 ).apply {
                     marginEnd = dp(8)
+                    topMargin = dp(6)
                 }
             })
 
-            addView(TextView(context).apply {
-                tag = TAG_FLOW_ID
-                textSize = 13f
-                setTypeface(Typeface.MONOSPACE, Typeface.NORMAL)
+            // Label + metadata column.
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                )
+
+                addView(TextView(context).apply {
+                    tag = TAG_FLOW_LABEL
+                    textSize = 13f
+                })
+
+                addView(TextView(context).apply {
+                    tag = TAG_FLOW_META
+                    textSize = 11f
+                    setTextColor(0xFF888888.toInt())
+                })
             })
         }
     }
@@ -163,9 +176,32 @@ class DashboardAdapter :
         holder: ViewHolder,
         item: DashboardItem.FlowItem
     ) {
-        val flowText = holder.itemView.findViewWithTag<TextView>(
-            TAG_FLOW_ID)
-        flowText.text = item.flowId
+        val labelText = holder.itemView.findViewWithTag<TextView>(
+            TAG_FLOW_LABEL)
+        val metaText = holder.itemView.findViewWithTag<TextView>(
+            TAG_FLOW_META)
+
+        // Show label if present, otherwise flow ID.
+        labelText.text = item.label.ifEmpty { item.flowId }
+
+        // Show metadata as "key: value" lines, flow ID, and
+        // last activity timestamp.
+        val parts = mutableListOf<String>()
+        if (item.label.isNotEmpty()) {
+            parts.add(item.flowId)
+        }
+        if (item.lastActivity.isNotEmpty()) {
+            parts.add("updated: ${formatTimestamp(item.lastActivity)}")
+        }
+        for ((k, v) in item.metadata.toSortedMap()) {
+            parts.add("$k: $v")
+        }
+        if (parts.isNotEmpty()) {
+            metaText.text = parts.joinToString("\n")
+            metaText.visibility = View.VISIBLE
+        } else {
+            metaText.visibility = View.GONE
+        }
     }
 
     private fun bindEmpty(
@@ -177,6 +213,19 @@ class DashboardAdapter :
     }
 
     // --- Helpers ---
+
+    /** Format an RFC 3339 timestamp to local date/time. */
+    private fun formatTimestamp(ts: String): String {
+        return try {
+            val instant = java.time.Instant.parse(ts)
+            val local = java.time.LocalDateTime.ofInstant(
+                instant, java.time.ZoneId.systemDefault())
+            local.format(java.time.format.DateTimeFormatter
+                .ofPattern("yyyy-MM-dd HH:mm:ss"))
+        } catch (_: Exception) {
+            ts
+        }
+    }
 
     private fun View.dp(value: Int): Int {
         return (value * resources.displayMetrics.density).toInt()
@@ -192,7 +241,8 @@ class DashboardAdapter :
         private const val TAG_WS_NAME = "ws_name"
         private const val TAG_WS_DETAIL = "ws_detail"
         private const val TAG_FLOW_DOT = "flow_dot"
-        private const val TAG_FLOW_ID = "flow_id"
+        private const val TAG_FLOW_LABEL = "flow_label"
+        private const val TAG_FLOW_META = "flow_meta"
         private const val TAG_EMPTY = "empty"
     }
 }
