@@ -199,12 +199,15 @@ func dispatchPermissionRequest(
 		actions      []string
 	)
 	if labels := suggestionLabels(input.PermissionSuggestions); len(labels) > 0 {
-		// Choice mode: "Allow once", suggestion labels, "Deny".
+		// Choice mode: "Allow once" and "Deny" appear first so
+		// they are visible on the notification buttons. The
+		// suggestion labels follow and overflow to the in-app
+		// "More..." dialog where there is room to display them.
 		responseType = payload.ResponseChoice
 		actions = make([]string, 0, len(labels)+2)
 		actions = append(actions, "Allow once")
-		actions = append(actions, labels...)
 		actions = append(actions, "Deny")
+		actions = append(actions, labels...)
 	} else {
 		// Fallback: binary Allow/Deny.
 		responseType = payload.ResponseBoolean

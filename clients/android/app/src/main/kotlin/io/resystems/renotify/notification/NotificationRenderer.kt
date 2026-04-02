@@ -254,10 +254,14 @@ object NotificationRenderer {
                 context, payload, androidId)
         }
 
-        // For multi-modal with text, always show "More..." so
-        // the user can access the text input in-app.
-        val forceMore = isMultiModal &&
-            types.contains(NotificationPayload.RESPONSE_TEXT)
+        // Force "More..." overflow when:
+        // - Multi-modal with text (text input in-app)
+        // - Choice with >2 options (labels too long for
+        //   notification buttons, e.g. permission suggestions)
+        val forceMore = (isMultiModal &&
+            types.contains(NotificationPayload.RESPONSE_TEXT)) ||
+            (types.contains(NotificationPayload.RESPONSE_CHOICE) &&
+                actions.size > 2)
 
         if (!forceMore &&
             actions.size <= MAX_NOTIFICATION_ACTIONS
