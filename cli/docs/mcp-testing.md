@@ -279,11 +279,64 @@ the Android logcat for `ActionReceiver` or `NatsService` errors.
 
 ---
 
-## 5. Google Antigravity Configuration
+## 5. Google Antigravity Configuration (Experimental)
 
-Antigravity (Google's AI agent) supports MCP servers via a
-local config file using either `stdio` or Standard SSE transport.
+> **Status: experimental.** The `/sse` endpoint passes curl
+> and integration tests but has not yet been proven end-to-end
+> with Antigravity. Initial testing (2026-04-03) showed
+> Antigravity sending `POST /sse` (Streamable HTTP dialect)
+> rather than the expected `GET /sse` (Standard SSE dialect),
+> and failing Accept-header validation on `/mcp`. Further
+> investigation is needed to determine which transport and
+> headers Antigravity actually requires.
 
-However, the Renotify daemon uses Streamable HTTP transport.
+The Renotify daemon serves Standard SSE transport at `/sse`
+alongside the Streamable HTTP transport at `/mcp`.
+
+**Config file:** `~/.gemini/antigravity/mcp_config.json`
+
+```json
+{
+  "mcpServers": {
+    "renotify": {
+      "serverUrl": "http://127.0.0.1:4224/sse"
+    }
+  }
+}
+```
+
+Note: Antigravity uses `serverUrl` (not `url`/`type`).
+
+### 5.1 Verify SSE Handshake with curl
+
+```bash
+curl -N http://127.0.0.1:4224/sse
+```
+
+Expected output (connection stays open):
+```
+event: endpoint
+data: /sse?sessionid=XXXXXXXXX
+```
+
+POST an `initialize` request to the session endpoint:
+
+```bash
+curl -s -X POST "http://127.0.0.1:4224/sse?sessionid=XXXXXXXXX" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {},
+      "clientInfo": {"name": "curl-test", "version": "1.0"}
+    }
+  }'
+```
+
+The response appears on the SSE stream (first terminal),
+not in the POST response (which returns `202 Accepted`).
 
 See: [Antigravity MCP Integration Analysis](mcp-antigravity-integration.md)
