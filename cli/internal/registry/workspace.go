@@ -1,6 +1,8 @@
 package registry
 
 import (
+	"sort"
+
 	"go.resystems.io/renotify/internal/heartbeat"
 	"go.resystems.io/renotify/internal/ledger"
 )
@@ -19,7 +21,7 @@ func (s *Service) rebuildWorkspaceSnapshot() {
 	type wsInfo struct {
 		displayName string
 		absPath     string
-		flowIDs     []string
+		flows       []heartbeat.FlowInfo
 	}
 	byWorkspace := make(map[string]*wsInfo)
 
@@ -32,7 +34,12 @@ func (s *Service) rebuildWorkspaceSnapshot() {
 			}
 			byWorkspace[f.WorkspaceID] = ws
 		}
-		ws.flowIDs = append(ws.flowIDs, f.FlowID)
+		ws.flows = append(ws.flows, heartbeat.FlowInfo{
+			FlowID:       f.FlowID,
+			Label:        f.Label,
+			Metadata:     f.Metadata,
+			LastActivity: f.LastActivityTimestamp,
+		})
 	}
 
 	snapshot := make([]heartbeat.WorkspaceInfo, 0, len(byWorkspace))
@@ -41,9 +48,14 @@ func (s *Service) rebuildWorkspaceSnapshot() {
 			WorkspaceID: wsID,
 			DisplayName: ws.displayName,
 			AbsPath:     ws.absPath,
-			ActiveFlows: ws.flowIDs,
+			ActiveFlows: ws.flows,
 		})
 	}
+
+	// Sort workspaces alphabetically by display name.
+	sort.Slice(snapshot, func(i, j int) bool {
+		return snapshot[i].DisplayName < snapshot[j].DisplayName
+	})
 
 	s.hb.SetWorkspaces(snapshot)
 	s.hb.Publish()

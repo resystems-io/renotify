@@ -14,6 +14,7 @@ data class ActiveFlowEntry(
     val displayName: String,
     val absPath: String,
     val label: String,
+    val metadata: Map<String, String>,
     val registeredAt: String,
     val lastActivityTimestamp: String
 )
@@ -42,7 +43,14 @@ data class ActiveFlowsResult(
                 workspaceId = wsId,
                 displayName = first.displayName,
                 absPath = first.absPath,
-                activeFlows = entries.map { it.flowId }
+                activeFlows = entries.map { e ->
+                    FlowInfo(
+                        flowId = e.flowId,
+                        label = e.label,
+                        metadata = e.metadata,
+                        lastActivity = e.lastActivityTimestamp
+                    )
+                }
             )
         }
 
@@ -64,6 +72,15 @@ data class ActiveFlowsResult(
                 val arr = obj.getJSONArray("flows")
                 for (i in 0 until arr.length()) {
                     val f = arr.getJSONObject(i)
+                    val meta = mutableMapOf<String, String>()
+                    if (f.has("metadata") &&
+                        !f.isNull("metadata")
+                    ) {
+                        val mo = f.getJSONObject("metadata")
+                        for (key in mo.keys()) {
+                            meta[key] = mo.optString(key, "")
+                        }
+                    }
                     flows.add(
                         ActiveFlowEntry(
                             flowId = f.getString("flow_id"),
@@ -76,6 +93,7 @@ data class ActiveFlowsResult(
                             absPath = f.optString(
                                 "abs_path", ""),
                             label = f.optString("label", ""),
+                            metadata = meta,
                             registeredAt = f.optString(
                                 "registered_at", ""),
                             lastActivityTimestamp = f.optString(
