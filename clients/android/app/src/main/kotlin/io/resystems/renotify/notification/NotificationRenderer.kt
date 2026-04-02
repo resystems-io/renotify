@@ -33,6 +33,10 @@ object NotificationRenderer {
     const val EXTRA_ACTION_VALUE = "action_value"
     const val EXTRA_REMOTE_INPUT_KEY = "remote_input_text"
 
+    // Extras for carrying notification data to the app.
+    const val EXTRA_ACTIONS_ARRAY = "actions_array"
+    const val EXTRA_RESPONSE_TYPES = "response_types"
+
     // Action types for PendingIntent discrimination.
     const val ACTION_TYPE_ACCEPTED = "accepted"
     const val ACTION_TYPE_REJECTED = "rejected"
@@ -222,9 +226,12 @@ object NotificationRenderer {
         }
 
         // Collect all candidate actions, then enforce the
-        // 3-button Android limit. If there are more than 3,
-        // show the first 2 and a "More..." button that opens
-        // the app to the full choice list.
+        // Android notification button limit. RemoteInput (text
+        // reply) doesn't expand reliably when sharing a
+        // notification with other action buttons, so when text
+        // is combined with other types we overflow the text
+        // action to the in-app "More..." dialog.
+        val isMultiModal = types.size > 1
         val actions = mutableListOf<NotificationCompat.Action>()
 
         if (types.contains(NotificationPayload.RESPONSE_BOOLEAN)) {
@@ -237,16 +244,34 @@ object NotificationRenderer {
                 context, payload, androidId)
         }
 
-        if (types.contains(NotificationPayload.RESPONSE_TEXT)) {
+        // Only add inline text reply when it's the sole
+        // response type. Multi-modal text is handled via the
+        // "More..." in-app dialog where it works reliably.
+        if (types.contains(NotificationPayload.RESPONSE_TEXT) &&
+            !isMultiModal
+        ) {
             actions += buildTextAction(
                 context, payload, androidId)
         }
 
-        if (actions.size <= MAX_NOTIFICATION_ACTIONS) {
+        // Force "More..." overflow when:
+        // - Multi-modal with text (text input in-app)
+        // - Choice with >2 options (labels too long for
+        //   notification buttons, e.g. permission suggestions)
+        val forceMore = (isMultiModal &&
+            types.contains(NotificationPayload.RESPONSE_TEXT)) ||
+            (types.contains(NotificationPayload.RESPONSE_CHOICE) &&
+                actions.size > 2)
+
+        if (!forceMore &&
+            actions.size <= MAX_NOTIFICATION_ACTIONS
+        ) {
             actions.forEach { builder.addAction(it) }
         } else {
             // Show first 2, then "More...".
-            actions.take(MAX_NOTIFICATION_ACTIONS - 1)
+            val take = (MAX_NOTIFICATION_ACTIONS - 1)
+                .coerceAtMost(actions.size)
+            actions.take(take)
                 .forEach { builder.addAction(it) }
             builder.addAction(buildMoreAction(
                 context, payload, androidId))
@@ -324,14 +349,53 @@ object NotificationRenderer {
     ): NotificationCompat.Action {
         return NotificationCompat.Action.Builder(
             0, "More\u2026",
-            actionIntent(context, androidId, payload,
-                ACTION_TYPE_MORE, "")
+            moreActionIntent(context, androidId, payload)
         ).build()
+    }
+
+    /**
+     * Build a PendingIntent for the "More..." overflow that
+     * includes the full actions list for in-app rendering.
+     */
+    private fun moreActionIntent(
+        context: Context,
+        androidId: Int,
+        payload: NotificationPayload
+    ): PendingIntent {
+        val intent = Intent(
+            context,
+            NotificationActionReceiver::class.java
+        ).apply {
+            action = INTENT_ACTION
+            putExtra(EXTRA_NOTIFICATION_ID, payload.id)
+            putExtra(EXTRA_FLOW_ID, payload.flowId)
+            putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_MORE)
+            putExtra(EXTRA_ACTION_VALUE, "")
+            payload.actions?.let {
+                putExtra(EXTRA_ACTIONS_ARRAY,
+                    it.toTypedArray())
+            }
+            putExtra(EXTRA_RESPONSE_TYPES,
+                payload.responseTypes.toTypedArray())
+        }
+
+        val requestCode =
+            (payload.id + ACTION_TYPE_MORE).hashCode()
+
+        return PendingIntent.getBroadcast(
+            context, requestCode, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or
+                PendingIntent.FLAG_MUTABLE
+        )
     }
 
     /**
      * Build a PendingIntent for an action button. The intent
      * carries all metadata needed by the M-04 BroadcastReceiver.
+     *
+     * Text actions (RemoteInput) require FLAG_MUTABLE so the
+     * system can attach the user's typed text to the intent.
+     * All other actions use FLAG_IMMUTABLE per best practice.
      */
     private fun actionIntent(
         context: Context,
@@ -353,10 +417,17 @@ object NotificationRenderer {
         val requestCode =
             (payload.id + actionType + actionValue).hashCode()
 
-        return PendingIntent.getBroadcast(
-            context, requestCode, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or
+        // RemoteInput (text reply) requires FLAG_MUTABLE on
+        // Android 12+ (API 31+) so the system can write the
+        // user's input into the intent extras.
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+            if (actionType == ACTION_TYPE_TEXT)
+                PendingIntent.FLAG_MUTABLE
+            else
                 PendingIntent.FLAG_IMMUTABLE
+
+        return PendingIntent.getBroadcast(
+            context, requestCode, intent, flags
         )
     }
 }

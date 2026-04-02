@@ -10,7 +10,6 @@ import (
 	"github.com/nats-io/nats.go"
 
 	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/ledger"
 	"go.resystems.io/renotify/internal/payload"
 )
 
@@ -141,30 +140,10 @@ func (s *Server) handleResponse(
 			s.db().InsertResponse(&resp)
 		}
 
-		// Publish completed lifecycle.
-		now := time.Now().UTC()
-		completedEvent := &payload.FlowLifecycleEvent{
-			FlowID:      flowID,
-			DaemonID:    s.daemonID,
-			WorkspaceID: "", // will be filled from ledger
-			Status:      payload.FlowCompleted,
-			Timestamp:   now,
-		}
-
-		// Read workspace_id from the active flow.
-		flows, err := s.db().ListActiveFlows(ledger.ActiveFlowsQuery{})
-		if err == nil {
-			for _, f := range flows {
-				if f.FlowID == flowID {
-					completedEvent.WorkspaceID = f.WorkspaceID
-					break
-				}
-			}
-		}
-
-		broker.PublishJSON(s.js,
-			broker.FlowLifecycleSubject(s.username, flowID),
-			flowID+"-ask-completed", completedEvent)
+		// Note: we do NOT publish FlowCompleted here. A flow
+		// can have multiple ask/post cycles. The flow lifecycle
+		// is managed by register_flow (active) and
+		// terminate_flow (completed).
 	}
 
 	// Emit MCP notifications/resources/updated.

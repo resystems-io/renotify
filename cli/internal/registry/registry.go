@@ -29,9 +29,10 @@ type Service struct {
 	cfg      config.ReapingConfig
 	logger   *slog.Logger
 
-	nc     *nats.Conn
-	sub    *nats.Subscription
-	cancel context.CancelFunc
+	nc         *nats.Conn
+	sub        *nats.Subscription
+	historySub *nats.Subscription
+	cancel     context.CancelFunc
 }
 
 // New creates a registry Service. The dbFunc parameter is a lazy
@@ -92,6 +93,18 @@ func (s *Service) Start(
 	}
 	s.sub = sub
 
+	// Subscribe to svc.history Core NATS endpoint (C-09).
+	historySub, err := s.subscribeHistoryEndpoint()
+	if err != nil {
+		cancel()
+		if ready != nil {
+			ready <- err
+			close(ready)
+		}
+		return err
+	}
+	s.historySub = historySub
+
 	// Start the stale flow reaper.
 	go s.runReaper(ctx)
 
@@ -115,6 +128,9 @@ func (s *Service) Stop(_ context.Context) error {
 	}
 	if s.sub != nil {
 		s.sub.Drain()
+	}
+	if s.historySub != nil {
+		s.historySub.Drain()
 	}
 	s.logger.Info("registry stopped")
 	return nil
