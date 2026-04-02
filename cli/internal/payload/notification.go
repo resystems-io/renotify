@@ -15,6 +15,7 @@ type NotificationRequest struct {
 	ResponseTypes []ResponseType `json:"response_types"`
 	Priority      Priority       `json:"priority"`
 	Source        string         `json:"source"`
+	WorkspaceName string         `json:"workspace_name,omitempty"`
 	Actions       []string       `json:"actions,omitempty"`
 	TimeoutSec    int            `json:"timeout_sec,omitempty"`
 	Timestamp     time.Time      `json:"timestamp"`

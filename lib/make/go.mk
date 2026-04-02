@@ -5,12 +5,14 @@
 # (alongside go.mod).
 #
 # Standard targets:
-#   make          — build the binary (default)
-#   make build    — same as above
-#   make build-dev — build without APK embedding (dev tag)
-#   make test     — run all tests
-#   make vet      — run go vet
-#   make clean    — remove build artifacts
+#   make              — build the binary (default)
+#   make build        — same as above
+#   make build-dev    — build without APK embedding (dev tag)
+#   make test         — run all tests (unit + integration)
+#   make test-unit    — run unit tests only (no build tags)
+#   make test-integration — run integration tests only
+#   make vet          — run go vet
+#   make clean        — remove build artifacts
 #
 # NOTE ON .PHONY BUILD TARGETS
 #
@@ -34,7 +36,7 @@ BINARY   := $(BUILD_DIR)/renotify
 
 .DEFAULT_GOAL := build
 
-.PHONY: build build-dev test vet clean
+.PHONY: build build-dev test test-unit test-integration vet clean
 
 build: | $(ENSURE_BUILD_DIR)
 	$(GO) build $(GOFLAGS) -o $(BINARY) ./cmd/renotify
@@ -43,7 +45,13 @@ build-dev: | $(ENSURE_BUILD_DIR)
 	$(GO) build $(GOFLAGS) -tags dev -o $(BINARY) ./cmd/renotify
 
 test:
+	$(GO) test -tags integration ./... -v -count=1
+
+test-unit:
 	$(GO) test ./... -v -count=1
+
+test-integration:
+	$(GO) test -tags integration -run "Test.*" ./... -v -count=1
 
 vet:
 	$(GO) vet ./...

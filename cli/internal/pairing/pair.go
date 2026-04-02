@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"time"
 
 	"go.resystems.io/renotify/internal/netutil"
 	"go.resystems.io/renotify/internal/state"
@@ -18,8 +19,9 @@ import (
 type Config struct {
 	CertPath     string // path to TLS cert PEM file
 	KeyPath      string // path to TLS key PEM file
-	TokenPath    string // path to pairing token file
-	UsernamePath string // path to pairing username file
+	TokenPath    string // legacy single-token path (migration)
+	UsernamePath string // legacy pairing username path (migration)
+	DevicesPath  string // path to devices.json registry
 	DaemonIDPath string // path to daemon_id file
 
 	Username string // NATS auth identity
@@ -38,6 +40,7 @@ type Result struct {
 	Host            string
 	Port            int
 	Token           string
+	DeviceID        string
 	CertFingerprint string
 	CertRegenerated bool
 	PayloadJSON     string
@@ -46,13 +49,17 @@ type Result struct {
 
 // ProvisioningPayload is the minified JSON encoded into the QR
 // code. Single-character keys minimise QR density (R-API-08).
+// Version 2 adds device_id and NATS username for multi-device
+// support (R-MOB-11).
 type ProvisioningPayload struct {
-	Version  int    `json:"v"`
-	Host     string `json:"h"`
-	Port     int    `json:"p"`
-	Token    string `json:"t"`
-	CertSHA  string `json:"c"`
-	Username string `json:"u"`
+	Version      int    `json:"v"`
+	Host         string `json:"h"`
+	Port         int    `json:"p"`
+	Token        string `json:"t"`
+	CertSHA      string `json:"c"`
+	Username     string `json:"u"`
+	DeviceID     string `json:"d,omitempty"`
+	NatsUsername string `json:"n,omitempty"`
 }
 
 // Pair executes the full pairing flow: load/generate daemon_id,
@@ -117,15 +124,24 @@ func Pair(cfg Config) (*Result, error) {
 		host = netutil.PreferredIP(discoveredIPs).String()
 	}
 
-	// 6. Always generate a new pairing token (revokes old).
-	token, err := state.GenerateToken(cfg.TokenPath)
+	// 6. Generate device identity and per-device token.
+	deviceID, err := state.GenerateDeviceID()
 	if err != nil {
-		return nil, fmt.Errorf("generate token: %w", err)
+		return nil, fmt.Errorf("device_id: %w", err)
+	}
+	token, err := state.GenerateDeviceToken()
+	if err != nil {
+		return nil, fmt.Errorf("device token: %w", err)
 	}
 
-	// 7. Store pairing username.
-	if err := state.WriteUsername(cfg.UsernamePath, cfg.Username); err != nil {
-		return nil, fmt.Errorf("write username: %w", err)
+	// 7. Add device to registry.
+	device := state.PairedDevice{
+		DeviceID: deviceID,
+		Token:    token,
+		PairedAt: time.Now().UTC(),
+	}
+	if err := state.AddDevice(cfg.DevicesPath, device); err != nil {
+		return nil, fmt.Errorf("add device: %w", err)
 	}
 
 	// 8. Compute cert fingerprint.
@@ -134,14 +150,17 @@ func Pair(cfg Config) (*Result, error) {
 		return nil, fmt.Errorf("fingerprint: %w", err)
 	}
 
-	// 9. Assemble provisioning payload.
+	// 9. Assemble provisioning payload (v2 with device_id).
+	natsUser := state.NatsUsername(deviceID)
 	payload := ProvisioningPayload{
-		Version:  1,
-		Host:     host,
-		Port:     cfg.WSSPort,
-		Token:    token,
-		CertSHA:  fingerprint,
-		Username: cfg.Username,
+		Version:      2,
+		Host:         host,
+		Port:         cfg.WSSPort,
+		Token:        token,
+		CertSHA:      fingerprint,
+		Username:     cfg.Username,
+		DeviceID:     deviceID,
+		NatsUsername: natsUser,
 	}
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
@@ -152,6 +171,7 @@ func Pair(cfg Config) (*Result, error) {
 		Host:            host,
 		Port:            cfg.WSSPort,
 		Token:           token,
+		DeviceID:        deviceID,
 		CertFingerprint: fingerprint,
 		CertRegenerated: certRegenerated,
 		PayloadJSON:     string(payloadJSON),

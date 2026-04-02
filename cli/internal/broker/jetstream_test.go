@@ -206,7 +206,7 @@ func TestEnsureJetStream_Creates(t *testing.T) {
 	_, nc := startTestServer(t)
 	ctx := context.Background()
 
-	err := EnsureJetStream(ctx, nc, "testuser",
+	err := EnsureJetStream(ctx, nc, "testuser", nil,
 		defaultJSConfig(), testLogger())
 	if err != nil {
 		t.Fatalf("EnsureJetStream: %v", err)
@@ -245,11 +245,11 @@ func TestEnsureJetStream_Idempotent(t *testing.T) {
 	ctx := context.Background()
 	cfg := defaultJSConfig()
 
-	if err := EnsureJetStream(ctx, nc, "testuser",
+	if err := EnsureJetStream(ctx, nc, "testuser", nil,
 		cfg, testLogger()); err != nil {
 		t.Fatalf("first call: %v", err)
 	}
-	if err := EnsureJetStream(ctx, nc, "testuser",
+	if err := EnsureJetStream(ctx, nc, "testuser", nil,
 		cfg, testLogger()); err != nil {
 		t.Fatalf("second call: %v", err)
 	}
@@ -266,11 +266,11 @@ func TestEnsureJetStream_UpdatesStream(t *testing.T) {
 	ctx := context.Background()
 
 	cfg := defaultJSConfig()
-	EnsureJetStream(ctx, nc, "testuser", cfg, testLogger())
+	EnsureJetStream(ctx, nc, "testuser", nil, cfg, testLogger())
 
 	// Update MaxAge.
 	cfg.MaxAge = config.NewDuration(1 * time.Hour)
-	if err := EnsureJetStream(ctx, nc, "testuser",
+	if err := EnsureJetStream(ctx, nc, "testuser", nil,
 		cfg, testLogger()); err != nil {
 		t.Fatalf("update: %v", err)
 	}
@@ -287,7 +287,7 @@ func TestEnsureJetStream_MobileConsumerReceives(t *testing.T) {
 	_, nc := startTestServer(t)
 	ctx := context.Background()
 
-	EnsureJetStream(ctx, nc, "testuser", defaultJSConfig(), testLogger())
+	EnsureJetStream(ctx, nc, "testuser", nil, defaultJSConfig(), testLogger())
 
 	// The mobile consumer is push-based with a deliver subject.
 	// Subscribe to the deliver subject to receive messages.
@@ -322,7 +322,7 @@ func TestEnsureJetStream_LifecycleConsumerReceives(t *testing.T) {
 	_, nc := startTestServer(t)
 	ctx := context.Background()
 
-	if err := EnsureJetStream(ctx, nc, "testuser",
+	if err := EnsureJetStream(ctx, nc, "testuser", nil,
 		defaultJSConfig(), testLogger()); err != nil {
 		t.Fatalf("EnsureJetStream: %v", err)
 	}
@@ -360,7 +360,7 @@ func TestEnsureJetStream_InterjectConsumerReceives(t *testing.T) {
 	_, nc := startTestServer(t)
 	ctx := context.Background()
 
-	if err := EnsureJetStream(ctx, nc, "testuser",
+	if err := EnsureJetStream(ctx, nc, "testuser", nil,
 		defaultJSConfig(), testLogger()); err != nil {
 		t.Fatalf("EnsureJetStream: %v", err)
 	}
@@ -398,7 +398,7 @@ func TestEnsureJetStream_ConsumerIsolation(t *testing.T) {
 	_, nc := startTestServer(t)
 	ctx := context.Background()
 
-	if err := EnsureJetStream(ctx, nc, "testuser",
+	if err := EnsureJetStream(ctx, nc, "testuser", nil,
 		defaultJSConfig(), testLogger()); err != nil {
 		t.Fatalf("EnsureJetStream: %v", err)
 	}

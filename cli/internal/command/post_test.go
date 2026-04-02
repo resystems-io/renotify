@@ -13,6 +13,8 @@ import (
 	nats_server "github.com/nats-io/nats-server/v2/server"
 	nats_test "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
+
+	"go.resystems.io/renotify/internal/testutil"
 )
 
 func TestPost_Integration(t *testing.T) {
@@ -101,11 +103,9 @@ func TestPost_Integration(t *testing.T) {
 
 	// Wait for messages to arrive.
 	nc.Flush()
-	time.Sleep(100 * time.Millisecond)
-
-	// Should have 3 messages: lifecycle(active), request,
-	// lifecycle(completed).
-	if len(received) < 3 {
+	if !testutil.WaitFor(t, 2*time.Second, func() bool {
+		return len(received) >= 3
+	}) {
 		t.Fatalf("received %d messages, want at least 3", len(received))
 	}
 

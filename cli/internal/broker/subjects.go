@@ -32,3 +32,9 @@ func FlowInterjectSubject(username, flowID string) string {
 	return fmt.Sprintf("resystems.renotify.%s.flow.%s.interject",
 		username, flowID)
 }
+
+// ServiceFlowsSubject returns the Core NATS Request-Reply subject
+// for the active flows query endpoint (R-CLI-14).
+func ServiceFlowsSubject(username string) string {
+	return fmt.Sprintf("resystems.renotify.%s.svc.flows", username)
+}

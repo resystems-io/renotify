@@ -11,6 +11,8 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import io.resystems.renotify.dashboard.ActiveFlowsResult
+import io.resystems.renotify.dashboard.DaemonHeartbeat
 import io.resystems.renotify.notification.NotificationPayload
 import io.resystems.renotify.notification.NotificationRenderer
 import io.resystems.renotify.pairing.EncryptedProvisioningStore
@@ -56,8 +58,14 @@ class NatsService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
-        manager = NatsConnectionManager(serviceScope, ::handleMessage)
+        manager = NatsConnectionManager(
+            serviceScope, ::handleMessage, ::handleHeartbeat,
+            ::handleInitialDashboard)
         store = EncryptedProvisioningStore(this)
+
+        // Load silent mode from preferences.
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        _silentMode.value = prefs.getBoolean(KEY_SILENT, false)
 
         // Update the persistent notification when state changes.
         serviceScope.launch {
@@ -79,6 +87,10 @@ class NatsService : Service() {
         // running as foreground.
         if (intent?.action == ACTION_PUBLISH_RESPONSE) {
             handlePublishResponse(intent)
+            return START_STICKY
+        }
+        if (intent?.action == ACTION_PUBLISH_INTERJECTION) {
+            handlePublishInterjection(intent)
             return START_STICKY
         }
 
@@ -155,7 +167,11 @@ class NatsService : Service() {
             return
         }
 
-        NotificationRenderer.render(this, payload)
+        if (!_silentMode.value) {
+            NotificationRenderer.render(this, payload)
+        } else {
+            Log.d(TAG, "Silent: suppressed ${payload.id}")
+        }
         manager.markRendered(payload.id)
         ack()
     }
@@ -182,6 +198,42 @@ class NatsService : Service() {
         }
 
         ack()
+    }
+
+    // --- Heartbeat handling (M-09) ---
+
+    /**
+     * Callback invoked by [NatsConnectionManager] for each
+     * Core NATS heartbeat message. Runs on jnats' dispatcher
+     * thread.
+     */
+    private fun handleHeartbeat(data: ByteArray) {
+        try {
+            val json = String(data, Charsets.UTF_8)
+            val heartbeat = DaemonHeartbeat.fromJson(json)
+            _dashboardState.value = heartbeat
+            Log.d(TAG, "Heartbeat: ${heartbeat.hostname} " +
+                "${heartbeat.workspaces.size} workspace(s)")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error parsing heartbeat", e)
+        }
+    }
+
+    /**
+     * Callback for the initial svc.flows query on connect.
+     * Converts the flat flow list to a heartbeat for the
+     * dashboard.
+     */
+    private fun handleInitialDashboard(data: ByteArray) {
+        try {
+            val json = String(data, Charsets.UTF_8)
+            val result = ActiveFlowsResult.fromJson(json)
+            _dashboardState.value = result.toDaemonHeartbeat()
+            Log.i(TAG, "Initial dashboard: " +
+                "${result.flows.size} flow(s)")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error parsing initial dashboard", e)
+        }
     }
 
     // --- Response publishing (M-04) ---
@@ -240,6 +292,62 @@ class NatsService : Service() {
                     this@NatsService, notificationId)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to publish response", e)
+            }
+        }
+    }
+
+    // --- Interjection publishing (M-08) ---
+
+    /**
+     * Publish an InterjectionCommand to a running flow. Called
+     * from the dashboard when the user taps Stop or Note.
+     */
+    private fun handlePublishInterjection(intent: Intent) {
+        val flowId = intent.getStringExtra(
+            EXTRA_INTERJECT_FLOW_ID) ?: return
+        val action = intent.getStringExtra(
+            EXTRA_INTERJECT_ACTION) ?: return
+        val context = intent.getStringExtra(
+            EXTRA_INTERJECT_CONTEXT) ?: ""
+
+        val payload = store.load()
+        if (payload == null) {
+            Log.w(TAG, "Cannot publish interjection: not paired")
+            return
+        }
+
+        val nc = manager.connection
+        if (nc == null || nc.status !=
+            io.nats.client.Connection.Status.CONNECTED
+        ) {
+            Log.w(TAG,
+                "Cannot publish interjection: not connected")
+            return
+        }
+
+        val now = java.time.Instant.now()
+        val json = buildInterjectionJson(
+            flowId, action, context, now.toString())
+        val subject = "resystems.renotify.${payload.username}" +
+            ".flow.$flowId.interject"
+        val dedupId = "$flowId-interject-$action-${now.toEpochMilli()}"
+
+        serviceScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val js = nc.jetStream()
+                val headers = io.nats.client.impl.Headers()
+                headers.add("Nats-Msg-Id", dedupId)
+                val msg = io.nats.client.impl.NatsMessage
+                    .builder()
+                    .subject(subject)
+                    .headers(headers)
+                    .data(json.toByteArray())
+                    .build()
+                js.publish(msg)
+                Log.i(TAG,
+                    "Interjection published: $action for $flowId")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to publish interjection", e)
             }
         }
     }
@@ -311,6 +419,13 @@ class NatsService : Service() {
         const val EXTRA_ACTION_VALUE = "action_value"
         const val EXTRA_TEXT = "text"
 
+        // Intent action and extras for M-08 interjections.
+        const val ACTION_PUBLISH_INTERJECTION =
+            "io.resystems.renotify.PUBLISH_INTERJECTION"
+        const val EXTRA_INTERJECT_FLOW_ID = "interject_flow_id"
+        const val EXTRA_INTERJECT_ACTION = "interject_action"
+        const val EXTRA_INTERJECT_CONTEXT = "interject_context"
+
         /**
          * Build a NotificationResponse JSON string from the
          * action type and value. Extracted as a companion
@@ -342,6 +457,26 @@ class NatsService : Service() {
         }
 
         /**
+         * Build an InterjectionCommand JSON string. Extracted
+         * as a companion function for testability.
+         */
+        fun buildInterjectionJson(
+            flowId: String,
+            action: String,
+            context: String,
+            timestamp: String
+        ): String {
+            val obj = JSONObject()
+            obj.put("flow_id", flowId)
+            obj.put("action", action)
+            if (context.isNotEmpty()) {
+                obj.put("context", context)
+            }
+            obj.put("timestamp", timestamp)
+            return obj.toString()
+        }
+
+        /**
          * Global state for non-bound observers (e.g.,
          * [io.resystems.renotify.MainActivity]). Updated by
          * the service's state collector.
@@ -351,5 +486,38 @@ class NatsService : Service() {
                 ConnectionState.Idle
             )
         val state: StateFlow<ConnectionState> = _state
+
+        /**
+         * Latest daemon heartbeat for the dashboard (M-09).
+         * Null before the first heartbeat arrives.
+         */
+        private val _dashboardState = kotlinx.coroutines.flow
+            .MutableStateFlow<DaemonHeartbeat?>(null)
+        val dashboardState: StateFlow<DaemonHeartbeat?> =
+            _dashboardState
+
+        /**
+         * Silent mode suppresses notification rendering while
+         * still receiving and ACKing messages.
+         */
+        private val _silentMode = kotlinx.coroutines.flow
+            .MutableStateFlow(false)
+        val silentMode: StateFlow<Boolean> = _silentMode
+
+        private const val PREFS_NAME = "renotify_settings"
+        private const val KEY_SILENT = "silent_mode"
+
+        /**
+         * Toggle silent mode and persist to SharedPreferences.
+         */
+        fun setSilentMode(
+            context: android.content.Context,
+            silent: Boolean
+        ) {
+            _silentMode.value = silent
+            context.getSharedPreferences(PREFS_NAME,
+                MODE_PRIVATE)
+                .edit().putBoolean(KEY_SILENT, silent).apply()
+        }
     }
 }

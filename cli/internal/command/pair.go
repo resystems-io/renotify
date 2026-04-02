@@ -75,6 +75,7 @@ Examples:
 				KeyPath:        xdg.TLSKeyPath(),
 				TokenPath:      xdg.PairingTokenPath(),
 				UsernamePath:   xdg.PairingUsernamePath(),
+				DevicesPath:    xdg.DevicesPath(),
 				DaemonIDPath:   xdg.DaemonIDPath(),
 				Username:       cfg.Username,
 				WSSPort:        cfg.Broker.WSSPort,

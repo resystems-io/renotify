@@ -19,7 +19,7 @@ func TestOpen_CreatesDB(t *testing.T) {
 	}
 }
 
-func TestOpen_MigratesV1(t *testing.T) {
+func TestOpen_MigratesLatest(t *testing.T) {
 	db := openTestDB(t)
 
 	var version int
@@ -27,8 +27,8 @@ func TestOpen_MigratesV1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if version != 1 {
-		t.Errorf("user_version = %d, want 1", version)
+	if version != 2 {
+		t.Errorf("user_version = %d, want 2", version)
 	}
 }
 
@@ -50,8 +50,8 @@ func TestOpen_IdempotentMigration(t *testing.T) {
 
 	var version int
 	db2.db.QueryRow("PRAGMA user_version").Scan(&version)
-	if version != 1 {
-		t.Errorf("user_version = %d, want 1", version)
+	if version != 2 {
+		t.Errorf("user_version = %d, want 2", version)
 	}
 }
 

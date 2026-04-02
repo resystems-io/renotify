@@ -81,8 +81,14 @@ class ProvisioningPayloadTest {
     }
 
     @Test
-    fun invalidVersion_two_throws() {
-        expectIAE { ProvisioningPayload.fromJson(validJson(v = "2")) }
+    fun version_two_accepted() {
+        val pp = ProvisioningPayload.fromJson(validJson(v = "2"))
+        assertEquals(2, pp.version)
+    }
+
+    @Test
+    fun invalidVersion_three_throws() {
+        expectIAE { ProvisioningPayload.fromJson(validJson(v = "3")) }
     }
 
     @Test

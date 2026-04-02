@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 
 	"go.resystems.io/renotify/internal/broker"
@@ -89,9 +88,10 @@ posting. The notification is buffered in JetStream for up to
 				DaemonID:    fc.daemonID,
 				WorkspaceID: fc.workspaceID,
 				Status:      payload.FlowActive,
+				Metadata:    fc.workspaceMetadata(),
 				Timestamp:   now,
 			}
-			if err := publishJSON(js,
+			if err := broker.PublishJSON(js,
 				broker.FlowLifecycleSubject(fc.username, fc.flowID),
 				fc.flowID, activeEvent,
 			); err != nil {
@@ -110,11 +110,12 @@ posting. The notification is buffered in JetStream for up to
 				ResponseTypes: []payload.ResponseType{
 					payload.ResponseNone,
 				},
-				Priority:  p,
-				Source:    source,
-				Timestamp: now,
+				Priority:      p,
+				Source:        source,
+				WorkspaceName: fc.displayName,
+				Timestamp:     now,
 			}
-			if err := publishJSON(js,
+			if err := broker.PublishJSON(js,
 				broker.FlowRequestSubject(fc.username, fc.flowID),
 				fc.notificationID, req,
 			); err != nil {
@@ -130,7 +131,7 @@ posting. The notification is buffered in JetStream for up to
 				Status:      payload.FlowCompleted,
 				Timestamp:   now,
 			}
-			if err := publishJSON(js,
+			if err := broker.PublishJSON(js,
 				broker.FlowLifecycleSubject(fc.username, fc.flowID),
 				fc.flowID+"-completed", completedEvent,
 			); err != nil {
@@ -168,23 +169,4 @@ posting. The notification is buffered in JetStream for up to
 		"output format: json|text")
 
 	return cmd
-}
-
-// publishJSON marshals v as JSON and publishes it to the given
-// JetStream subject with a Nats-Msg-Id header for deduplication.
-func publishJSON(js nats.JetStreamContext, subject, msgID string, v any) error {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return fmt.Errorf("marshal: %w", err)
-	}
-
-	msg := &nats.Msg{
-		Subject: subject,
-		Data:    data,
-		Header:  nats.Header{},
-	}
-	msg.Header.Set("Nats-Msg-Id", msgID)
-
-	_, err = js.PublishMsg(msg)
-	return err
 }

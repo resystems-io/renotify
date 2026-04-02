@@ -104,7 +104,7 @@ Examples:
 
 			subject := broker.FlowInterjectSubject(
 				cfg.Username, flowID)
-			if err := publishJSON(js, subject, msgID, interj); err != nil {
+			if err := broker.PublishJSON(js, subject, msgID, interj); err != nil {
 				return exitcode.Errorf(exitcode.Error,
 					"publish interjection: %v", err)
 			}

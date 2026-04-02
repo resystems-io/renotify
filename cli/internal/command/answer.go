@@ -108,7 +108,7 @@ Examples:
 
 			subject := broker.FlowResponseSubject(
 				cfg.Username, flowID)
-			if err := publishJSON(js, subject,
+			if err := broker.PublishJSON(js, subject,
 				requestID+"-response", resp,
 			); err != nil {
 				return exitcode.Errorf(exitcode.Error,
