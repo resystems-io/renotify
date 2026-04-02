@@ -163,6 +163,12 @@ var Registry = []ParamInfo{
 		Resolve:     func(c *Config) any { return c.Reaping.GracePeriod },
 	},
 	{
+		Key: "reaping.interval", Type: "duration",
+		EnvVar:      "RENOTIFY_REAPING_INTERVAL",
+		Description: "how often the stale flow reaper runs",
+		Resolve:     func(c *Config) any { return c.Reaping.Interval },
+	},
+	{
 		Key: "timeout.default_ask_timeout", Type: "duration",
 		EnvVar:      "RENOTIFY_TIMEOUT_DEFAULT_ASK_TIMEOUT",
 		Description: "default blocking ask timeout",

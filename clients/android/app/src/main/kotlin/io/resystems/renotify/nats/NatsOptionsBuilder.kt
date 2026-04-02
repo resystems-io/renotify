@@ -15,15 +15,12 @@ import io.resystems.renotify.pairing.ProvisioningPayload
  */
 object NatsOptionsBuilder {
 
-    /** NATS auth username for the mobile account. */
-    private const val NATS_USERNAME = "mobile"
-
     /**
      * Build jnats connection options from provisioning
      * credentials.
      *
      * - WSS URL with TLS fingerprint pinning
-     * - Username/password auth (mobile + pairing token)
+     * - Username/password auth (device-specific or legacy "mobile")
      * - Auto-reconnect disabled (managed manually with
      *   exponential backoff in [NatsConnectionManager])
      */
@@ -32,11 +29,12 @@ object NatsOptionsBuilder {
         val sslContext = PinnedSSLContext.create(
             payload.certFingerprint
         )
+        val natsUser = payload.natsUsername.ifEmpty { "mobile" }
 
         return Options.Builder()
             .server("wss://$host")
             .sslContext(sslContext)
-            .userInfo(NATS_USERNAME, payload.token)
+            .userInfo(natsUser, payload.token)
             .noReconnect()
             .connectionName("renotify-mobile")
             .build()

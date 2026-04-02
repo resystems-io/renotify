@@ -21,6 +21,8 @@ type ActiveFlow struct {
 	Username              string
 	DaemonID              string
 	WorkspaceID           string
+	DisplayName           string
+	AbsPath               string
 	Label                 string
 	Metadata              map[string]string
 	RegisteredAt          time.Time
@@ -55,6 +57,7 @@ type HistoryResult struct {
 // ActiveFlowsQuery holds the filter parameters for
 // ListActiveFlows.
 type ActiveFlowsQuery struct {
+	FlowID      string
 	DaemonID    string
 	WorkspaceID string
 }

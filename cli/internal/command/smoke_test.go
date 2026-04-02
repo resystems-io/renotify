@@ -218,7 +218,7 @@ func TestSmoke_AskWithAnswerUtility(t *testing.T) {
 	var req payload.NotificationRequest
 	select {
 	case req = <-reqCh:
-	case <-time.After(3 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for ask to publish request")
 	}
 
@@ -235,7 +235,7 @@ func TestSmoke_AskWithAnswerUtility(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ask failed: %v", err)
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("ask did not exit after answer")
 	}
 
@@ -282,7 +282,7 @@ func TestSmoke_AskWithInterjectStop(t *testing.T) {
 	var req payload.NotificationRequest
 	select {
 	case req = <-reqCh:
-	case <-time.After(3 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for ask to publish request")
 	}
 
@@ -303,7 +303,7 @@ func TestSmoke_AskWithInterjectStop(t *testing.T) {
 			t.Errorf("error = %q, expected 'stopped by user'",
 				err)
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("ask did not exit after interject stop")
 	}
 }
@@ -495,7 +495,7 @@ func connectAndSetupConsumers(
 		&bytes.Buffer{}, nil))
 
 	if err := broker.EnsureJetStream(
-		context.Background(), nc, "testuser", cfg, logger,
+		context.Background(), nc, "testuser", nil, cfg, logger,
 	); err != nil {
 		t.Fatal(err)
 	}

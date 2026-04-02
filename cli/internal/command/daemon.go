@@ -22,6 +22,7 @@ import (
 	"go.resystems.io/renotify/internal/httpserver"
 	"go.resystems.io/renotify/internal/ledger"
 	"go.resystems.io/renotify/internal/mcpserver"
+	"go.resystems.io/renotify/internal/registry"
 	"go.resystems.io/renotify/internal/state"
 	"go.resystems.io/renotify/internal/xdg"
 )
@@ -257,11 +258,11 @@ func newDaemonStopCmd() *cobra.Command {
 					"signal process %d: %v", pid, err)
 			}
 
-			// Wait briefly for shutdown.
+			// Wait briefly for shutdown. The daemon's own
+			// defer removes the PID file on exit.
 			for range 20 {
 				time.Sleep(250 * time.Millisecond)
 				if !processRunning(pid) {
-					os.Remove(xdg.PIDPath())
 					fmt.Fprintln(cmd.ErrOrStderr(),
 						"daemon stopped")
 					return nil
@@ -346,11 +347,22 @@ func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
 	}
 	defer cleanup()
 
+	// Clean up stale PID file from a previous run that didn't
+	// exit cleanly (e.g., SIGKILL where defer never ran). If
+	// the PID is still running, the daemon start pre-check
+	// (line ~200) already blocked with "already running" before
+	// reaching here — so a running PID at this point means the
+	// pre-check passed and this is safe to skip.
+	if pid, ok := readPID(); ok && !processRunning(pid) {
+		os.Remove(xdg.PIDPath())
+		logger.Info("removed stale PID file", "pid", pid)
+	}
+
 	// Write PID file.
 	if err := writePID(); err != nil {
 		logger.Warn("failed to write PID file", "err", err)
 	}
-	defer os.Remove(xdg.PIDPath())
+	defer removePIDIfOwned()
 
 	// Load daemon_id early so subsystems that need it (heartbeat)
 	// can be constructed before Run.
@@ -372,7 +384,8 @@ func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
 
 	if cfg.MCP.Enabled {
 		httpSrv := httpserver.New(cfg.MCP.Host, cfg.MCP.Port, logger)
-		mcpSrv := mcpserver.New(httpSrv, logger)
+		mcpSrv := mcpserver.New(httpSrv, logger,
+			ledgerSub.DB, cfg.Username, daemonID, cfg)
 		opts = append(opts,
 			daemon.WithSubsystem(httpSrv),
 			daemon.WithSubsystem(mcpSrv),
@@ -383,6 +396,14 @@ func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
 	hbPub := heartbeat.New(daemonID, cfg.Username, hostname,
 		cfg.Heartbeat.Interval.Duration, logger)
 	opts = append(opts, daemon.WithSubsystem(hbPub))
+
+	// Active flow registry (C-10). Starts after heartbeat so the
+	// publisher is ready to receive workspace snapshots.
+	regSvc := registry.New(
+		ledgerSub.DB, hbPub,
+		cfg.Username, daemonID,
+		cfg.Reaping, logger)
+	opts = append(opts, daemon.WithSubsystem(regSvc))
 
 	// Signal handling: SIGINT/SIGTERM for shutdown, SIGHUP for
 	// auth reload (triggered by `renotify pair`).
@@ -471,6 +492,16 @@ func writePID() error {
 	}
 	return os.WriteFile(xdg.PIDPath(),
 		[]byte(strconv.Itoa(os.Getpid())+"\n"), 0600)
+}
+
+// removePIDIfOwned removes the PID file only if it still
+// contains this process's PID. Prevents a race where a new
+// daemon's writePID runs before the old daemon's defer.
+func removePIDIfOwned() {
+	pid, ok := readPID()
+	if ok && pid == os.Getpid() {
+		os.Remove(xdg.PIDPath())
+	}
 }
 
 func processRunning(pid int) bool {

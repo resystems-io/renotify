@@ -17,7 +17,7 @@ func testLogger() *slog.Logger {
 
 func TestServer_Name(t *testing.T) {
 	httpSrv := httpserver.New("127.0.0.1", 0, testLogger())
-	s := New(httpSrv, testLogger())
+	s := New(httpSrv, testLogger(), nil, "", "", nil)
 	if s.Name() != "mcp" {
 		t.Errorf("Name() = %q, want %q", s.Name(), "mcp")
 	}
@@ -25,7 +25,7 @@ func TestServer_Name(t *testing.T) {
 
 func TestServer_StartSignalsReady(t *testing.T) {
 	httpSrv := httpserver.New("127.0.0.1", 0, testLogger())
-	s := New(httpSrv, testLogger())
+	s := New(httpSrv, testLogger(), nil, "", "", nil)
 
 	ready := make(chan error, 1)
 	err := s.Start(context.Background(), nil, ready)
@@ -45,7 +45,7 @@ func TestServer_StartSignalsReady(t *testing.T) {
 
 func TestServer_StopClean(t *testing.T) {
 	httpSrv := httpserver.New("127.0.0.1", 0, testLogger())
-	s := New(httpSrv, testLogger())
+	s := New(httpSrv, testLogger(), nil, "", "", nil)
 
 	ready := make(chan error, 1)
 	s.Start(context.Background(), nil, ready)
@@ -59,7 +59,7 @@ func TestServer_StopClean(t *testing.T) {
 
 func TestServer_RegistersHandler(t *testing.T) {
 	httpSrv := httpserver.New("127.0.0.1", 0, testLogger())
-	s := New(httpSrv, testLogger())
+	s := New(httpSrv, testLogger(), nil, "", "", nil)
 
 	// Start MCP (registers /mcp on httpSrv).
 	mcpReady := make(chan error, 1)
@@ -86,7 +86,7 @@ func TestServer_RegistersHandler(t *testing.T) {
 
 func TestServer_HandlerReturnsNonNil(t *testing.T) {
 	httpSrv := httpserver.New("127.0.0.1", 0, testLogger())
-	s := New(httpSrv, testLogger())
+	s := New(httpSrv, testLogger(), nil, "", "", nil)
 	if s.Handler() == nil {
 		t.Error("Handler() should return non-nil")
 	}

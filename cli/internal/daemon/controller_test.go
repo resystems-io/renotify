@@ -28,6 +28,17 @@ func testConfig() *config.Config {
 	return cfg
 }
 
+// waitReady blocks until the controller signals all subsystems
+// are ready, or fails after 5 seconds.
+func waitReady(t *testing.T, c *Controller) {
+	t.Helper()
+	select {
+	case <-c.Ready:
+	case <-time.After(5 * time.Second):
+		t.Fatal("daemon startup timeout")
+	}
+}
+
 func TestNewController_Defaults(t *testing.T) {
 	cfg := testConfig()
 	c := NewController(cfg)
@@ -61,13 +72,13 @@ func TestController_ShutdownOnCancel(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	c.Ready = make(chan struct{})
 	done := make(chan error, 1)
 	go func() {
 		done <- c.Run(ctx)
 	}()
 
-	// Give the daemon a moment to start, then cancel.
-	time.Sleep(500 * time.Millisecond)
+	waitReady(t, c)
 	cancel()
 
 	select {
@@ -75,7 +86,7 @@ func TestController_ShutdownOnCancel(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected nil on clean shutdown, got %v", err)
 		}
-	case <-time.After(10 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout waiting for shutdown")
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/nats-io/nats.go"
 
 	"go.resystems.io/renotify/internal/payload"
+	"go.resystems.io/renotify/internal/testutil"
 )
 
 func TestAnswer_Accepted(t *testing.T) {
@@ -50,8 +51,9 @@ func TestAnswer_Accepted(t *testing.T) {
 
 	// Verify the message arrived on NATS.
 	nc.Flush()
-	time.Sleep(50 * time.Millisecond)
-	if received == nil {
+	if !testutil.WaitFor(t, 2*time.Second, func() bool {
+		return received != nil
+	}) {
 		t.Fatal("no message received on .response subject")
 	}
 	// Verify dedup header.

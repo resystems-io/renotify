@@ -14,7 +14,9 @@ data class ProvisioningPayload(
     val port: Int,
     val token: String,
     val certFingerprint: String,
-    val username: String
+    val username: String,
+    val deviceId: String,
+    val natsUsername: String
 ) {
     companion object {
         // Crockford Base32 body: excludes I, L, O, U in both cases.
@@ -38,9 +40,9 @@ data class ProvisioningPayload(
             }
 
             val version = requireInt(obj, "v")
-            if (version != 1) {
+            if (version !in 1..2) {
                 throw IllegalArgumentException(
-                    "unsupported version: $version (expected 1)"
+                    "unsupported version: $version (expected 1 or 2)"
                 )
             }
 
@@ -72,13 +74,19 @@ data class ProvisioningPayload(
                 throw IllegalArgumentException("username is empty")
             }
 
+            // v2 fields (optional for v1 backwards compat).
+            val deviceId = obj.optString("d", "")
+            val natsUsername = obj.optString("n", "mobile")
+
             return ProvisioningPayload(
                 version = version,
                 host = host,
                 port = port,
                 token = token,
                 certFingerprint = cert,
-                username = username
+                username = username,
+                deviceId = deviceId,
+                natsUsername = natsUsername
             )
         }
 

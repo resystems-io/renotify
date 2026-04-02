@@ -6,7 +6,9 @@
 #   make build-cli    — build CLI with embedded APK (requires Android build first)
 #   make build-cli-dev — build CLI without APK embedding (fast iteration)
 #   make build-android — build Android APK only
-#   make test         — run fast tests (CLI + Android JVM unit tests)
+#   make test         — run all tests (unit + integration + Android JVM)
+#   make test-unit    — run unit tests only (no integration tag)
+#   make test-integration — run integration tests only
 #   make test-all     — run all tests including Android instrumented
 #                       tests (requires emulator or connected device)
 #   make clean        — remove all build artifacts
@@ -14,7 +16,7 @@
 .DEFAULT_GOAL := build
 
 .PHONY: build build-all build-cli build-cli-dev build-android
-.PHONY: test test-all clean
+.PHONY: test test-unit test-integration test-all clean
 
 build: build-all
 
@@ -35,6 +37,13 @@ build-cli-dev:
 test:
 	$(MAKE) -C cli test
 	$(MAKE) -C clients/android test
+
+test-unit:
+	$(MAKE) -C cli test-unit
+	$(MAKE) -C clients/android test
+
+test-integration:
+	$(MAKE) -C cli test-integration
 
 test-all: test
 	$(MAKE) -C clients/android emulator-test
