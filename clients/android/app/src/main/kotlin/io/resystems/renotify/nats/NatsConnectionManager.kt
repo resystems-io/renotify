@@ -302,6 +302,26 @@ class NatsConnectionManager(
         }
     }
 
+    /**
+     * Query the daemon's svc.history endpoint. Returns the raw
+     * response bytes, or null on failure. Called from
+     * [NatsService] on the IO dispatcher.
+     */
+    fun queryHistory(requestJson: ByteArray): ByteArray? {
+        val nc = connection ?: return null
+        val p = payload ?: return null
+        val subject = "resystems.renotify.${p.username}.svc.history"
+        return try {
+            val resp = nc.request(
+                subject, requestJson,
+                java.time.Duration.ofSeconds(2))
+            resp.data
+        } catch (e: Exception) {
+            Log.w(TAG, "History query failed: ${e.message}")
+            null
+        }
+    }
+
     companion object {
         private const val TAG = "NatsConnectionManager"
         private const val STREAM_NAME = "RENOTIFY"
