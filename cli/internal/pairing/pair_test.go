@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.resystems.io/renotify/internal/state"
 )
 
 func testConfig(t *testing.T) Config {
@@ -17,6 +19,7 @@ func testConfig(t *testing.T) Config {
 		KeyPath:      filepath.Join(dir, "tls", "key.pem"),
 		TokenPath:    filepath.Join(dir, "pairing", "token"),
 		UsernamePath: filepath.Join(dir, "pairing", "username"),
+		DevicesPath:  filepath.Join(dir, "pairing", "devices.json"),
 		DaemonIDPath: filepath.Join(dir, "daemon_id"),
 		Username:     "testuser",
 		WSSPort:      4223,
@@ -49,6 +52,13 @@ func TestPair_FirstRun(t *testing.T) {
 		t.Errorf("Port = %d, want 4223", result.Port)
 	}
 
+	if result.DeviceID == "" {
+		t.Error("expected non-empty device_id")
+	}
+	if !strings.HasPrefix(result.DeviceID, "mb_") {
+		t.Errorf("device_id = %q, want mb_ prefix", result.DeviceID)
+	}
+
 	// Verify files were created.
 	if _, err := os.Stat(cfg.CertPath); err != nil {
 		t.Errorf("cert file not created: %v", err)
@@ -56,8 +66,8 @@ func TestPair_FirstRun(t *testing.T) {
 	if _, err := os.Stat(cfg.KeyPath); err != nil {
 		t.Errorf("key file not created: %v", err)
 	}
-	if _, err := os.Stat(cfg.TokenPath); err != nil {
-		t.Errorf("token file not created: %v", err)
+	if _, err := os.Stat(cfg.DevicesPath); err != nil {
+		t.Errorf("devices.json not created: %v", err)
 	}
 }
 
@@ -139,7 +149,7 @@ func TestPair_DiscoveredIP(t *testing.T) {
 	}
 }
 
-func TestPair_TokenAlwaysNew(t *testing.T) {
+func TestPair_EachPairAddsDevice(t *testing.T) {
 	cfg := testConfig(t)
 
 	r1, err := Pair(cfg)
@@ -154,6 +164,14 @@ func TestPair_TokenAlwaysNew(t *testing.T) {
 
 	if r2.Token == r1.Token {
 		t.Error("second pair should generate a new token")
+	}
+	if r2.DeviceID == r1.DeviceID {
+		t.Error("second pair should generate a new device_id")
+	}
+
+	devices, _ := state.LoadDevices(cfg.DevicesPath)
+	if len(devices) != 2 {
+		t.Fatalf("got %d devices, want 2", len(devices))
 	}
 }
 
@@ -192,8 +210,8 @@ func TestPair_PayloadVersion(t *testing.T) {
 
 	var payload ProvisioningPayload
 	json.Unmarshal([]byte(result.PayloadJSON), &payload)
-	if payload.Version != 1 {
-		t.Errorf("version = %d, want 1", payload.Version)
+	if payload.Version != 2 {
+		t.Errorf("version = %d, want 2", payload.Version)
 	}
 }
 
@@ -205,7 +223,7 @@ func TestPair_PayloadMinifiedKeys(t *testing.T) {
 	}
 
 	// Verify single-character JSON keys.
-	for _, key := range []string{`"v":`, `"h":`, `"p":`, `"t":`, `"c":`, `"u":`} {
+	for _, key := range []string{`"v":`, `"h":`, `"p":`, `"t":`, `"c":`, `"u":`, `"d":`, `"n":`} {
 		if !strings.Contains(result.PayloadJSON, key) {
 			t.Errorf("payload missing key %s", key)
 		}
@@ -226,20 +244,26 @@ func TestPair_PayloadUsername(t *testing.T) {
 	}
 }
 
-func TestPair_UsernameStored(t *testing.T) {
+func TestPair_DeviceAddedToRegistry(t *testing.T) {
 	cfg := testConfig(t)
-	_, err := Pair(cfg)
+	result, err := Pair(cfg)
 	if err != nil {
 		t.Fatalf("Pair: %v", err)
 	}
 
-	data, err := os.ReadFile(cfg.UsernamePath)
+	devices, err := state.LoadDevices(cfg.DevicesPath)
 	if err != nil {
-		t.Fatalf("read username: %v", err)
+		t.Fatalf("load devices: %v", err)
 	}
-	if strings.TrimSpace(string(data)) != "testuser" {
-		t.Errorf("username = %q, want testuser",
-			strings.TrimSpace(string(data)))
+	if len(devices) != 1 {
+		t.Fatalf("got %d devices, want 1", len(devices))
+	}
+	if devices[0].DeviceID != result.DeviceID {
+		t.Errorf("device_id = %q, want %q",
+			devices[0].DeviceID, result.DeviceID)
+	}
+	if devices[0].Token != result.Token {
+		t.Errorf("token mismatch")
 	}
 }
 

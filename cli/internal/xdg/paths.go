@@ -93,6 +93,11 @@ func PairingUsernamePath() string {
 	return filepath.Join(PairingDir(), "username")
 }
 
+// DevicesPath returns the path to the device registry.
+func DevicesPath() string {
+	return filepath.Join(PairingDir(), "devices.json")
+}
+
 // EnsureDir creates a directory and all parents with mode 0700 if
 // it does not already exist.
 func EnsureDir(path string) error {

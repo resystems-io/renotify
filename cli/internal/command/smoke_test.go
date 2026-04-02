@@ -495,7 +495,7 @@ func connectAndSetupConsumers(
 		&bytes.Buffer{}, nil))
 
 	if err := broker.EnsureJetStream(
-		context.Background(), nc, "testuser", cfg, logger,
+		context.Background(), nc, "testuser", nil, cfg, logger,
 	); err != nil {
 		t.Fatal(err)
 	}

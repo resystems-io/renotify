@@ -56,7 +56,7 @@ func startTestNATS(t *testing.T) (*natsserver.Server, *nats.Conn) {
 	// Create stream and consumers.
 	logger := slog.Default()
 	if err := broker.EnsureJetStream(
-		t.Context(), nc, testUsername,
+		t.Context(), nc, testUsername, nil,
 		config.Default().JetStream, logger,
 	); err != nil {
 		t.Fatal(err)

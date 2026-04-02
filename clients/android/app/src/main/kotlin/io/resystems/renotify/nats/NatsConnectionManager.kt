@@ -164,7 +164,10 @@ class NatsConnectionManager(
         nc: Connection,
         payload: ProvisioningPayload
     ) {
-        val consumerName = "mobile-${payload.username}"
+        val consumerName = if (payload.deviceId.isNotEmpty())
+            "mobile-${payload.username}-${payload.deviceId}"
+        else
+            "mobile-${payload.username}"
         val js: JetStream = nc.jetStream()
         val subOpts = PushSubscribeOptions.bind(
             STREAM_NAME, consumerName
