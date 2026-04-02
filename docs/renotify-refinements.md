@@ -929,7 +929,7 @@ workspace monitoring).*
   queries pushed over Core NATS Request-Reply.
 - [ ] **M-05: UI & Branding:** Apply the resystems.io branding and SVG logo to
   the application assets and UI.
-- [ ] **C-16: Remote Silent Mode:** Implement `renotify silent --device <id>
+- [x] **C-16: Remote Silent Mode:** Implement `renotify silent --device <id>
   on|off` to remotely toggle notification suppression on a paired device. Publishes
   a control message to `resystems.renotify.{username}.device.{device_id}.control`
   via Core NATS. The Android app subscribes to its device control subject and
@@ -1089,6 +1089,7 @@ Record completed items here with the date.
 | 2026-04-02 | M-08 | Active Workspace UI implemented. Tap a flow row in the dashboard to expand inline with Stop and Note action buttons. Stop sends `InterjectionCommand(action="stop")` to the flow's `.interject` subject via JetStream. Note shows a text input dialog and sends `InterjectionCommand(action="note", context="...")`. Publishing follows the existing M-04 response pattern (`NatsService.handlePublishInterjection()` with dedup header). No Go changes — mobile ACL already permits `.flow.*.interject` publish. R-MOB-08 satisfied. Phase 5 complete. |
 | 2026-04-02 | C-09 | Daemon Core NATS History API implemented. New `svc.history` Core NATS Request-Reply endpoint in the registry service wraps `ledger.QueryHistory()` with `HistoryQueryRequest`/`HistoryQueryResult` wire types. Supports workspace/flow filtering, time range, and offset-based pagination. CLI `renotify history` command fully implemented with `--workspace-id`, `--flow-id`, `--since`, `--until`, `--limit`, `--offset`, `--format` flags (default text). 4 endpoint tests (empty, with records, workspace filter, pagination). |
 | 2026-04-02 | M-07 | Remote History Viewer UI implemented. Tab toggle ("Dashboard · History") below the status line swaps the RecyclerView between the live dashboard and paginated notification history. `HistoryAdapter` renders record rows (title, timestamp, priority, response summary) with "Load more" pagination footer. `HistoryQueryResult` and `HistoryRecord` Kotlin data classes parse the `svc.history` wire format. `NatsConnectionManager.queryHistory()` uses Core NATS Request-Reply. `NatsService` exposes `historyState: StateFlow<HistoryQueryResult?>` with `ACTION_QUERY_HISTORY` intent and append-mode pagination. 7 parsing tests. R-MOB-07 satisfied. |
+| 2026-04-02 | C-16 | Remote Silent Mode implemented. CLI `renotify silent --device <id> on\|off` publishes `deviceControl` message (`command: "set_silent"`) to `resystems.renotify.{username}.device.{device_id}.control` via Core NATS Pub/Sub. Android `NatsConnectionManager` subscribes to the device-specific control subject on connect/reconnect. `NatsService.handleDeviceControl()` parses the command and calls `setSilentMode()` to update StateFlow + SharedPreferences. `--all` flag targets all paired devices. Device ID displayed on dashboard in small grey text below status line. No ACL changes needed — existing wildcards cover the new subject. 8 CLI tests. |
 
 ## 6. References
 

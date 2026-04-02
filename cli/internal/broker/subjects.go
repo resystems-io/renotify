@@ -44,3 +44,11 @@ func ServiceFlowsSubject(username string) string {
 func ServiceHistorySubject(username string) string {
 	return fmt.Sprintf("resystems.renotify.%s.svc.history", username)
 }
+
+// DeviceControlSubject returns the Core NATS Pub/Sub subject
+// for sending control commands to a specific mobile device
+// (C-16).
+func DeviceControlSubject(username, deviceID string) string {
+	return fmt.Sprintf("resystems.renotify.%s.device.%s.control",
+		username, deviceID)
+}
