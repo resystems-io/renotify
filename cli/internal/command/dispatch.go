@@ -24,14 +24,15 @@ import (
 // events. Fields are a union of PermissionRequest and
 // Notification inputs; unused fields are zero-valued.
 type hookInput struct {
-	SessionID        string          `json:"session_id"`
-	Cwd              string          `json:"cwd"`
-	HookEventName    string          `json:"hook_event_name"`
-	ToolName         string          `json:"tool_name,omitempty"`
-	ToolInput        json.RawMessage `json:"tool_input,omitempty"`
-	Title            string          `json:"title,omitempty"`
-	Message          string          `json:"message,omitempty"`
-	NotificationType string          `json:"notification_type,omitempty"`
+	SessionID             string            `json:"session_id"`
+	Cwd                   string            `json:"cwd"`
+	HookEventName         string            `json:"hook_event_name"`
+	ToolName              string            `json:"tool_name,omitempty"`
+	ToolInput             json.RawMessage   `json:"tool_input,omitempty"`
+	PermissionSuggestions []json.RawMessage `json:"permission_suggestions,omitempty"`
+	Title                 string            `json:"title,omitempty"`
+	Message               string            `json:"message,omitempty"`
+	NotificationType      string            `json:"notification_type,omitempty"`
 }
 
 // hookDecision is the PermissionRequest stdout response.
@@ -45,8 +46,9 @@ type hookSpecificOutput struct {
 }
 
 type hookBehavior struct {
-	Behavior string `json:"behavior"`
-	Message  string `json:"message,omitempty"`
+	Behavior           string            `json:"behavior"`
+	Message            string            `json:"message,omitempty"`
+	UpdatedPermissions []json.RawMessage `json:"updatedPermissions,omitempty"`
 }
 
 func newDispatchCmd(app *App) *cobra.Command {
@@ -190,6 +192,25 @@ func dispatchPermissionRequest(
 	timeoutDur := cfg.Timeout.DefaultAskTimeout.Duration
 	timeoutSec := int(timeoutDur.Seconds())
 
+	// Build actions and response type based on whether
+	// Claude Code provided permission_suggestions.
+	var (
+		responseType payload.ResponseType
+		actions      []string
+	)
+	if labels := suggestionLabels(input.PermissionSuggestions); len(labels) > 0 {
+		// Choice mode: "Allow once", suggestion labels, "Deny".
+		responseType = payload.ResponseChoice
+		actions = make([]string, 0, len(labels)+2)
+		actions = append(actions, "Allow once")
+		actions = append(actions, labels...)
+		actions = append(actions, "Deny")
+	} else {
+		// Fallback: binary Allow/Deny.
+		responseType = payload.ResponseBoolean
+		actions = []string{"Allow", "Deny"}
+	}
+
 	req := &payload.NotificationRequest{
 		ID:            fc.notificationID,
 		FlowID:        fc.flowID,
@@ -197,11 +218,11 @@ func dispatchPermissionRequest(
 		WorkspaceID:   fc.workspaceID,
 		Title:         fmt.Sprintf("Permission: %s", input.ToolName),
 		Body:          summariseToolInput(input.ToolName, input.ToolInput),
-		ResponseTypes: []payload.ResponseType{payload.ResponseBoolean},
+		ResponseTypes: []payload.ResponseType{responseType},
 		Priority:      payload.PriorityHigh,
 		Source:        hookSource(input.SessionID),
 		WorkspaceName: fc.displayName,
-		Actions:       []string{"Allow", "Deny"},
+		Actions:       actions,
 		TimeoutSec:    timeoutSec,
 		Timestamp:     now,
 	}
@@ -241,7 +262,7 @@ func dispatchPermissionRequest(
 	case msg := <-respCh:
 		msg.Ack()
 		return handlePermissionResponse(
-			cmd, legacyJS, fc, msg.Data())
+			cmd, legacyJS, fc, input, msg.Data())
 
 	case <-safetyTimer.C:
 		publishFailed()
@@ -260,6 +281,7 @@ func handlePermissionResponse(
 	cmd *cobra.Command,
 	js nats.JetStreamContext,
 	fc *flowContext,
+	input *hookInput,
 	data []byte,
 ) error {
 	// Check for ErrorResponse (timeout, rate limit, etc.).
@@ -290,11 +312,41 @@ func handlePermissionResponse(
 		},
 	}
 
-	if resp.Accepted != nil && *resp.Accepted {
+	switch {
+	case resp.Action == "Deny":
+		// Explicit deny from choice.
+		decision.HookSpecificOutput.Decision = hookBehavior{
+			Behavior: "deny",
+			Message:  "Denied by remote user via Renotify",
+		}
+
+	case resp.Action == "Allow once":
+		// Allow without updating permissions.
 		decision.HookSpecificOutput.Decision = hookBehavior{
 			Behavior: "allow",
 		}
-	} else {
+
+	case resp.Action != "":
+		// A suggestion label was selected. Look up the
+		// matching permission_suggestion by label.
+		decision.HookSpecificOutput.Decision = hookBehavior{
+			Behavior: "allow",
+		}
+		if perm := matchSuggestion(
+			input.PermissionSuggestions, resp.Action,
+		); perm != nil {
+			decision.HookSpecificOutput.Decision.UpdatedPermissions =
+				[]json.RawMessage{perm}
+		}
+
+	case resp.Accepted != nil && *resp.Accepted:
+		// Boolean allow (fallback path).
+		decision.HookSpecificOutput.Decision = hookBehavior{
+			Behavior: "allow",
+		}
+
+	default:
+		// Boolean deny or nil accepted.
 		decision.HookSpecificOutput.Decision = hookBehavior{
 			Behavior: "deny",
 			Message:  "Denied by remote user via Renotify",
@@ -557,4 +609,92 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// --- Permission suggestion handling ---
+
+// suggestionLabel is the parsed form of a permission_suggestion
+// entry, used for label generation and matching.
+type suggestionLabel struct {
+	Type        string `json:"type"`
+	Destination string `json:"destination"`
+	Behavior    string `json:"behavior"`
+	Rules       []struct {
+		ToolName    string `json:"toolName"`
+		RuleContent string `json:"ruleContent"`
+	} `json:"rules"`
+}
+
+// suggestionLabels generates human-readable choice labels from
+// the permission_suggestions array. Returns nil if no valid
+// suggestions exist.
+func suggestionLabels(suggestions []json.RawMessage) []string {
+	if len(suggestions) == 0 {
+		return nil
+	}
+
+	var labels []string
+	for _, raw := range suggestions {
+		label := formatSuggestion(raw)
+		if label != "" {
+			labels = append(labels, label)
+		}
+	}
+	return labels
+}
+
+// formatSuggestion converts a single permission_suggestion JSON
+// object into a human-readable label for the mobile UI.
+func formatSuggestion(raw json.RawMessage) string {
+	var s suggestionLabel
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return ""
+	}
+
+	// Only handle addRules (the common suggestion type).
+	if s.Type != "addRules" || len(s.Rules) == 0 {
+		return ""
+	}
+
+	// Build the tool description from the first rule.
+	tool := s.Rules[0].ToolName
+	rule := s.Rules[0].RuleContent
+	toolDesc := tool
+	if rule != "" {
+		toolDesc = fmt.Sprintf("%s(%s)", tool, rule)
+	}
+
+	// Map destination to a human-readable scope.
+	switch s.Destination {
+	case "session":
+		return truncate(
+			fmt.Sprintf("Allow %s for session", toolDesc), 60)
+	case "localSettings":
+		return truncate(
+			fmt.Sprintf("Always allow %s", toolDesc), 60)
+	case "projectSettings":
+		return truncate(
+			fmt.Sprintf("Allow %s in project", toolDesc), 60)
+	case "userSettings":
+		return truncate(
+			fmt.Sprintf("Always allow %s (global)", toolDesc), 60)
+	default:
+		return truncate(
+			fmt.Sprintf("Allow %s (%s)", toolDesc, s.Destination), 60)
+	}
+}
+
+// matchSuggestion finds the permission_suggestion whose label
+// matches the selected action string, and returns it as raw
+// JSON for pass-through in updatedPermissions.
+func matchSuggestion(
+	suggestions []json.RawMessage,
+	selectedAction string,
+) json.RawMessage {
+	for _, raw := range suggestions {
+		if formatSuggestion(raw) == selectedAction {
+			return raw
+		}
+	}
+	return nil
 }

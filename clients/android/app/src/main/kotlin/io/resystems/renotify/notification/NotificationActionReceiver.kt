@@ -42,10 +42,27 @@ class NotificationActionReceiver : BroadcastReceiver() {
             NotificationRenderer.dismiss(context, notificationId)
 
             val appIntent = Intent(context, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra(NotificationRenderer.EXTRA_NOTIFICATION_ID,
                     notificationId)
                 .putExtra(NotificationRenderer.EXTRA_FLOW_ID, flowId)
+            // Forward the full actions list and response types
+            // for in-app rendering.
+            val actions = intent.getStringArrayExtra(
+                NotificationRenderer.EXTRA_ACTIONS_ARRAY)
+            if (actions != null) {
+                appIntent.putExtra(
+                    NotificationRenderer.EXTRA_ACTIONS_ARRAY,
+                    actions)
+            }
+            val responseTypes = intent.getStringArrayExtra(
+                NotificationRenderer.EXTRA_RESPONSE_TYPES)
+            if (responseTypes != null) {
+                appIntent.putExtra(
+                    NotificationRenderer.EXTRA_RESPONSE_TYPES,
+                    responseTypes)
+            }
             context.startActivity(appIntent)
             return
         }

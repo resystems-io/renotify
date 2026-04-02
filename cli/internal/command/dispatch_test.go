@@ -504,6 +504,211 @@ func TestDispatch_PermissionRequest_Deny(t *testing.T) {
 	}
 }
 
+// --- Permission suggestion tests ---
+
+func TestFormatSuggestion_Session(t *testing.T) {
+	raw := json.RawMessage(`{
+		"type": "addRules",
+		"rules": [{"toolName": "Read", "ruleContent": "docs/*"}],
+		"behavior": "allow",
+		"destination": "session"
+	}`)
+	got := formatSuggestion(raw)
+	want := "Allow Read(docs/*) for session"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestFormatSuggestion_LocalSettings(t *testing.T) {
+	raw := json.RawMessage(`{
+		"type": "addRules",
+		"rules": [{"toolName": "Bash", "ruleContent": "npm test"}],
+		"behavior": "allow",
+		"destination": "localSettings"
+	}`)
+	got := formatSuggestion(raw)
+	want := "Always allow Bash(npm test)"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestFormatSuggestion_ProjectSettings(t *testing.T) {
+	raw := json.RawMessage(`{
+		"type": "addRules",
+		"rules": [{"toolName": "Edit"}],
+		"behavior": "allow",
+		"destination": "projectSettings"
+	}`)
+	got := formatSuggestion(raw)
+	want := "Allow Edit in project"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestFormatSuggestion_UserSettings(t *testing.T) {
+	raw := json.RawMessage(`{
+		"type": "addRules",
+		"rules": [{"toolName": "Read"}],
+		"behavior": "allow",
+		"destination": "userSettings"
+	}`)
+	got := formatSuggestion(raw)
+	want := "Always allow Read (global)"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestFormatSuggestion_NoRuleContent(t *testing.T) {
+	raw := json.RawMessage(`{
+		"type": "addRules",
+		"rules": [{"toolName": "Bash"}],
+		"behavior": "allow",
+		"destination": "session"
+	}`)
+	got := formatSuggestion(raw)
+	want := "Allow Bash for session"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestFormatSuggestion_NonAddRules_Empty(t *testing.T) {
+	raw := json.RawMessage(`{
+		"type": "setMode",
+		"mode": "acceptEdits",
+		"destination": "session"
+	}`)
+	got := formatSuggestion(raw)
+	if got != "" {
+		t.Errorf("expected empty for setMode, got %q", got)
+	}
+}
+
+func TestFormatSuggestion_InvalidJSON_Empty(t *testing.T) {
+	got := formatSuggestion(json.RawMessage(`not json`))
+	if got != "" {
+		t.Errorf("expected empty for invalid JSON, got %q", got)
+	}
+}
+
+func TestFormatSuggestion_Truncation(t *testing.T) {
+	long := strings.Repeat("x", 200)
+	raw := json.RawMessage(`{
+		"type": "addRules",
+		"rules": [{"toolName": "Bash", "ruleContent": "` + long + `"}],
+		"behavior": "allow",
+		"destination": "session"
+	}`)
+	got := formatSuggestion(raw)
+	if len(got) > 60 {
+		t.Errorf("label len %d exceeds 60", len(got))
+	}
+}
+
+func TestSuggestionLabels_Multiple(t *testing.T) {
+	suggestions := []json.RawMessage{
+		json.RawMessage(`{
+			"type": "addRules",
+			"rules": [{"toolName": "Read", "ruleContent": "docs/*"}],
+			"behavior": "allow",
+			"destination": "session"
+		}`),
+		json.RawMessage(`{
+			"type": "addRules",
+			"rules": [{"toolName": "Read"}],
+			"behavior": "allow",
+			"destination": "localSettings"
+		}`),
+	}
+	labels := suggestionLabels(suggestions)
+	if len(labels) != 2 {
+		t.Fatalf("got %d labels, want 2", len(labels))
+	}
+	if labels[0] != "Allow Read(docs/*) for session" {
+		t.Errorf("labels[0] = %q", labels[0])
+	}
+	if labels[1] != "Always allow Read" {
+		t.Errorf("labels[1] = %q", labels[1])
+	}
+}
+
+func TestSuggestionLabels_Empty(t *testing.T) {
+	labels := suggestionLabels(nil)
+	if labels != nil {
+		t.Errorf("expected nil for empty suggestions, got %v",
+			labels)
+	}
+}
+
+func TestSuggestionLabels_SkipsUnsupported(t *testing.T) {
+	suggestions := []json.RawMessage{
+		json.RawMessage(`{
+			"type": "setMode",
+			"mode": "acceptEdits",
+			"destination": "session"
+		}`),
+		json.RawMessage(`{
+			"type": "addRules",
+			"rules": [{"toolName": "Bash"}],
+			"behavior": "allow",
+			"destination": "session"
+		}`),
+	}
+	labels := suggestionLabels(suggestions)
+	if len(labels) != 1 {
+		t.Fatalf("got %d labels, want 1 (setMode skipped)",
+			len(labels))
+	}
+	if labels[0] != "Allow Bash for session" {
+		t.Errorf("labels[0] = %q", labels[0])
+	}
+}
+
+func TestMatchSuggestion_Found(t *testing.T) {
+	suggestions := []json.RawMessage{
+		json.RawMessage(`{
+			"type": "addRules",
+			"rules": [{"toolName": "Read", "ruleContent": "docs/*"}],
+			"behavior": "allow",
+			"destination": "session"
+		}`),
+		json.RawMessage(`{
+			"type": "addRules",
+			"rules": [{"toolName": "Read"}],
+			"behavior": "allow",
+			"destination": "localSettings"
+		}`),
+	}
+	got := matchSuggestion(suggestions,
+		"Allow Read(docs/*) for session")
+	if got == nil {
+		t.Fatal("expected match, got nil")
+	}
+	// Verify it returned the first suggestion.
+	if !strings.Contains(string(got), "docs/*") {
+		t.Errorf("matched wrong suggestion: %s", got)
+	}
+}
+
+func TestMatchSuggestion_NotFound(t *testing.T) {
+	suggestions := []json.RawMessage{
+		json.RawMessage(`{
+			"type": "addRules",
+			"rules": [{"toolName": "Read"}],
+			"behavior": "allow",
+			"destination": "session"
+		}`),
+	}
+	got := matchSuggestion(suggestions, "nonexistent label")
+	if got != nil {
+		t.Errorf("expected nil for no match, got %s", got)
+	}
+}
+
 func TestDispatch_PermissionRequest_NotificationFields(t *testing.T) {
 	srv, stateDir := startTestNATS(t)
 	defer srv.Shutdown()
@@ -580,13 +785,298 @@ func TestDispatch_PermissionRequest_NotificationFields(t *testing.T) {
 			t.Errorf("priority = %q, want %q",
 				req.Priority, payload.PriorityHigh)
 		}
+		// No suggestions → boolean fallback → "Allow"/"Deny".
 		if len(req.Actions) != 2 ||
 			req.Actions[0] != "Allow" ||
 			req.Actions[1] != "Deny" {
 			t.Errorf("actions = %v, want [Allow Deny]",
 				req.Actions)
 		}
+		if req.ResponseTypes[0] != payload.ResponseBoolean {
+			t.Errorf("response_types = %v, want [boolean]",
+				req.ResponseTypes)
+		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for request")
+	}
+}
+
+func TestDispatch_PermissionRequest_WithSuggestions_SendsChoice(
+	t *testing.T,
+) {
+	srv, stateDir := startTestNATS(t)
+	defer srv.Shutdown()
+	setupPostEnv(t, srv, stateDir)
+
+	nc, err := nats.Connect(srv.ClientURL())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nc.Close()
+
+	reqCh := make(chan *payload.NotificationRequest, 1)
+	sub, err := nc.Subscribe(
+		"resystems.renotify.testuser.flow.>",
+		func(msg *nats.Msg) {
+			if !strings.HasSuffix(msg.Subject, ".request") {
+				return
+			}
+			var req payload.NotificationRequest
+			json.Unmarshal(msg.Data, &req)
+			reqCh <- &req
+
+			// Respond with the session suggestion choice.
+			resp := payload.NotificationResponse{
+				RequestID: req.ID,
+				Action:    "Allow Read(docs/*) for session",
+				Timestamp: time.Now().UTC(),
+			}
+			data, _ := json.Marshal(resp)
+			respSubject := strings.Replace(
+				msg.Subject, ".request", ".response", 1)
+			js, _ := nc.JetStream()
+			js.Publish(respSubject, data,
+				nats.MsgId(req.ID+"-response"))
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sub.Unsubscribe()
+
+	hookJSON := `{
+		"session_id": "sess_004",
+		"cwd": "/home/user/project",
+		"hook_event_name": "PermissionRequest",
+		"tool_name": "Read",
+		"tool_input": {"file_path": "/home/user/project/docs/README.md"},
+		"permission_suggestions": [
+			{
+				"type": "addRules",
+				"rules": [{"toolName": "Read", "ruleContent": "docs/*"}],
+				"behavior": "allow",
+				"destination": "session"
+			},
+			{
+				"type": "addRules",
+				"rules": [{"toolName": "Read"}],
+				"behavior": "allow",
+				"destination": "localSettings"
+			}
+		]
+	}`
+
+	root := NewRoot()
+	var outBuf, errBuf bytes.Buffer
+	root.SetOut(&outBuf)
+	root.SetErr(&errBuf)
+	root.SetArgs([]string{"dispatch"})
+	root.SetIn(bytes.NewReader([]byte(hookJSON)))
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("dispatch failed: %v", err)
+	}
+
+	// Verify the request was sent as choice with correct actions.
+	select {
+	case req := <-reqCh:
+		if req.ResponseTypes[0] != payload.ResponseChoice {
+			t.Errorf("response_types = %v, want [choice]",
+				req.ResponseTypes)
+		}
+		// Expected: "Allow once", 2 suggestion labels, "Deny"
+		wantActions := []string{
+			"Allow once",
+			"Allow Read(docs/*) for session",
+			"Always allow Read",
+			"Deny",
+		}
+		if len(req.Actions) != len(wantActions) {
+			t.Fatalf("actions = %v, want %v",
+				req.Actions, wantActions)
+		}
+		for i, want := range wantActions {
+			if req.Actions[i] != want {
+				t.Errorf("actions[%d] = %q, want %q",
+					i, req.Actions[i], want)
+			}
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for request")
+	}
+
+	// Verify the decision includes updatedPermissions.
+	var decision hookDecision
+	if err := json.Unmarshal(outBuf.Bytes(), &decision); err != nil {
+		t.Fatalf("invalid decision JSON: %v\n%s",
+			err, outBuf.String())
+	}
+	if decision.HookSpecificOutput.Decision.Behavior != "allow" {
+		t.Errorf("behavior = %q, want allow",
+			decision.HookSpecificOutput.Decision.Behavior)
+	}
+	perms := decision.HookSpecificOutput.Decision.UpdatedPermissions
+	if len(perms) != 1 {
+		t.Fatalf("updatedPermissions len = %d, want 1",
+			len(perms))
+	}
+	// Verify the echoed suggestion is the session one.
+	if !strings.Contains(string(perms[0]), `"session"`) {
+		t.Errorf("expected session suggestion, got %s", perms[0])
+	}
+	if !strings.Contains(string(perms[0]), `docs/*`) {
+		t.Errorf("expected docs/* rule, got %s", perms[0])
+	}
+}
+
+func TestDispatch_PermissionRequest_WithSuggestions_AllowOnce(
+	t *testing.T,
+) {
+	srv, stateDir := startTestNATS(t)
+	defer srv.Shutdown()
+	setupPostEnv(t, srv, stateDir)
+
+	nc, err := nats.Connect(srv.ClientURL())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nc.Close()
+
+	sub, err := nc.Subscribe(
+		"resystems.renotify.testuser.flow.>",
+		func(msg *nats.Msg) {
+			if !strings.HasSuffix(msg.Subject, ".request") {
+				return
+			}
+			var req payload.NotificationRequest
+			json.Unmarshal(msg.Data, &req)
+
+			// Select "Allow once" (no suggestion).
+			resp := payload.NotificationResponse{
+				RequestID: req.ID,
+				Action:    "Allow once",
+				Timestamp: time.Now().UTC(),
+			}
+			data, _ := json.Marshal(resp)
+			respSubject := strings.Replace(
+				msg.Subject, ".request", ".response", 1)
+			js, _ := nc.JetStream()
+			js.Publish(respSubject, data,
+				nats.MsgId(req.ID+"-response"))
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sub.Unsubscribe()
+
+	hookJSON := `{
+		"hook_event_name": "PermissionRequest",
+		"tool_name": "Read",
+		"tool_input": {"file_path": "/tmp/test"},
+		"permission_suggestions": [
+			{
+				"type": "addRules",
+				"rules": [{"toolName": "Read"}],
+				"behavior": "allow",
+				"destination": "session"
+			}
+		]
+	}`
+
+	root := NewRoot()
+	var outBuf, errBuf bytes.Buffer
+	root.SetOut(&outBuf)
+	root.SetErr(&errBuf)
+	root.SetArgs([]string{"dispatch"})
+	root.SetIn(bytes.NewReader([]byte(hookJSON)))
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("dispatch failed: %v", err)
+	}
+
+	var decision hookDecision
+	json.Unmarshal(outBuf.Bytes(), &decision)
+
+	if decision.HookSpecificOutput.Decision.Behavior != "allow" {
+		t.Errorf("behavior = %q, want allow",
+			decision.HookSpecificOutput.Decision.Behavior)
+	}
+	// "Allow once" should NOT echo updatedPermissions.
+	if len(decision.HookSpecificOutput.Decision.UpdatedPermissions) != 0 {
+		t.Errorf("Allow once should have no updatedPermissions, got %d",
+			len(decision.HookSpecificOutput.Decision.UpdatedPermissions))
+	}
+}
+
+func TestDispatch_PermissionRequest_WithSuggestions_Deny(
+	t *testing.T,
+) {
+	srv, stateDir := startTestNATS(t)
+	defer srv.Shutdown()
+	setupPostEnv(t, srv, stateDir)
+
+	nc, err := nats.Connect(srv.ClientURL())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nc.Close()
+
+	sub, err := nc.Subscribe(
+		"resystems.renotify.testuser.flow.>",
+		func(msg *nats.Msg) {
+			if !strings.HasSuffix(msg.Subject, ".request") {
+				return
+			}
+			var req payload.NotificationRequest
+			json.Unmarshal(msg.Data, &req)
+
+			// Select "Deny" from the choice actions.
+			resp := payload.NotificationResponse{
+				RequestID: req.ID,
+				Action:    "Deny",
+				Timestamp: time.Now().UTC(),
+			}
+			data, _ := json.Marshal(resp)
+			respSubject := strings.Replace(
+				msg.Subject, ".request", ".response", 1)
+			js, _ := nc.JetStream()
+			js.Publish(respSubject, data,
+				nats.MsgId(req.ID+"-response"))
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sub.Unsubscribe()
+
+	hookJSON := `{
+		"hook_event_name": "PermissionRequest",
+		"tool_name": "Bash",
+		"tool_input": {"command": "rm -rf /"},
+		"permission_suggestions": [
+			{
+				"type": "addRules",
+				"rules": [{"toolName": "Bash"}],
+				"behavior": "allow",
+				"destination": "session"
+			}
+		]
+	}`
+
+	root := NewRoot()
+	var outBuf, errBuf bytes.Buffer
+	root.SetOut(&outBuf)
+	root.SetErr(&errBuf)
+	root.SetArgs([]string{"dispatch"})
+	root.SetIn(bytes.NewReader([]byte(hookJSON)))
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("dispatch failed: %v", err)
+	}
+
+	var decision hookDecision
+	json.Unmarshal(outBuf.Bytes(), &decision)
+
+	if decision.HookSpecificOutput.Decision.Behavior != "deny" {
+		t.Errorf("behavior = %q, want deny",
+			decision.HookSpecificOutput.Decision.Behavior)
 	}
 }
