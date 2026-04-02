@@ -114,8 +114,26 @@ class MainActivity : ComponentActivity() {
         }
         root.addView(statusText)
 
-        // Dashboard RecyclerView (M-09).
+        // Dashboard RecyclerView (M-09) with interjection
+        // actions (M-08).
         dashboardAdapter = DashboardAdapter()
+        dashboardAdapter.onFlowAction = { flowId, action, ctx ->
+            val intent = Intent(this, NatsService::class.java)
+                .apply {
+                    this.action =
+                        NatsService.ACTION_PUBLISH_INTERJECTION
+                    putExtra(
+                        NatsService.EXTRA_INTERJECT_FLOW_ID,
+                        flowId)
+                    putExtra(
+                        NatsService.EXTRA_INTERJECT_ACTION,
+                        action)
+                    if (ctx != null) putExtra(
+                        NatsService.EXTRA_INTERJECT_CONTEXT,
+                        ctx)
+                }
+            startService(intent)
+        }
         val recycler = RecyclerView(this).apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = dashboardAdapter

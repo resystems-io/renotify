@@ -89,6 +89,10 @@ class NatsService : Service() {
             handlePublishResponse(intent)
             return START_STICKY
         }
+        if (intent?.action == ACTION_PUBLISH_INTERJECTION) {
+            handlePublishInterjection(intent)
+            return START_STICKY
+        }
 
         val payload = store.load()
         if (payload == null) {
@@ -292,6 +296,62 @@ class NatsService : Service() {
         }
     }
 
+    // --- Interjection publishing (M-08) ---
+
+    /**
+     * Publish an InterjectionCommand to a running flow. Called
+     * from the dashboard when the user taps Stop or Note.
+     */
+    private fun handlePublishInterjection(intent: Intent) {
+        val flowId = intent.getStringExtra(
+            EXTRA_INTERJECT_FLOW_ID) ?: return
+        val action = intent.getStringExtra(
+            EXTRA_INTERJECT_ACTION) ?: return
+        val context = intent.getStringExtra(
+            EXTRA_INTERJECT_CONTEXT) ?: ""
+
+        val payload = store.load()
+        if (payload == null) {
+            Log.w(TAG, "Cannot publish interjection: not paired")
+            return
+        }
+
+        val nc = manager.connection
+        if (nc == null || nc.status !=
+            io.nats.client.Connection.Status.CONNECTED
+        ) {
+            Log.w(TAG,
+                "Cannot publish interjection: not connected")
+            return
+        }
+
+        val now = java.time.Instant.now()
+        val json = buildInterjectionJson(
+            flowId, action, context, now.toString())
+        val subject = "resystems.renotify.${payload.username}" +
+            ".flow.$flowId.interject"
+        val dedupId = "$flowId-interject-$action-${now.toEpochMilli()}"
+
+        serviceScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val js = nc.jetStream()
+                val headers = io.nats.client.impl.Headers()
+                headers.add("Nats-Msg-Id", dedupId)
+                val msg = io.nats.client.impl.NatsMessage
+                    .builder()
+                    .subject(subject)
+                    .headers(headers)
+                    .data(json.toByteArray())
+                    .build()
+                js.publish(msg)
+                Log.i(TAG,
+                    "Interjection published: $action for $flowId")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to publish interjection", e)
+            }
+        }
+    }
+
     // --- Notification management ---
 
     private fun createNotificationChannels() {
@@ -359,6 +419,13 @@ class NatsService : Service() {
         const val EXTRA_ACTION_VALUE = "action_value"
         const val EXTRA_TEXT = "text"
 
+        // Intent action and extras for M-08 interjections.
+        const val ACTION_PUBLISH_INTERJECTION =
+            "io.resystems.renotify.PUBLISH_INTERJECTION"
+        const val EXTRA_INTERJECT_FLOW_ID = "interject_flow_id"
+        const val EXTRA_INTERJECT_ACTION = "interject_action"
+        const val EXTRA_INTERJECT_CONTEXT = "interject_context"
+
         /**
          * Build a NotificationResponse JSON string from the
          * action type and value. Extracted as a companion
@@ -386,6 +453,26 @@ class NatsService : Service() {
 
             obj.put("timestamp",
                 java.time.Instant.now().toString())
+            return obj.toString()
+        }
+
+        /**
+         * Build an InterjectionCommand JSON string. Extracted
+         * as a companion function for testability.
+         */
+        fun buildInterjectionJson(
+            flowId: String,
+            action: String,
+            context: String,
+            timestamp: String
+        ): String {
+            val obj = JSONObject()
+            obj.put("flow_id", flowId)
+            obj.put("action", action)
+            if (context.isNotEmpty()) {
+                obj.put("context", context)
+            }
+            obj.put("timestamp", timestamp)
             return obj.toString()
         }
 
