@@ -11,6 +11,7 @@ import (
 	natsjs "github.com/nats-io/nats.go/jetstream"
 
 	"go.resystems.io/renotify/internal/config"
+	"go.resystems.io/renotify/internal/state"
 )
 
 // StreamName is the single JetStream stream used by Renotify.
@@ -20,10 +21,15 @@ const StreamName = "RENOTIFY"
 // Captures all flow-scoped traffic for all users.
 const StreamSubjects = "resystems.renotify.*.flow.>"
 
-// MobileConsumerName returns the durable consumer name for the
-// mobile app.
+// MobileConsumerName returns the legacy durable consumer name
+// for the mobile app (pre-multi-device).
 func MobileConsumerName(username string) string {
 	return "mobile-" + username
+}
+
+// MobileDeviceConsumerName returns the per-device consumer name.
+func MobileDeviceConsumerName(username, deviceID string) string {
+	return "mobile-" + username + "-" + deviceID
 }
 
 // LifecycleConsumerName returns the durable consumer name for the
@@ -46,6 +52,7 @@ func EnsureJetStream(
 	ctx context.Context,
 	nc *nats.Conn,
 	username string,
+	devices []state.PairedDevice,
 	cfg config.JetStreamConfig,
 	logger *slog.Logger,
 ) error {
@@ -81,6 +88,11 @@ func EnsureJetStream(
 		mobileConsumerConfig(username),
 		lifecycleConsumerConfig(username),
 		interjectConsumerConfig(username),
+	}
+	// Per-device consumers for multi-device pairing (R-MOB-11).
+	for _, d := range devices {
+		consumers = append(consumers,
+			mobileDeviceConsumerConfig(username, d.DeviceID))
 	}
 	for _, cc := range consumers {
 		if _, err := js.CreateOrUpdateConsumer(
@@ -122,6 +134,25 @@ func mobileConsumerConfig(username string) natsjs.ConsumerConfig {
 	return natsjs.ConsumerConfig{
 		Durable:           MobileConsumerName(username),
 		DeliverSubject:    "resystems.renotify." + username + ".mobile.deliver",
+		FilterSubject:     "resystems.renotify." + username + ".flow.>",
+		AckPolicy:         natsjs.AckExplicitPolicy,
+		MaxDeliver:        3,
+		MaxAckPending:     256,
+		DeliverPolicy:     natsjs.DeliverAllPolicy,
+		InactiveThreshold: 35 * time.Minute,
+	}
+}
+
+// mobileDeviceConsumerConfig builds a per-device push consumer.
+// Same config as the legacy mobile consumer but with a
+// device-specific name and deliver subject.
+func mobileDeviceConsumerConfig(
+	username, deviceID string,
+) natsjs.ConsumerConfig {
+	return natsjs.ConsumerConfig{
+		Durable: MobileDeviceConsumerName(username, deviceID),
+		DeliverSubject: "resystems.renotify." + username +
+			".mobile." + deviceID + ".deliver",
 		FilterSubject:     "resystems.renotify." + username + ".flow.>",
 		AckPolicy:         natsjs.AckExplicitPolicy,
 		MaxDeliver:        3,

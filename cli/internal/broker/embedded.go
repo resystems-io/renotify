@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/nats-io/nats-server/v2/server"
+
+	"go.resystems.io/renotify/internal/state"
 )
 
 // readyTimeout is how long Start waits for the embedded NATS
@@ -26,7 +28,7 @@ type EmbeddedConfig struct {
 	Username string
 
 	InternalToken string
-	PairingToken  string // empty → no mobile account
+	Devices       []state.PairedDevice // paired mobile devices
 
 	JetStreamMaxMem int64
 }
@@ -59,7 +61,7 @@ func NewEmbeddedServer(cfg EmbeddedConfig, logger *slog.Logger) (*EmbeddedServer
 		StoreDir:           storeDir,
 		NoLog:              true,
 		NoSigs:             true,
-		Users:              BuildAuthConfig(cfg.Username, cfg.InternalToken, cfg.PairingToken),
+		Users:              BuildAuthConfig(cfg.Username, cfg.InternalToken, cfg.Devices),
 	}
 
 	// Configure WSS listener if TLS is available. Load the
@@ -135,15 +137,18 @@ func (s *EmbeddedServer) ClientURL() string {
 }
 
 // ReloadAuth rebuilds the NATS auth configuration with the
-// given pairing token and applies it to the running server via
-// ReloadOptions. This is called on SIGHUP after `renotify pair`
-// writes a new token to disk.
-func (s *EmbeddedServer) ReloadAuth(username, internalToken, pairingToken string) error {
+// given devices and applies it to the running server via
+// ReloadOptions. Called on SIGHUP after `renotify pair` or
+// `renotify revoke` updates devices.json.
+func (s *EmbeddedServer) ReloadAuth(
+	username, internalToken string,
+	devices []state.PairedDevice,
+) error {
 	if s.srv == nil {
 		return fmt.Errorf("server not started")
 	}
 	newOpts := *s.opts
-	newOpts.Users = BuildAuthConfig(username, internalToken, pairingToken)
+	newOpts.Users = BuildAuthConfig(username, internalToken, devices)
 	if err := s.srv.ReloadOptions(&newOpts); err != nil {
 		return fmt.Errorf("reload auth: %w", err)
 	}

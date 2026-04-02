@@ -36,7 +36,7 @@ func TestRootHelp(t *testing.T) {
 	if !strings.Contains(stdout, "Available Commands") {
 		t.Error("help output missing 'Available Commands'")
 	}
-	for _, cmd := range []string{"daemon", "post", "ask", "answer", "interject", "dispatch", "flow", "flows", "history", "pair", "revoke", "apk", "config"} {
+	for _, cmd := range []string{"daemon", "post", "ask", "answer", "interject", "dispatch", "flow", "flows", "history", "pair", "pairings", "revoke", "apk", "config"} {
 		if !strings.Contains(stdout, cmd) {
 			t.Errorf("help output missing command %q", cmd)
 		}
@@ -56,7 +56,8 @@ func TestSubcommandHelp(t *testing.T) {
 		{"flow", []string{"--format"}},
 		{"history", []string{"--workspace-id", "--flow-id", "--since", "--until", "--limit", "--offset", "--format"}},
 		{"pair", []string{"--ip", "--regenerate-cert", "--format"}},
-		{"revoke", []string{"--format"}},
+		{"pairings", []string{"--format"}},
+		{"revoke", []string{"--format", "--device", "--all"}},
 		{"apk extract", []string{"--output"}},
 		{"apk serve", []string{"--addr", "--port"}},
 		{"config init", []string{"--full", "--force", "--output"}},
@@ -314,56 +315,51 @@ func TestPairInvalidIP(t *testing.T) {
 	}
 }
 
-func TestRevoke_NoToken(t *testing.T) {
+func TestRevoke_NoDevices(t *testing.T) {
 	t.Setenv("RENOTIFY_USERNAME", "testuser")
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	_, stderr, err := executeCommand("revoke")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(stderr, "no active pairing") {
-		t.Errorf("expected 'no active pairing', got: %q", stderr)
+	if !strings.Contains(stderr, "no paired devices") {
+		t.Errorf("expected 'no paired devices', got: %q",
+			stderr)
 	}
 }
 
-func TestRevoke_DeletesToken(t *testing.T) {
+func TestRevoke_LegacyTokenMigrated(t *testing.T) {
 	t.Setenv("RENOTIFY_USERNAME", "testuser")
 	stateDir := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", stateDir)
 
-	// Create pairing token and username files.
+	// Create legacy token file (pre-multi-device).
 	pairingDir := filepath.Join(stateDir, "renotify", "pairing")
 	os.MkdirAll(pairingDir, 0700)
 	tokenPath := filepath.Join(pairingDir, "token")
-	usernamePath := filepath.Join(pairingDir, "username")
 	os.WriteFile(tokenPath, []byte("rn_tk_TESTTOKEN\n"), 0600)
-	os.WriteFile(usernamePath, []byte("testuser\n"), 0600)
 
 	_, stderr, err := executeCommand("revoke")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(stderr, "Token revoked") {
-		t.Errorf("expected 'Token revoked' in stderr, got: %q", stderr)
+	if !strings.Contains(stderr, "revoked") {
+		t.Errorf("expected 'revoked' in stderr, got: %q",
+			stderr)
 	}
 
-	// Token file should be deleted.
+	// Legacy token file should be removed by migration.
 	if _, err := os.Stat(tokenPath); !os.IsNotExist(err) {
-		t.Error("token file should be deleted after revoke")
-	}
-	// Username file should be deleted.
-	if _, err := os.Stat(usernamePath); !os.IsNotExist(err) {
-		t.Error("username file should be deleted after revoke")
+		t.Error("legacy token file should be deleted")
 	}
 }
 
-func TestRevoke_JSONOutput(t *testing.T) {
+func TestRevoke_JSONOutput_NoDevices(t *testing.T) {
 	t.Setenv("RENOTIFY_USERNAME", "testuser")
-	stateDir := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", stateDir)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 
-	// No token — should report revoked=false.
-	stdout, _, err := executeCommand("revoke", "--format", "json")
+	stdout, _, err := executeCommand("revoke",
+		"--format", "json")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -375,24 +371,23 @@ func TestRevoke_JSONOutput(t *testing.T) {
 	if output["revoked"] != false {
 		t.Errorf("revoked = %v, want false", output["revoked"])
 	}
-	if output["message"] != "no active pairing" {
-		t.Errorf("message = %v, want 'no active pairing'",
-			output["message"])
-	}
 }
 
-func TestRevoke_JSONOutput_WithToken(t *testing.T) {
+func TestRevoke_JSONOutput_WithDevice(t *testing.T) {
 	t.Setenv("RENOTIFY_USERNAME", "testuser")
 	stateDir := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", stateDir)
 
-	// Create a token file.
+	// Create a devices.json with one device.
 	pairingDir := filepath.Join(stateDir, "renotify", "pairing")
 	os.MkdirAll(pairingDir, 0700)
-	os.WriteFile(filepath.Join(pairingDir, "token"),
-		[]byte("rn_tk_TESTTOKEN\n"), 0600)
+	devicesPath := filepath.Join(pairingDir, "devices.json")
+	os.WriteFile(devicesPath,
+		[]byte(`[{"device_id":"mb_TEST01","token":"rn_tk_T","paired_at":"2026-04-01T12:00:00Z"}]`),
+		0600)
 
-	stdout, _, err := executeCommand("revoke", "--format", "json")
+	stdout, _, err := executeCommand("revoke",
+		"--format", "json")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

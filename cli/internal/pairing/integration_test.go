@@ -23,6 +23,7 @@ func integrationConfig(t *testing.T) Config {
 		KeyPath:      filepath.Join(dir, "tls", "key.pem"),
 		TokenPath:    filepath.Join(dir, "pairing", "token"),
 		UsernamePath: filepath.Join(dir, "pairing", "username"),
+		DevicesPath:  filepath.Join(dir, "pairing", "devices.json"),
 		DaemonIDPath: filepath.Join(dir, "daemon_id"),
 		Username:     "integrationuser",
 		WSSPort:      4223,
@@ -67,8 +68,8 @@ func TestPair_EndToEnd_JSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(result.PayloadJSON), &payload); err != nil {
 		t.Fatalf("invalid payload JSON: %v", err)
 	}
-	if payload.Version != 1 {
-		t.Errorf("version = %d, want 1", payload.Version)
+	if payload.Version != 2 {
+		t.Errorf("version = %d, want 2", payload.Version)
 	}
 	if payload.Host == "" {
 		t.Error("empty host in payload")

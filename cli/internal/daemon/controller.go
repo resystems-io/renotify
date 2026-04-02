@@ -39,7 +39,9 @@ type Controller struct {
 	// Overridable paths for testing.
 	DaemonIDPath      string
 	InternalTokenPath string
-	PairingTokenPath  string
+	PairingTokenPath  string // legacy single-token (migration)
+	UsernamePath      string // legacy username (migration)
+	DevicesPath       string // devices.json registry
 }
 
 // Option configures a Controller.
@@ -76,6 +78,8 @@ func NewController(cfg *config.Config, opts ...Option) *Controller {
 		DaemonIDPath:      xdg.DaemonIDPath(),
 		InternalTokenPath: xdg.InternalTokenPath(),
 		PairingTokenPath:  xdg.PairingTokenPath(),
+		UsernamePath:      xdg.PairingUsernamePath(),
+		DevicesPath:       xdg.DevicesPath(),
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -116,8 +120,10 @@ func (c *Controller) Run(ctx context.Context) error {
 	}()
 
 	// 2.5. Ensure JetStream stream and consumers.
+	// Load devices for per-device consumer creation.
+	devices, _ := state.LoadDevices(c.DevicesPath)
 	if err := broker.EnsureJetStream(ctx, nc,
-		c.cfg.Username, c.cfg.JetStream, c.logger); err != nil {
+		c.cfg.Username, devices, c.cfg.JetStream, c.logger); err != nil {
 		return fmt.Errorf("jetstream: %w", err)
 	}
 
@@ -187,7 +193,7 @@ func (c *Controller) Run(ctx context.Context) error {
 	return nil
 }
 
-// reloadAuth re-reads the pairing token from disk and applies
+// reloadAuth re-reads the device registry from disk and applies
 // the updated auth configuration to the embedded broker.
 func (c *Controller) reloadAuth(srv *broker.EmbeddedServer) {
 	c.logger.Info("reloading auth configuration (SIGHUP)")
@@ -203,23 +209,19 @@ func (c *Controller) reloadAuth(srv *broker.EmbeddedServer) {
 		c.logger.Error("reload: read internal token", "err", err)
 		return
 	}
-	pairingToken, err := state.LoadPairingToken(c.PairingTokenPath)
+	devices, err := state.LoadDevices(c.DevicesPath)
 	if err != nil {
-		c.logger.Error("reload: read pairing token", "err", err)
+		c.logger.Error("reload: read devices", "err", err)
 		return
 	}
 
-	if err := srv.ReloadAuth(c.cfg.Username, internalToken, pairingToken); err != nil {
+	if err := srv.ReloadAuth(c.cfg.Username, internalToken, devices); err != nil {
 		c.logger.Error("reload: apply auth config", "err", err)
 		return
 	}
 
-	if pairingToken != "" {
-		c.logger.Info("auth reloaded",
-			"pairing_token", pairingToken[:10]+"...")
-	} else {
-		c.logger.Info("auth reloaded", "pairing_token", "(none)")
-	}
+	c.logger.Info("auth reloaded",
+		"devices", len(devices))
 }
 
 func (c *Controller) startEmbedded(_ context.Context) (*nats.Conn, *broker.EmbeddedServer, error) {
@@ -239,10 +241,14 @@ func (c *Controller) startEmbedded(_ context.Context) (*nats.Conn, *broker.Embed
 		return nil, nil, fmt.Errorf("internal token: %w", err)
 	}
 
-	// Load pairing token (optional).
-	pairingToken, err := state.LoadPairingToken(c.PairingTokenPath)
+	// Migrate legacy single-token pairing to devices.json.
+	state.MigrateFromSingleToken(
+		c.PairingTokenPath, c.UsernamePath, c.DevicesPath)
+
+	// Load paired devices (optional).
+	devices, err := state.LoadDevices(c.DevicesPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("pairing token: %w", err)
+		return nil, nil, fmt.Errorf("load devices: %w", err)
 	}
 
 	// Configure and start embedded NATS.
@@ -255,7 +261,7 @@ func (c *Controller) startEmbedded(_ context.Context) (*nats.Conn, *broker.Embed
 		TLSKey:          key,
 		Username:        c.cfg.Username,
 		InternalToken:   internalToken,
-		PairingToken:    pairingToken,
+		Devices:         devices,
 		JetStreamMaxMem: c.cfg.JetStream.MaxBytes,
 	}, c.logger)
 	if err != nil {

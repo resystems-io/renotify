@@ -720,7 +720,7 @@ func TestController_JetStreamMobileReceives(t *testing.T) {
 	defer nc.Close()
 
 	ctx := context.Background()
-	if err := broker.EnsureJetStream(ctx, nc, cfg.Username,
+	if err := broker.EnsureJetStream(ctx, nc, cfg.Username, nil,
 		cfg.JetStream, integrationLogger()); err != nil {
 		t.Fatalf("EnsureJetStream: %v", err)
 	}

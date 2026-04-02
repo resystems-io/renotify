@@ -48,6 +48,8 @@ class EncryptedProvisioningStore(context: Context) :
             .putString(KEY_TOKEN, payload.token)
             .putString(KEY_CERT, payload.certFingerprint)
             .putString(KEY_USERNAME, payload.username)
+            .putString(KEY_DEVICE_ID, payload.deviceId)
+            .putString(KEY_NATS_USERNAME, payload.natsUsername)
             .apply()
     }
 
@@ -67,7 +69,10 @@ class EncryptedProvisioningStore(context: Context) :
             port = port,
             token = token,
             certFingerprint = cert,
-            username = username
+            username = username,
+            deviceId = prefs.getString(KEY_DEVICE_ID, "") ?: "",
+            natsUsername = prefs.getString(
+                KEY_NATS_USERNAME, "mobile") ?: "mobile"
         )
     }
 
@@ -85,5 +90,7 @@ class EncryptedProvisioningStore(context: Context) :
         private const val KEY_TOKEN = "t"
         private const val KEY_CERT = "c"
         private const val KEY_USERNAME = "u"
+        private const val KEY_DEVICE_ID = "d"
+        private const val KEY_NATS_USERNAME = "n"
     }
 }

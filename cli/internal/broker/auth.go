@@ -6,15 +6,20 @@ import (
 	"fmt"
 
 	"github.com/nats-io/nats-server/v2/server"
+
+	"go.resystems.io/renotify/internal/state"
 )
 
-// BuildAuthConfig constructs NATS server options with two-account
-// auth. The daemon account (internal token) has full access. The
-// mobile account (pairing token) has scoped ACLs. If pairingToken
-// is empty, only the daemon account is configured.
+// BuildAuthConfig constructs NATS server auth with the daemon
+// account and one account per paired mobile device. Each device
+// has scoped ACLs. If no devices are paired, only the daemon
+// account is configured.
 //
 // See docs/analysis-nats-transport-design.md Section 7.
-func BuildAuthConfig(username, internalToken, pairingToken string) []*server.User {
+func BuildAuthConfig(
+	username, internalToken string,
+	devices []state.PairedDevice,
+) []*server.User {
 	prefix := fmt.Sprintf("resystems.renotify.%s", username)
 
 	daemonUser := &server.User{
@@ -43,10 +48,10 @@ func BuildAuthConfig(username, internalToken, pairingToken string) []*server.Use
 
 	users := []*server.User{daemonUser}
 
-	if pairingToken != "" {
+	for _, d := range devices {
 		mobileUser := &server.User{
-			Username: "mobile",
-			Password: pairingToken,
+			Username: state.NatsUsername(d.DeviceID),
+			Password: d.Token,
 			Permissions: &server.Permissions{
 				Publish: &server.SubjectPermission{
 					Allow: []string{
