@@ -925,7 +925,7 @@ workspace monitoring).*
   serves data drawn from the SQLite logs. The history query logic is implemented
   in the `ledger` package (C-03). C-09 exposes it via the Core NATS
   `svc.history` endpoint and wires it into `renotify history`.
-- [ ] **M-07: Remote History Viewer UI:** Develop the ledger overview rendering
+- [x] **M-07: Remote History Viewer UI:** Develop the ledger overview rendering
   queries pushed over Core NATS Request-Reply.
 - [ ] **M-05: UI & Branding:** Apply the resystems.io branding and SVG logo to
   the application assets and UI.
@@ -1088,6 +1088,7 @@ Record completed items here with the date.
 | 2026-04-02 | — | Multi-device pairing implemented (R-MOB-11). Per-device `device_id` (`mb_` prefix), per-device auth token, per-device NATS account and JetStream consumer. Device registry in `devices.json` replaces single-token `pairing/token` file. Provisioning payload bumped to v2 with `"d"` (device_id) and `"n"` (NATS username). Legacy v1 migrated on daemon startup. New `renotify pairings` command. Updated `renotify revoke` with `--device` and `--all` flags. Android app parses v2 payload, authenticates with device-specific username, binds to device-specific consumer. R-SEC-02 updated from single-device to multi-device model. D-68 records design. |
 | 2026-04-02 | M-08 | Active Workspace UI implemented. Tap a flow row in the dashboard to expand inline with Stop and Note action buttons. Stop sends `InterjectionCommand(action="stop")` to the flow's `.interject` subject via JetStream. Note shows a text input dialog and sends `InterjectionCommand(action="note", context="...")`. Publishing follows the existing M-04 response pattern (`NatsService.handlePublishInterjection()` with dedup header). No Go changes — mobile ACL already permits `.flow.*.interject` publish. R-MOB-08 satisfied. Phase 5 complete. |
 | 2026-04-02 | C-09 | Daemon Core NATS History API implemented. New `svc.history` Core NATS Request-Reply endpoint in the registry service wraps `ledger.QueryHistory()` with `HistoryQueryRequest`/`HistoryQueryResult` wire types. Supports workspace/flow filtering, time range, and offset-based pagination. CLI `renotify history` command fully implemented with `--workspace-id`, `--flow-id`, `--since`, `--until`, `--limit`, `--offset`, `--format` flags (default text). 4 endpoint tests (empty, with records, workspace filter, pagination). |
+| 2026-04-02 | M-07 | Remote History Viewer UI implemented. Tab toggle ("Dashboard · History") below the status line swaps the RecyclerView between the live dashboard and paginated notification history. `HistoryAdapter` renders record rows (title, timestamp, priority, response summary) with "Load more" pagination footer. `HistoryQueryResult` and `HistoryRecord` Kotlin data classes parse the `svc.history` wire format. `NatsConnectionManager.queryHistory()` uses Core NATS Request-Reply. `NatsService` exposes `historyState: StateFlow<HistoryQueryResult?>` with `ACTION_QUERY_HISTORY` intent and append-mode pagination. 7 parsing tests. R-MOB-07 satisfied. |
 
 ## 6. References
 

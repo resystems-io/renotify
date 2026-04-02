@@ -18,6 +18,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.resystems.renotify.dashboard.DashboardAdapter
+import io.resystems.renotify.dashboard.HistoryAdapter
 import io.resystems.renotify.nats.ConnectionState
 import io.resystems.renotify.nats.NatsService
 import io.resystems.renotify.notification.NotificationPayload
@@ -38,6 +39,11 @@ class MainActivity : ComponentActivity() {
     private lateinit var silentButton: Button
     private lateinit var store: EncryptedProvisioningStore
     private lateinit var dashboardAdapter: DashboardAdapter
+    private lateinit var historyAdapter: HistoryAdapter
+    private lateinit var recycler: RecyclerView
+    private lateinit var tabDashboard: TextView
+    private lateinit var tabHistory: TextView
+    private var activeTab = TAB_DASHBOARD
 
     /**
      * Request notification permission on Android 13+. The result
@@ -118,8 +124,41 @@ class MainActivity : ComponentActivity() {
         }
         root.addView(statusText)
 
-        // Dashboard RecyclerView (M-09) with interjection
-        // actions (M-08).
+        // Tab strip: Dashboard | History (M-07).
+        val tabBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(0), dp(16), dp(8))
+        }
+
+        tabDashboard = TextView(this).apply {
+            text = "Dashboard"
+            textSize = 13f
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+            setOnClickListener { switchTab(TAB_DASHBOARD) }
+        }
+        tabBar.addView(tabDashboard)
+
+        val tabSep = TextView(this).apply {
+            text = " · "
+            textSize = 13f
+            setTextColor(0xFF999999.toInt())
+        }
+        tabBar.addView(tabSep)
+
+        tabHistory = TextView(this).apply {
+            text = "History"
+            textSize = 13f
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+            setOnClickListener { switchTab(TAB_HISTORY) }
+        }
+        tabBar.addView(tabHistory)
+
+        root.addView(tabBar)
+        updateTabStyles()
+
+        // Dashboard adapter (M-09) with interjection actions
+        // (M-08).
         dashboardAdapter = DashboardAdapter()
         dashboardAdapter.onFlowAction = { flowId, action, ctx ->
             val intent = Intent(this, NatsService::class.java)
@@ -138,7 +177,13 @@ class MainActivity : ComponentActivity() {
                 }
             startService(intent)
         }
-        val recycler = RecyclerView(this).apply {
+
+        // History adapter (M-07).
+        historyAdapter = HistoryAdapter()
+        historyAdapter.onLoadMore = { loadMoreHistory() }
+
+        // Shared RecyclerView — adapter swapped by tab.
+        recycler = RecyclerView(this).apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = dashboardAdapter
             layoutParams = LinearLayout.LayoutParams(
@@ -220,6 +265,15 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             NatsService.dashboardState.collect { heartbeat ->
                 dashboardAdapter.update(heartbeat)
+            }
+        }
+
+        // Observe history state (M-07).
+        lifecycleScope.launch {
+            NatsService.historyState.collect { result ->
+                if (result != null) {
+                    historyAdapter.update(result)
+                }
             }
         }
 
@@ -329,6 +383,59 @@ class MainActivity : ComponentActivity() {
         builder.show()
     }
 
+    // --- Tab switching (M-07) ---
+
+    private fun switchTab(tab: Int) {
+        if (tab == activeTab) return
+        activeTab = tab
+        updateTabStyles()
+
+        when (tab) {
+            TAB_DASHBOARD -> {
+                recycler.adapter = dashboardAdapter
+            }
+            TAB_HISTORY -> {
+                recycler.adapter = historyAdapter
+                queryHistory(offset = 0, append = false)
+            }
+        }
+    }
+
+    private fun updateTabStyles() {
+        val active = 0xFF111111.toInt()
+        val inactive = 0xFF999999.toInt()
+
+        tabDashboard.setTextColor(
+            if (activeTab == TAB_DASHBOARD) active else inactive)
+        tabDashboard.setTypeface(null,
+            if (activeTab == TAB_DASHBOARD)
+                android.graphics.Typeface.BOLD
+            else android.graphics.Typeface.NORMAL)
+
+        tabHistory.setTextColor(
+            if (activeTab == TAB_HISTORY) active else inactive)
+        tabHistory.setTypeface(null,
+            if (activeTab == TAB_HISTORY)
+                android.graphics.Typeface.BOLD
+            else android.graphics.Typeface.NORMAL)
+    }
+
+    private fun queryHistory(offset: Int, append: Boolean) {
+        val intent = Intent(this, NatsService::class.java)
+            .setAction(NatsService.ACTION_QUERY_HISTORY)
+            .putExtra(NatsService.EXTRA_HISTORY_LIMIT,
+                HISTORY_PAGE_SIZE)
+            .putExtra(NatsService.EXTRA_HISTORY_OFFSET, offset)
+            .putExtra(NatsService.EXTRA_HISTORY_APPEND, append)
+        startService(intent)
+    }
+
+    private fun loadMoreHistory() {
+        queryHistory(
+            offset = historyAdapter.recordCount,
+            append = true)
+    }
+
     // --- Service management ---
 
     private fun startNatsService() {
@@ -403,5 +510,11 @@ class MainActivity : ComponentActivity() {
 
     private fun dp(value: Int): Int {
         return (value * resources.displayMetrics.density).toInt()
+    }
+
+    companion object {
+        private const val TAB_DASHBOARD = 0
+        private const val TAB_HISTORY = 1
+        private const val HISTORY_PAGE_SIZE = 25
     }
 }
