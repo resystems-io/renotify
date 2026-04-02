@@ -502,6 +502,28 @@ func summariseToolInput(toolName string, raw json.RawMessage) string {
 		if query := getString("query"); query != "" {
 			return truncate(query, 200)
 		}
+
+	case "Skill":
+		if skill := getString("skill"); skill != "" {
+			if args := getString("args"); args != "" {
+				return fmt.Sprintf("%s %s", skill, truncate(args, 180))
+			}
+			return skill
+		}
+
+	case "EnterPlanMode", "ExitPlanMode":
+		// These carry allowedPrompts or no useful content.
+		return toolName
+
+	case "TaskCreate", "TaskUpdate":
+		if desc := getString("description"); desc != "" {
+			return truncate(desc, 200)
+		}
+
+	case "NotebookEdit":
+		if fp := getString("file_path"); fp != "" {
+			return fp
+		}
 	}
 
 	// MCP tools: show tool name prefix.
@@ -510,7 +532,17 @@ func summariseToolInput(toolName string, raw json.RawMessage) string {
 		return truncate(toolName+" "+string(compact), 200)
 	}
 
-	// Fallback: compact JSON.
+	// Fallback: try common descriptive fields before
+	// dumping raw JSON.
+	for _, key := range []string{
+		"description", "prompt", "content", "message",
+	} {
+		if v := getString(key); v != "" {
+			return truncate(v, 200)
+		}
+	}
+
+	// Last resort: compact JSON.
 	compact, err := json.Marshal(fields)
 	if err != nil {
 		return truncate(string(raw), 200)
