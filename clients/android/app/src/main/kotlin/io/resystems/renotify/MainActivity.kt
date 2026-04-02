@@ -1,12 +1,14 @@
 package io.resystems.renotify
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
@@ -18,6 +20,8 @@ import androidx.recyclerview.widget.RecyclerView
 import io.resystems.renotify.dashboard.DashboardAdapter
 import io.resystems.renotify.nats.ConnectionState
 import io.resystems.renotify.nats.NatsService
+import io.resystems.renotify.notification.NotificationPayload
+import io.resystems.renotify.notification.NotificationRenderer
 import io.resystems.renotify.pairing.EncryptedProvisioningStore
 import io.resystems.renotify.pairing.ScannerActivity
 import kotlinx.coroutines.launch
@@ -232,6 +236,97 @@ class MainActivity : ComponentActivity() {
         if (store.isPaired() && !isServiceActive()) {
             startNatsService()
         }
+
+        // Handle "More..." overflow intent from notification.
+        handleChoiceIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleChoiceIntent(intent)
+    }
+
+    // --- In-app choice dialog for "More..." overflow ---
+
+    /**
+     * If the intent carries notification metadata (from the
+     * "More..." overflow button), show an AlertDialog with
+     * all choices and an optional text input field. The user's
+     * selection is published as a response via NatsService.
+     */
+    private fun handleChoiceIntent(intent: Intent?) {
+        if (intent == null) return
+
+        val notificationId = intent.getStringExtra(
+            NotificationRenderer.EXTRA_NOTIFICATION_ID) ?: return
+        val flowId = intent.getStringExtra(
+            NotificationRenderer.EXTRA_FLOW_ID) ?: return
+        val responseTypes = intent.getStringArrayExtra(
+            NotificationRenderer.EXTRA_RESPONSE_TYPES)
+        val actions = intent.getStringArrayExtra(
+            NotificationRenderer.EXTRA_ACTIONS_ARRAY)
+
+        // Need at least response types or actions to show.
+        if (responseTypes == null && actions == null) return
+
+        // Clear the extras so re-creating the activity doesn't
+        // re-show the dialog.
+        intent.removeExtra(NotificationRenderer.EXTRA_ACTIONS_ARRAY)
+        intent.removeExtra(NotificationRenderer.EXTRA_RESPONSE_TYPES)
+
+        val hasText = responseTypes?.contains(
+            NotificationPayload.RESPONSE_TEXT) == true
+
+        // Build the dialog.
+        val builder = AlertDialog.Builder(this)
+            .setTitle("Choose an action")
+
+        // Add text input if the notification accepts text.
+        val editText = if (hasText) {
+            EditText(this).apply {
+                hint = "Type a response (optional)"
+                setPadding(dp(24), dp(12), dp(24), dp(12))
+            }
+        } else null
+
+        if (editText != null) {
+            builder.setView(editText)
+        }
+
+        // Publish a response helper.
+        fun publishResponse(actionType: String, value: String) {
+            val text = editText?.text?.toString()
+            val svcIntent = Intent(this, NatsService::class.java)
+                .setAction(NatsService.ACTION_PUBLISH_RESPONSE)
+                .putExtra(NatsService.EXTRA_NOTIFICATION_ID,
+                    notificationId)
+                .putExtra(NatsService.EXTRA_FLOW_ID, flowId)
+                .putExtra(NatsService.EXTRA_ACTION_TYPE, actionType)
+                .putExtra(NatsService.EXTRA_ACTION_VALUE, value)
+            if (!text.isNullOrEmpty()) {
+                svcIntent.putExtra(NatsService.EXTRA_TEXT, text)
+            }
+            startService(svcIntent)
+        }
+
+        if (actions != null && actions.isNotEmpty()) {
+            // Show action buttons as list items.
+            builder.setItems(actions) { _, which ->
+                publishResponse(
+                    NotificationRenderer.ACTION_TYPE_CHOICE,
+                    actions[which])
+            }
+        } else if (hasText) {
+            // Text-only: send button submits the text.
+            builder.setPositiveButton("Send") { _, _ ->
+                val text = editText?.text?.toString() ?: ""
+                publishResponse(
+                    NotificationRenderer.ACTION_TYPE_TEXT, text)
+            }
+        }
+
+        builder.setNegativeButton("Cancel", null)
+        builder.show()
     }
 
     // --- Service management ---
