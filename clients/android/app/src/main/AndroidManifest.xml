@@ -18,6 +18,7 @@
 
     <application
         android:label="Renotify"
+        android:icon="@mipmap/ic_launcher"
         android:supportsRtl="true">
 
         <activity
