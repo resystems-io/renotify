@@ -883,12 +883,14 @@ func TestDispatch_PermissionRequest_WithSuggestions_SendsChoice(
 			t.Errorf("response_types = %v, want [choice]",
 				req.ResponseTypes)
 		}
-		// Expected: "Allow once", 2 suggestion labels, "Deny"
+		// Expected: "Allow once", "Deny" first (visible on
+		// notification), then suggestion labels (overflow to
+		// in-app "More..." dialog).
 		wantActions := []string{
 			"Allow once",
+			"Deny",
 			"Allow Read(docs/*) for session",
 			"Always allow Read",
-			"Deny",
 		}
 		if len(req.Actions) != len(wantActions) {
 			t.Fatalf("actions = %v, want %v",
