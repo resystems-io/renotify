@@ -34,7 +34,8 @@ class NatsConnectionManager(
     private val scope: CoroutineScope,
     private val onMessage: ((subject: String, data: ByteArray, ack: () -> Unit) -> Unit)? = null,
     private val onHeartbeat: ((data: ByteArray) -> Unit)? = null,
-    private val onInitialDashboard: ((data: ByteArray) -> Unit)? = null
+    private val onInitialDashboard: ((data: ByteArray) -> Unit)? = null,
+    private val onDeviceControl: ((data: ByteArray) -> Unit)? = null
 ) {
 
     private val _state = MutableStateFlow<ConnectionState>(
@@ -129,6 +130,7 @@ class NatsConnectionManager(
 
             subscribeToConsumer(nc, payload)
             subscribeToHeartbeat(nc, payload)
+            subscribeToDeviceControl(nc, payload)
             queryInitialDashboard(nc, payload)
 
             _state.value = ConnectionState.Connected
@@ -229,6 +231,29 @@ class NatsConnectionManager(
     }
 
     /**
+     * Subscribe to device-specific control commands over Core
+     * NATS Pub/Sub (C-16). Enables remote silent mode toggle
+     * from the daemon CLI.
+     */
+    private fun subscribeToDeviceControl(
+        nc: Connection,
+        payload: ProvisioningPayload
+    ) {
+        val handler = onDeviceControl ?: return
+        if (payload.deviceId.isEmpty()) return
+
+        val subject = "resystems.renotify.${payload.username}" +
+            ".device.${payload.deviceId}.control"
+
+        val dispatcher = nc.createDispatcher { msg ->
+            handler(msg.data)
+        }
+        dispatcher.subscribe(subject)
+
+        Log.i(TAG, "Subscribed to device control: $subject")
+    }
+
+    /**
      * Query the daemon's svc.flows endpoint for an immediate
      * dashboard snapshot. Non-fatal on failure — the periodic
      * heartbeat will populate the dashboard later.
@@ -277,6 +302,7 @@ class NatsConnectionManager(
 
                 subscribeToConsumer(nc, payload)
                 subscribeToHeartbeat(nc, payload)
+                subscribeToDeviceControl(nc, payload)
                 queryInitialDashboard(nc, payload)
 
                 _state.value = ConnectionState.Connected
@@ -299,6 +325,26 @@ class NatsConnectionManager(
                     "${e.message}")
                 connection = null
             }
+        }
+    }
+
+    /**
+     * Query the daemon's svc.history endpoint. Returns the raw
+     * response bytes, or null on failure. Called from
+     * [NatsService] on the IO dispatcher.
+     */
+    fun queryHistory(requestJson: ByteArray): ByteArray? {
+        val nc = connection ?: return null
+        val p = payload ?: return null
+        val subject = "resystems.renotify.${p.username}.svc.history"
+        return try {
+            val resp = nc.request(
+                subject, requestJson,
+                java.time.Duration.ofSeconds(2))
+            resp.data
+        } catch (e: Exception) {
+            Log.w(TAG, "History query failed: ${e.message}")
+            null
         }
     }
 

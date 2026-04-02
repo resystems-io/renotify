@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import io.resystems.renotify.dashboard.ActiveFlowsResult
 import io.resystems.renotify.dashboard.DaemonHeartbeat
+import io.resystems.renotify.dashboard.HistoryQueryResult
 import io.resystems.renotify.notification.NotificationPayload
 import io.resystems.renotify.notification.NotificationRenderer
 import io.resystems.renotify.pairing.EncryptedProvisioningStore
@@ -60,7 +61,7 @@ class NatsService : Service() {
         createNotificationChannels()
         manager = NatsConnectionManager(
             serviceScope, ::handleMessage, ::handleHeartbeat,
-            ::handleInitialDashboard)
+            ::handleInitialDashboard, ::handleDeviceControl)
         store = EncryptedProvisioningStore(this)
 
         // Load silent mode from preferences.
@@ -91,6 +92,10 @@ class NatsService : Service() {
         }
         if (intent?.action == ACTION_PUBLISH_INTERJECTION) {
             handlePublishInterjection(intent)
+            return START_STICKY
+        }
+        if (intent?.action == ACTION_QUERY_HISTORY) {
+            handleQueryHistory(intent)
             return START_STICKY
         }
 
@@ -233,6 +238,83 @@ class NatsService : Service() {
                 "${result.flows.size} flow(s)")
         } catch (e: Exception) {
             Log.w(TAG, "Error parsing initial dashboard", e)
+        }
+    }
+
+    // --- History query (M-07) ---
+
+    /**
+     * Handle a history query intent from MainActivity. Sends a
+     * svc.history request to the daemon and updates the global
+     * [historyState] StateFlow.
+     */
+    private fun handleQueryHistory(intent: Intent) {
+        val limitVal = intent.getIntExtra(EXTRA_HISTORY_LIMIT, 25)
+        val offsetVal = intent.getIntExtra(EXTRA_HISTORY_OFFSET, 0)
+        val append = intent.getBooleanExtra(
+            EXTRA_HISTORY_APPEND, false)
+
+        val reqObj = JSONObject()
+        reqObj.put("limit", limitVal)
+        reqObj.put("offset", offsetVal)
+
+        serviceScope.launch(Dispatchers.IO) {
+            val data = manager.queryHistory(
+                reqObj.toString().toByteArray())
+            if (data != null) {
+                try {
+                    val json = String(data, Charsets.UTF_8)
+                    val result = HistoryQueryResult.fromJson(json)
+                    if (append) {
+                        // Merge with existing.
+                        val existing = _historyState.value
+                        if (existing != null) {
+                            _historyState.value =
+                                HistoryQueryResult(
+                                    records = existing.records +
+                                        result.records,
+                                    total = result.total
+                                )
+                        } else {
+                            _historyState.value = result
+                        }
+                    } else {
+                        _historyState.value = result
+                    }
+                    Log.i(TAG, "History: ${result.records.size} " +
+                        "records (total ${result.total})")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error parsing history", e)
+                }
+            } else {
+                Log.w(TAG, "History query returned null")
+            }
+        }
+    }
+
+    // --- Device control (C-16) ---
+
+    /**
+     * Callback invoked by [NatsConnectionManager] for device
+     * control messages. Runs on jnats' dispatcher thread.
+     */
+    private fun handleDeviceControl(data: ByteArray) {
+        try {
+            val json = String(data, Charsets.UTF_8)
+            val obj = JSONObject(json)
+            val command = obj.optString("command", "")
+
+            when (command) {
+                "set_silent" -> {
+                    val value = obj.getBoolean("value")
+                    setSilentMode(this, value)
+                    Log.i(TAG, "Remote silent mode: $value")
+                }
+                else -> Log.w(TAG,
+                    "Unknown device control: $command")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error parsing device control", e)
         }
     }
 
@@ -419,6 +501,13 @@ class NatsService : Service() {
         const val EXTRA_ACTION_VALUE = "action_value"
         const val EXTRA_TEXT = "text"
 
+        // Intent action and extras for M-07 history query.
+        const val ACTION_QUERY_HISTORY =
+            "io.resystems.renotify.QUERY_HISTORY"
+        const val EXTRA_HISTORY_LIMIT = "history_limit"
+        const val EXTRA_HISTORY_OFFSET = "history_offset"
+        const val EXTRA_HISTORY_APPEND = "history_append"
+
         // Intent action and extras for M-08 interjections.
         const val ACTION_PUBLISH_INTERJECTION =
             "io.resystems.renotify.PUBLISH_INTERJECTION"
@@ -495,6 +584,15 @@ class NatsService : Service() {
             .MutableStateFlow<DaemonHeartbeat?>(null)
         val dashboardState: StateFlow<DaemonHeartbeat?> =
             _dashboardState
+
+        /**
+         * Latest history query result for the history viewer
+         * (M-07). Null before the first query.
+         */
+        private val _historyState = kotlinx.coroutines.flow
+            .MutableStateFlow<HistoryQueryResult?>(null)
+        val historyState: StateFlow<HistoryQueryResult?> =
+            _historyState
 
         /**
          * Silent mode suppresses notification rendering while

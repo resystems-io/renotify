@@ -36,7 +36,7 @@ func TestRootHelp(t *testing.T) {
 	if !strings.Contains(stdout, "Available Commands") {
 		t.Error("help output missing 'Available Commands'")
 	}
-	for _, cmd := range []string{"daemon", "post", "ask", "answer", "interject", "dispatch", "flow", "flows", "history", "pair", "pairings", "revoke", "apk", "config"} {
+	for _, cmd := range []string{"daemon", "post", "ask", "answer", "interject", "dispatch", "flow", "flows", "history", "silent", "pair", "pairings", "revoke", "apk", "config"} {
 		if !strings.Contains(stdout, cmd) {
 			t.Errorf("help output missing command %q", cmd)
 		}
@@ -55,6 +55,7 @@ func TestSubcommandHelp(t *testing.T) {
 		{"interject", []string{"--flow-id", "--message", "--format"}},
 		{"flow", []string{"--format"}},
 		{"history", []string{"--workspace-id", "--flow-id", "--since", "--until", "--limit", "--offset", "--format"}},
+		{"silent", []string{"--device", "--all"}},
 		{"pair", []string{"--ip", "--regenerate-cert", "--format"}},
 		{"pairings", []string{"--format"}},
 		{"revoke", []string{"--format", "--device", "--all"}},
@@ -225,16 +226,15 @@ func TestAskAcceptsFlags(t *testing.T) {
 
 func TestHistoryAcceptsFlags(t *testing.T) {
 	t.Setenv("RENOTIFY_USERNAME", "testuser")
-	_, stderr, err := executeCommand("history",
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	_, _, err := executeCommand("history",
 		"--limit", "25",
 		"--offset", "50",
 		"--workspace-id", "ws_test",
 	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(stderr, "not yet implemented") {
-		t.Error("expected stub message on stderr")
+	// Expected to fail: no daemon running.
+	if err == nil {
+		t.Fatal("expected error (no daemon)")
 	}
 }
 
