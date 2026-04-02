@@ -61,6 +61,8 @@ func NewEmbeddedServer(cfg EmbeddedConfig, logger *slog.Logger) (*EmbeddedServer
 		StoreDir:           storeDir,
 		NoLog:              true,
 		NoSigs:             true,
+		PingInterval:       20 * time.Second,
+		MaxPingsOut:        2,
 		Users:              BuildAuthConfig(cfg.Username, cfg.InternalToken, cfg.Devices),
 	}
 
