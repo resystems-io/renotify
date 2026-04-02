@@ -184,7 +184,7 @@ func (c *Controller) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			break
 		case <-c.ReloadCh:
-			c.reloadAuth(embeddedSrv)
+			c.reloadAuth(embeddedSrv, nc)
 			continue
 		}
 		break
@@ -193,9 +193,12 @@ func (c *Controller) Run(ctx context.Context) error {
 	return nil
 }
 
-// reloadAuth re-reads the device registry from disk and applies
-// the updated auth configuration to the embedded broker.
-func (c *Controller) reloadAuth(srv *broker.EmbeddedServer) {
+// reloadAuth re-reads the device registry from disk, applies
+// the updated auth configuration, and ensures per-device
+// JetStream consumers exist.
+func (c *Controller) reloadAuth(
+	srv *broker.EmbeddedServer, nc *nats.Conn,
+) {
 	c.logger.Info("reloading auth configuration (SIGHUP)")
 
 	if srv == nil {
@@ -218,6 +221,17 @@ func (c *Controller) reloadAuth(srv *broker.EmbeddedServer) {
 	if err := srv.ReloadAuth(c.cfg.Username, internalToken, devices); err != nil {
 		c.logger.Error("reload: apply auth config", "err", err)
 		return
+	}
+
+	// Ensure per-device JetStream consumers exist for any
+	// newly paired devices. EnsureJetStream is idempotent —
+	// existing consumers are left unchanged.
+	if err := broker.EnsureJetStream(
+		context.Background(), nc,
+		c.cfg.Username, devices,
+		c.cfg.JetStream, c.logger,
+	); err != nil {
+		c.logger.Error("reload: ensure consumers", "err", err)
 	}
 
 	c.logger.Info("auth reloaded",
