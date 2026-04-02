@@ -38,3 +38,9 @@ func FlowInterjectSubject(username, flowID string) string {
 func ServiceFlowsSubject(username string) string {
 	return fmt.Sprintf("resystems.renotify.%s.svc.flows", username)
 }
+
+// ServiceHistorySubject returns the Core NATS Request-Reply
+// subject for the notification history query endpoint (C-09).
+func ServiceHistorySubject(username string) string {
+	return fmt.Sprintf("resystems.renotify.%s.svc.history", username)
+}

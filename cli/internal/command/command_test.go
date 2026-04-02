@@ -225,16 +225,15 @@ func TestAskAcceptsFlags(t *testing.T) {
 
 func TestHistoryAcceptsFlags(t *testing.T) {
 	t.Setenv("RENOTIFY_USERNAME", "testuser")
-	_, stderr, err := executeCommand("history",
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	_, _, err := executeCommand("history",
 		"--limit", "25",
 		"--offset", "50",
 		"--workspace-id", "ws_test",
 	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(stderr, "not yet implemented") {
-		t.Error("expected stub message on stderr")
+	// Expected to fail: no daemon running.
+	if err == nil {
+		t.Fatal("expected error (no daemon)")
 	}
 }
 
