@@ -38,8 +38,9 @@ BINARY   := $(BUILD_DIR)/renotify
 
 .PHONY: build build-dev test test-unit test-integration vet clean
 
+# Omit DWARF debug info (-w) but keep the symbol table for crash stack traces.
 build: | $(ENSURE_BUILD_DIR)
-	$(GO) build $(GOFLAGS) -o $(BINARY) ./cmd/renotify
+	$(GO) build $(GOFLAGS) -ldflags="-w" -o $(BINARY) ./cmd/renotify
 
 build-dev: | $(ENSURE_BUILD_DIR)
 	$(GO) build $(GOFLAGS) -tags dev -o $(BINARY) ./cmd/renotify

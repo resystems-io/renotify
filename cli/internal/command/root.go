@@ -70,6 +70,7 @@ back to the originating pipeline.`,
 		newAppCmd(app),
 		newConfigCmd(app),
 		newMCPCmd(app),
+		newVersionCmd(app),
 	)
 
 	return root
