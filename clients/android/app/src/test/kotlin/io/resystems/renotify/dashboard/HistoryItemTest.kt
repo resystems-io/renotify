@@ -1,6 +1,7 @@
 package io.resystems.renotify.dashboard
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -239,4 +240,175 @@ class HistoryItemTest {
         assertEquals("ntf_A", result.records[0].id)
         assertEquals("ntf_B", result.records[1].id)
     }
+
+    // --- hasResponse ---
+
+    @Test
+    fun hasResponse_allNull_isFalse() {
+        val rec = record()
+        assertFalse(rec.hasResponse)
+    }
+
+    @Test
+    fun hasResponse_acceptedTrue_isTrue() {
+        val rec = record(responseAccepted = true)
+        assertTrue(rec.hasResponse)
+    }
+
+    @Test
+    fun hasResponse_actionOnly_isTrue() {
+        val rec = record(responseAction = "staging")
+        assertTrue(rec.hasResponse)
+    }
+
+    @Test
+    fun hasResponse_textOnly_isTrue() {
+        val rec = record(responseText = "ok")
+        assertTrue(rec.hasResponse)
+    }
+
+    // --- responseSummary truncation boundary ---
+
+    @Test
+    fun responseSummary_exactly30Chars_noTruncation() {
+        val text = "a".repeat(30)
+        val rec = record(responseText = text)
+        assertEquals(text, rec.responseSummary)
+    }
+
+    @Test
+    fun responseSummary_31Chars_truncatedWithEllipsis() {
+        val text = "a".repeat(31)
+        val rec = record(responseText = text)
+        assertEquals("a".repeat(27) + "...", rec.responseSummary)
+    }
+
+    // --- isExpandable ---
+
+    @Test
+    fun isExpandable_withBody_isTrue() {
+        val rec = record(body = "Deploy details")
+        assertTrue(rec.isExpandable)
+    }
+
+    @Test
+    fun isExpandable_nullBody_noLongText_isFalse() {
+        val rec = record()
+        assertFalse(rec.isExpandable)
+    }
+
+    @Test
+    fun isExpandable_nullBody_shortText_isFalse() {
+        val rec = record(responseText = "short")
+        assertFalse(rec.isExpandable)
+    }
+
+    @Test
+    fun isExpandable_nullBody_exactly30CharText_isFalse() {
+        val rec = record(responseText = "a".repeat(30))
+        assertFalse(rec.isExpandable)
+    }
+
+    @Test
+    fun isExpandable_nullBody_31CharText_isTrue() {
+        val rec = record(responseText = "a".repeat(31))
+        assertTrue(rec.isExpandable)
+    }
+
+    @Test
+    fun isExpandable_bodyAndLongText_isTrue() {
+        val rec = record(
+            body = "details",
+            responseText = "a".repeat(40)
+        )
+        assertTrue(rec.isExpandable)
+    }
+
+    // --- fromJson: responseTimestamp ---
+
+    @Test
+    fun parsesResponseTimestamp() {
+        val json = """
+            {
+                "records": [
+                    {
+                        "Username": "testuser",
+                        "Request": {
+                            "id": "ntf_006",
+                            "flow_id": "fl_006",
+                            "daemon_id": "dn_001",
+                            "workspace_id": "ws_001",
+                            "title": "Approve?",
+                            "response_types": ["boolean"],
+                            "priority": "normal",
+                            "timestamp": "2026-04-01T15:00:00Z"
+                        },
+                        "Response": {
+                            "request_id": "ntf_006",
+                            "accepted": true,
+                            "timestamp": "2026-04-01T15:00:30Z"
+                        }
+                    }
+                ],
+                "total": 1
+            }
+        """.trimIndent()
+
+        val rec = HistoryQueryResult.fromJson(json).records[0]
+        assertEquals("2026-04-01T15:00:30Z", rec.responseTimestamp)
+    }
+
+    @Test
+    fun missingResponseTimestamp_isNull() {
+        val json = """
+            {
+                "records": [
+                    {
+                        "Username": "testuser",
+                        "Request": {
+                            "id": "ntf_007",
+                            "flow_id": "fl_007",
+                            "daemon_id": "dn_001",
+                            "workspace_id": "ws_001",
+                            "title": "Approve?",
+                            "response_types": ["boolean"],
+                            "priority": "normal",
+                            "timestamp": "2026-04-01T16:00:00Z"
+                        },
+                        "Response": {
+                            "request_id": "ntf_007",
+                            "accepted": false
+                        }
+                    }
+                ],
+                "total": 1
+            }
+        """.trimIndent()
+
+        val rec = HistoryQueryResult.fromJson(json).records[0]
+        assertNull(rec.responseTimestamp)
+    }
+
+    // --- Helper ---
+
+    private fun record(
+        body: String? = null,
+        responseAccepted: Boolean? = null,
+        responseAction: String? = null,
+        responseText: String? = null,
+        responseTimestamp: String? = null
+    ) = HistoryRecord(
+        id = "ntf_test",
+        flowId = "fl_test",
+        workspaceId = "ws_test",
+        title = "Test",
+        body = body,
+        priority = "normal",
+        source = "",
+        timestamp = "2026-04-01T10:00:00Z",
+        responseAccepted = responseAccepted,
+        responseAction = responseAction,
+        responseText = responseText,
+        responseTimestamp = responseTimestamp
+    )
 }

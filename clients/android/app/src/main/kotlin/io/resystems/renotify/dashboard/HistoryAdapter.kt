@@ -2,6 +2,7 @@ package io.resystems.renotify.dashboard
 
 import android.graphics.Typeface
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -22,6 +23,9 @@ class HistoryAdapter :
     private var records: List<HistoryRecord> = emptyList()
     private var total: Int = 0
 
+    /** Adapter position of the currently expanded item, or -1. */
+    private var expandedPosition: Int = -1
+
     /** Callback when the user taps "Load more". */
     var onLoadMore: (() -> Unit)? = null
 
@@ -29,6 +33,7 @@ class HistoryAdapter :
     fun update(result: HistoryQueryResult) {
         records = result.records
         total = result.total
+        expandedPosition = -1
         notifyDataSetChanged()
     }
 
@@ -97,6 +102,25 @@ class HistoryAdapter :
                 }
                 root.addView(response)
 
+                // Expandable body (child 3) — hidden by default.
+                val body = TextView(ctx).apply {
+                    textSize = 12f
+                    setTextColor(Brand.TEXT_DARK)
+                    setPadding(0, dp(6), 0, 0)
+                    visibility = View.GONE
+                }
+                root.addView(body)
+
+                // Expandable full response (child 4) — hidden by
+                // default, shown when response text was truncated.
+                val fullResponse = TextView(ctx).apply {
+                    textSize = 12f
+                    setTextColor(Brand.TEXT_SECONDARY)
+                    setPadding(0, dp(4), 0, 0)
+                    visibility = View.GONE
+                }
+                root.addView(fullResponse)
+
                 ViewHolder(root)
             }
 
@@ -155,6 +179,63 @@ class HistoryAdapter :
         (root.getChildAt(2) as? TextView)?.text =
             if (rec.hasResponse) rec.responseSummary
             else "\u2014"
+
+        // Expansion state.
+        val expanded = pos == expandedPosition && rec.isExpandable
+        bindExpansion(root, rec, expanded)
+
+        // Accordion tap handler.
+        root.setOnClickListener {
+            val adapterPos = holder.bindingAdapterPosition
+            if (adapterPos == RecyclerView.NO_POSITION) return@setOnClickListener
+            val clicked = records.getOrNull(adapterPos) ?: return@setOnClickListener
+            if (!clicked.isExpandable) return@setOnClickListener
+
+            val prev = expandedPosition
+            expandedPosition = if (prev == adapterPos) -1 else adapterPos
+            if (prev >= 0 && prev < itemCount) notifyItemChanged(prev)
+            if (expandedPosition >= 0) notifyItemChanged(expandedPosition)
+        }
+    }
+
+    /**
+     * Show or hide the expandable body (child 3) and full
+     * response (child 4) for the given record.
+     */
+    private fun bindExpansion(
+        root: LinearLayout,
+        rec: HistoryRecord,
+        expanded: Boolean
+    ) {
+        val bodyView = root.getChildAt(3) as? TextView
+        val fullRespView = root.getChildAt(4) as? TextView
+
+        if (!expanded) {
+            bodyView?.visibility = View.GONE
+            fullRespView?.visibility = View.GONE
+            return
+        }
+
+        // Body text.
+        if (!rec.body.isNullOrEmpty()) {
+            bodyView?.text = rec.body
+            bodyView?.visibility = View.VISIBLE
+        } else {
+            bodyView?.visibility = View.GONE
+        }
+
+        // Full response text (only when truncated in summary).
+        val hasFullText = !rec.responseText.isNullOrEmpty() &&
+            rec.responseText.length > 30
+        if (hasFullText) {
+            val respTs = rec.responseTimestamp?.let {
+                " · ${formatTimestamp(it)}"
+            } ?: ""
+            fullRespView?.text = "Response: ${rec.responseText}$respTs"
+            fullRespView?.visibility = View.VISIBLE
+        } else {
+            fullRespView?.visibility = View.GONE
+        }
     }
 
     class ViewHolder(view: android.view.View) :
