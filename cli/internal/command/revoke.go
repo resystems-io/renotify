@@ -79,7 +79,8 @@ a message and exits successfully.`,
 
 	cmd.Flags().StringVar(&format, "format", "text",
 		"output format: json|text")
-	cmd.Flags().StringVar(&deviceID, "device", "",
+
+	cmd.Flags().StringVarP(&deviceID, "device", "d", "",
 		"revoke a specific device by ID")
 	cmd.Flags().BoolVar(&all, "all", false,
 		"revoke all paired devices")

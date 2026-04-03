@@ -99,9 +99,9 @@ by workspace, flow, time range, and pagination via limit/offset.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&workspaceID, "workspace-id", "",
-		"filter by workspace")
-	cmd.Flags().StringVar(&flowID, "flow-id", "",
+	cmd.Flags().StringVarP(&workspaceID, "workspace", "w", "",
+		"filter by workspace ID")
+	cmd.Flags().StringVarP(&flowID, "flow-id", "f", "",
 		"filter by flow")
 	cmd.Flags().StringVar(&since, "since", "",
 		"include records since, RFC 3339 (e.g. 2026-04-01T00:00:00Z)")

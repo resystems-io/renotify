@@ -110,7 +110,7 @@ Use flow IDs with other commands:
 	}
 
 	cmd.Flags().StringVar(&format, "format", "text",
-		"output format: text or json")
+		"output format: json|text")
 	cmd.Flags().StringVarP(&workspace, "workspace", "w", "",
 		"filter by workspace ID")
 

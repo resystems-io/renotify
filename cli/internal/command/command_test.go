@@ -50,13 +50,13 @@ func TestSubcommandHelp(t *testing.T) {
 		flags []string
 	}{
 		{"daemon start", []string{"--foreground", "--username", "--log-level", "--shared-broker", "--no-mcp"}},
-		{"post", []string{"--title", "--body", "--priority", "--source", "--format"}},
-		{"ask", []string{"--title", "--body", "--priority", "--actions", "--response-types", "--timeout", "--format"}},
-		{"answer", []string{"--flow-id", "--request-id", "--accepted", "--rejected", "--action", "--text", "--format"}},
+		{"post", []string{"--title", "--message", "--priority", "--source", "--format"}},
+		{"ask", []string{"--title", "--message", "--priority", "--source", "--actions", "--response-types", "--timeout", "--format"}},
+		{"answer", []string{"--flow-id", "--request-id", "--accepted", "--rejected", "--action", "--message", "--format"}},
 		{"interject", []string{"--flow-id", "--message", "--format"}},
 		{"flow", []string{"--format"}},
-		{"history", []string{"--workspace-id", "--flow-id", "--since", "--until", "--limit", "--offset", "--format"}},
-		{"silent", []string{"--device", "--all"}},
+		{"history", []string{"--workspace", "--flow-id", "--since", "--until", "--limit", "--offset", "--format"}},
+		{"silent", []string{"--device", "--all", "--format"}},
 		{"pair", []string{"--ip", "--regenerate-cert", "--format"}},
 		{"pairings", []string{"--format"}},
 		{"revoke", []string{"--format", "--device", "--all"}},
@@ -177,7 +177,7 @@ func TestPostAcceptsFlags(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	_, _, err := executeCommand("post",
 		"--title", "Build done",
-		"--body", "All tests passed",
+		"--message", "All tests passed",
 		"--priority", "high",
 		"--source", "ci/pipeline",
 	)
@@ -231,7 +231,7 @@ func TestHistoryAcceptsFlags(t *testing.T) {
 	_, _, err := executeCommand("history",
 		"--limit", "25",
 		"--offset", "50",
-		"--workspace-id", "ws_test",
+		"--workspace", "ws_test",
 	)
 	// Expected to fail: no daemon running.
 	if err == nil {

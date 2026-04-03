@@ -2,7 +2,6 @@ package command
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -22,7 +21,7 @@ func newAnswerCmd(app *App) *cobra.Command {
 		accepted  bool
 		rejected  bool
 		action    string
-		text      string
+		message   string
 		format    string
 	)
 
@@ -33,12 +32,13 @@ func newAnswerCmd(app *App) *cobra.Command {
 'renotify ask' command. The flow-id and request-id are obtained
 from the ask command's stderr output.
 
-If --text is not provided, text is read from stdin when piped.
+If --message is not provided, the message is read from stdin
+when piped.
 
 Examples:
 
   renotify answer -f fl_... -n ntf_... --accepted
-  renotify answer -f fl_... -n ntf_... --rejected -t "Not ready"
+  renotify answer -f fl_... -n ntf_... --rejected -m "Not ready"
   renotify answer -f fl_... -n ntf_... -a "Approve"
   echo "Reason" | renotify answer -f fl_... -n ntf_... --rejected`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -61,15 +61,15 @@ Examples:
 				}
 			}
 
-			// Read text from stdin if not provided via flag.
-			if !cmd.Flags().Changed("text") {
+			// Read message from stdin if not provided via flag.
+			if !cmd.Flags().Changed("message") {
 				if info, _ := os.Stdin.Stat(); info.Mode()&os.ModeCharDevice == 0 {
 					data, err := io.ReadAll(os.Stdin)
 					if err != nil {
 						return exitcode.Errorf(exitcode.Error,
 							"read stdin: %v", err)
 					}
-					text = strings.TrimRight(string(data), "\n")
+					message = strings.TrimRight(string(data), "\n")
 				}
 			}
 
@@ -88,8 +88,8 @@ Examples:
 			if action != "" {
 				resp.Action = action
 			}
-			if text != "" {
-				resp.Text = text
+			if message != "" {
+				resp.Text = message
 			}
 
 			// Connect and publish.
@@ -136,8 +136,8 @@ Examples:
 		"boolean response: rejected")
 	cmd.Flags().StringVarP(&action, "action", "a", "",
 		"choice response: selected action label")
-	cmd.Flags().StringVarP(&text, "text", "t", "",
-		fmt.Sprintf("free-form text / comment (reads stdin if omitted)"))
+	cmd.Flags().StringVarP(&message, "message", "m", "",
+		"free-form message / comment (reads stdin if omitted)")
 	cmd.Flags().StringVar(&format, "format", "text",
 		"output format: json|text")
 

@@ -41,7 +41,7 @@ func TestSmoke_PostRoundTrip(t *testing.T) {
 	// Run post command.
 	stdout, _, err := executeCommand("post",
 		"-t", "Build done",
-		"-b", "All tests passed",
+		"-m", "All tests passed",
 		"--priority", "high",
 		"--source", "ci/pipeline",
 		"--format", "json",
@@ -415,7 +415,7 @@ func TestSmoke_PayloadSerialisation(t *testing.T) {
 
 	_, _, err := executeCommand("post",
 		"-t", "Serialisation test",
-		"-b", "Check JSON format",
+		"-m", "Check JSON format",
 		"--priority", "low",
 		"--source", "test/v00",
 		"--format", "json",

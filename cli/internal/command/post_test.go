@@ -76,7 +76,7 @@ func TestPost_Integration(t *testing.T) {
 	// Run the post command.
 	stdout, _, cmdErr := executeCommand("post",
 		"--title", "Build done",
-		"--body", "All tests passed",
+		"--message", "All tests passed",
 		"--priority", "high",
 		"--source", "ci/test",
 		"--format", "json",

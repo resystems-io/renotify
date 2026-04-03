@@ -115,7 +115,7 @@ func TestAnswer_AcceptedWithText(t *testing.T) {
 		"-f", "fl_TEST04",
 		"-n", "ntf_TEST04",
 		"--accepted",
-		"-t", "Looks good to me",
+		"-m", "Looks good to me",
 		"--format", "json",
 	)
 	if err != nil {

@@ -102,7 +102,7 @@ file unless --force is passed.`,
 		"include all parameters with defaults")
 	cmd.Flags().BoolVar(&force, "force", false,
 		"overwrite existing file")
-	cmd.Flags().StringVar(&output, "output", "",
+	cmd.Flags().StringVarP(&output, "output", "o", "",
 		"output path (default: $XDG_CONFIG_HOME/renotify/settings.json)")
 
 	return cmd

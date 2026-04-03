@@ -60,7 +60,7 @@ specific device, or 'renotify revoke --all' to revoke all.`,
 	}
 
 	cmd.Flags().StringVar(&format, "format", "text",
-		"output format: text or json")
+		"output format: json|text")
 
 	return cmd
 }
