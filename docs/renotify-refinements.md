@@ -958,8 +958,12 @@ workspace monitoring).*
   extended with error-path tests, broker subject tests, error discrimination
   helper extraction, and code quality cleanup. V&V method: demonstration +
   test (see change log).
-- [ ] **V-02: Documentation Updates:** Update README with comprehensive setup
-  instructions, architecture diagram, and CLI usage examples.
+- [x] **V-02: Documentation Updates:** README rewritten with quick start,
+  agent integration configs (Claude Code HTTP, Antigravity stdio, hooks),
+  CLI command table, and links to guides. New `docs/renotify-architecture.md`
+  with system context, design principles, Mermaid block diagram (showing
+  concurrent HTTP MCP, stdio, and terminal connections), and sequence
+  diagrams for post, ask, and interjection flows.
 
 ---
 
@@ -1108,6 +1112,7 @@ Record completed items here with the date.
 | 2026-04-03 | P-02 | Artefact embedding implemented. New `internal/embed` package with `//go:embed all:dist` embeds the APK directory at build time. Default checkout: `dist/` contains only `.gitignore` (ignores `*.apk`), so `go build` and `go install` succeed without the APK. Full `make` build copies the real APK into `dist/` before compiling. `renotify app` command group introduced for future platform extensibility (iOS). |
 | 2026-04-03 | P-03 | APK management commands implemented as `renotify app apk extract` and `renotify app apk serve`. Extract writes the embedded APK to disk. Serve starts a temporary HTTP server with QR code download URL, uses `http.ServeContent` for Range request support (required by Firefox), and prints ufw firewall hints on Linux. IP discovery fixed: `FlagRunning` check filters virtual bridges (virbr0, docker0) that lack carrier. |
 | 2026-04-03 | V-01 | Test gap analysis and code quality pass. Removed dead `caCert` ReadFile in `broker/client.go`. Fixed duplicate `New()` comment in `mcpserver/server.go`. Extracted `sessionIDPayload` type in `stdio_relay.go`. Extracted shared `isErrorResponse()` helper from duplicated inline probes in `ask.go` and `dispatch.go` with 5 unit tests. Added 7 broker subject unit tests (service, device, MCP). Added MCP tool error-path tests (expired flow, terminated flow). Added APK extract write-path test (skipped when APK absent). |
+| 2026-04-03 | V-02 | README rewritten (~110 lines) with quick start, agent integration configs (Claude Code HTTP MCP, Antigravity/Cursor stdio, Claude Code hooks), CLI command table, and links to testing guides. New `docs/renotify-architecture.md` with system context prose, design principles, Mermaid system block diagram (concurrent HTTP MCP + stdio + terminal + multi-device), and sequence diagrams for post, ask, and interjection flows. Port architecture table and NATS subject namespace reference. Phase 7 complete. |
 
 ## 6. References
 
