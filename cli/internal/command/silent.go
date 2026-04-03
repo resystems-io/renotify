@@ -25,6 +25,7 @@ func newSilentCmd(app *App) *cobra.Command {
 	var (
 		deviceID string
 		all      bool
+		format   string
 	)
 
 	cmd := &cobra.Command{
@@ -116,6 +117,12 @@ with --all. Use 'renotify pairings' to list device IDs.`,
 			}
 			data, _ := json.Marshal(msg)
 
+			type silentResult struct {
+				DeviceID string `json:"device_id"`
+				Silent   bool   `json:"silent"`
+			}
+			var results []silentResult
+
 			for _, d := range targets {
 				subject := broker.DeviceControlSubject(
 					cfg.Username, d.DeviceID)
@@ -124,16 +131,29 @@ with --all. Use 'renotify pairings' to list device IDs.`,
 						"publish to %s: %v",
 						d.DeviceID, err)
 				}
+				results = append(results, silentResult{
+					DeviceID: d.DeviceID,
+					Silent:   silent,
+				})
+			}
+
+			nc.Flush()
+
+			if format == "json" {
+				enc := json.NewEncoder(cmd.OutOrStdout())
+				enc.SetIndent("", "  ")
+				return enc.Encode(results)
+			}
+
+			for _, r := range results {
 				stateStr := "on"
-				if !silent {
+				if !r.Silent {
 					stateStr = "off"
 				}
 				fmt.Fprintf(cmd.OutOrStdout(),
 					"Silent mode set to %s for %s\n",
-					stateStr, d.DeviceID)
+					stateStr, r.DeviceID)
 			}
-
-			nc.Flush()
 			return nil
 		},
 	}
@@ -142,6 +162,8 @@ with --all. Use 'renotify pairings' to list device IDs.`,
 		"target device ID")
 	cmd.Flags().BoolVar(&all, "all", false,
 		"target all paired devices")
+	cmd.Flags().StringVar(&format, "format", "text",
+		"output format: json|text")
 
 	return cmd
 }

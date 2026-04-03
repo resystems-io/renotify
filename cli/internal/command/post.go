@@ -18,7 +18,7 @@ import (
 func newPostCmd(app *App) *cobra.Command {
 	var (
 		title    string
-		body     string
+		message  string
 		priority string
 		source   string
 		format   string
@@ -30,8 +30,8 @@ func newPostCmd(app *App) *cobra.Command {
 		Long: `Publish a one-way notification to the mobile app. The command
 exits immediately after publishing; no response is expected.
 
-If --body is not provided, the body is read from stdin. This
-allows piping output from other commands:
+If --message is not provided, the message is read from stdin.
+This allows piping output from other commands:
 
   echo "All 42 tests passed" | renotify post -t "Build done"
 
@@ -56,15 +56,15 @@ posting. The notification is buffered in JetStream for up to
 				}
 			}
 
-			// Read body from stdin if not provided via flag.
-			if !cmd.Flags().Changed("body") {
+			// Read message from stdin if not provided via flag.
+			if !cmd.Flags().Changed("message") {
 				if info, _ := os.Stdin.Stat(); info.Mode()&os.ModeCharDevice == 0 {
 					data, err := io.ReadAll(os.Stdin)
 					if err != nil {
 						return exitcode.Errorf(exitcode.Error,
 							"read stdin: %v", err)
 					}
-					body = strings.TrimRight(string(data), "\n")
+					message = strings.TrimRight(string(data), "\n")
 				}
 			}
 
@@ -106,7 +106,7 @@ posting. The notification is buffered in JetStream for up to
 				DaemonID:    fc.daemonID,
 				WorkspaceID: fc.workspaceID,
 				Title:       title,
-				Body:        body,
+				Body:        message,
 				ResponseTypes: []payload.ResponseType{
 					payload.ResponseNone,
 				},
@@ -159,11 +159,11 @@ posting. The notification is buffered in JetStream for up to
 
 	cmd.Flags().StringVarP(&title, "title", "t", "",
 		"notification title (required)")
-	cmd.Flags().StringVarP(&body, "body", "b", "",
-		"notification body (reads stdin if omitted)")
-	cmd.Flags().StringVar(&priority, "priority", "normal",
+	cmd.Flags().StringVarP(&message, "message", "m", "",
+		"notification message (reads stdin if omitted)")
+	cmd.Flags().StringVarP(&priority, "priority", "p", "normal",
 		"low|normal|high")
-	cmd.Flags().StringVar(&source, "source", "",
+	cmd.Flags().StringVarP(&source, "source", "s", "",
 		"source pipeline identifier")
 	cmd.Flags().StringVar(&format, "format", "text",
 		"output format: json|text")

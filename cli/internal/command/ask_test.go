@@ -264,6 +264,7 @@ func TestAsk_InterjectionNote(t *testing.T) {
 		"-t", "Continue?",
 		"-r", "boolean",
 		"--timeout", "5s",
+		"--format", "json",
 	)
 	if err != nil {
 		t.Fatalf("ask failed: %v", err)

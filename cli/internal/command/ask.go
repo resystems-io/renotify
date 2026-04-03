@@ -23,8 +23,9 @@ import (
 func newAskCmd(app *App) *cobra.Command {
 	var (
 		title         string
-		body          string
+		message       string
 		priority      string
+		source        string
 		actions       []string
 		responseTypes []string
 		timeout       string
@@ -38,7 +39,7 @@ func newAskCmd(app *App) *cobra.Command {
 until a response is received or the timeout expires. The response
 is printed to stdout as JSON (default) or formatted text.
 
-If --body is not provided, the body is read from stdin.
+If --message is not provided, the message is read from stdin.
 
 The daemon is the sole timeout enforcer (R-CLI-17). The CLI does
 not run a local timer; it waits for the daemon to publish an
@@ -112,15 +113,15 @@ protects against daemon failure.`,
 			}
 			timeoutSec := int(timeoutDur.Seconds())
 
-			// Read body from stdin if not provided via flag.
-			if !cmd.Flags().Changed("body") {
+			// Read message from stdin if not provided via flag.
+			if !cmd.Flags().Changed("message") {
 				if info, _ := os.Stdin.Stat(); info.Mode()&os.ModeCharDevice == 0 {
 					data, err := io.ReadAll(os.Stdin)
 					if err != nil {
 						return exitcode.Errorf(exitcode.Error,
 							"read stdin: %v", err)
 					}
-					body = strings.TrimRight(string(data), "\n")
+					message = strings.TrimRight(string(data), "\n")
 				}
 			}
 
@@ -218,10 +219,10 @@ protects against daemon failure.`,
 				DaemonID:      fc.daemonID,
 				WorkspaceID:   fc.workspaceID,
 				Title:         title,
-				Body:          body,
+				Body:          message,
 				ResponseTypes: rts,
 				Priority:      p,
-				Source:        "",
+				Source:        source,
 				WorkspaceName: fc.displayName,
 				Actions:       actions,
 				TimeoutSec:    timeoutSec,
@@ -305,17 +306,19 @@ protects against daemon failure.`,
 
 	cmd.Flags().StringVarP(&title, "title", "t", "",
 		"notification title (required)")
-	cmd.Flags().StringVarP(&body, "body", "b", "",
-		"notification body (reads stdin if omitted)")
-	cmd.Flags().StringVar(&priority, "priority", "normal",
+	cmd.Flags().StringVarP(&message, "message", "m", "",
+		"notification message (reads stdin if omitted)")
+	cmd.Flags().StringVarP(&priority, "priority", "p", "normal",
 		"low|normal|high")
+	cmd.Flags().StringVarP(&source, "source", "s", "",
+		"source pipeline identifier")
 	cmd.Flags().StringSliceVarP(&actions, "actions", "a", nil,
 		"choice labels (required when response-types includes choice)")
 	cmd.Flags().StringSliceVarP(&responseTypes, "response-types", "r", nil,
 		"accepted response types: boolean, choice, text (required)")
 	cmd.Flags().StringVar(&timeout, "timeout", "",
 		"override default ask timeout (e.g., 5m, 10m)")
-	cmd.Flags().StringVar(&format, "format", "json",
+	cmd.Flags().StringVar(&format, "format", "text",
 		"output format: json|text")
 
 	return cmd
