@@ -43,6 +43,16 @@ func (is *InterjectionStore) Register(flowID string) {
 	}
 }
 
+// Registered reports whether a flow has been registered in
+// the interjection store (even if no interjections have
+// arrived yet).
+func (is *InterjectionStore) Registered(flowID string) bool {
+	is.mu.Lock()
+	defer is.mu.Unlock()
+	_, ok := is.flows[flowID]
+	return ok
+}
+
 // Append adds an interjection to the flow's queue and signals
 // any waiting await_interjection caller. A new notification
 // channel is created for the next wait cycle.
@@ -131,10 +141,12 @@ func (s *Server) registerInterjectionTemplate() {
 			URITemplate: "renotify://interjections/{flow_id}",
 			Name:        "interjection",
 			Title:       "Interjection Resource",
-			Description: "Most recent interjection (stop, note, pause) " +
-				"for a flow. Use check_interjections or " +
-				"await_interjection to consume accumulated " +
-				"interjections.",
+			Description: "Most recent interjection (stop, note) for a " +
+				"flow. Available immediately after register_flow " +
+				"(returns [] when empty). Subscribe for push " +
+				"notifications, or poll between work steps. " +
+				"A stop interjection means abort; a note includes " +
+				"context to consider.",
 			MIMEType: "application/json",
 		},
 		s.handleReadInterjection,
@@ -142,6 +154,9 @@ func (s *Server) registerInterjectionTemplate() {
 }
 
 // handleReadInterjection serves the latest InterjectionResource.
+// Returns an empty array when the flow is registered but no
+// interjections have arrived yet — this allows MCP clients to
+// subscribe to the resource immediately after register_flow.
 func (s *Server) handleReadInterjection(
 	_ context.Context,
 	req *mcp.ReadResourceRequest,
@@ -152,14 +167,21 @@ func (s *Server) handleReadInterjection(
 	}
 	flowID := req.Params.URI[len(prefix):]
 
-	resource := s.interjections.Get(flowID)
-	if resource == nil {
+	if !s.interjections.Registered(flowID) {
 		return nil, mcp.ResourceNotFoundError(req.Params.URI)
 	}
 
-	data, err := json.Marshal(resource)
-	if err != nil {
-		return nil, err
+	resource := s.interjections.Get(flowID)
+
+	var data []byte
+	var err error
+	if resource == nil {
+		data = []byte("[]")
+	} else {
+		data, err = json.Marshal(resource)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &mcp.ReadResourceResult{

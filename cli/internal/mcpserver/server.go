@@ -45,6 +45,12 @@ type Server struct {
 	interjections *InterjectionStore
 
 	cancelMu sync.Mutex
+
+	// Stdio relay sessions (renotify mcp → NATS → mcp.Server).
+	stdioMu       sync.Mutex
+	stdioSessions map[string]*stdioSession
+	stdioOpenSub  *nats.Subscription
+	stdioCloseSub *nats.Subscription
 }
 
 // New creates an MCP server that will register its handler on
@@ -143,6 +149,18 @@ func (s *Server) Start(_ context.Context, nc *nats.Conn, ready chan<- error) err
 			}
 		}
 
+		// Start stdio relay listener for `renotify mcp` sessions.
+		// Skipped when username is empty (lightweight test mode).
+		if s.username != "" {
+			if err := s.startStdioRelay(context.Background()); err != nil {
+				if ready != nil {
+					ready <- err
+					close(ready)
+				}
+				return err
+			}
+		}
+
 		s.logger.Info("MCP tools registered",
 			"tools", "register_flow, refresh_flow, terminate_flow, post, ask, await_decision, check_interjections, await_interjection")
 	}
@@ -158,9 +176,11 @@ func (s *Server) Start(_ context.Context, nc *nats.Conn, ready chan<- error) err
 	return nil
 }
 
-// Stop cancels all pending response subscribers.
+// Stop cancels all pending response subscribers and stdio
+// relay sessions.
 func (s *Server) Stop(_ context.Context) error {
 	s.subscribers.CancelAll()
+	s.stopStdioRelay()
 	s.logger.Info("MCP server stopped")
 	return nil
 }

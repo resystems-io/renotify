@@ -131,6 +131,37 @@ single route. No separate `/message` endpoint is needed.
 }
 ```
 
+### Stdio Transport (recommended for Antigravity)
+
+Initial testing (2026-04-03) showed Antigravity sending
+Streamable HTTP dialect (POST-first) rather than Standard
+SSE (GET-first), and failing Accept-header validation on
+both `/mcp` and `/sse`. The most reliable transport for
+Antigravity is **stdio**:
+
+```json
+{
+  "mcpServers": {
+    "renotify": {
+      "command": "renotify",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+The `renotify mcp` command bridges stdin/stdout to the
+daemon's `mcp.Server` via NATS. It is a raw byte relay —
+adding new MCP tools requires no CLI changes.
+
+**Daemon restart behaviour:** The CLI exits immediately on
+NATS disconnect. Antigravity detects subprocess death and
+relaunches. Future improvement: persist `ServerSessionState`
+(the SDK's `ServerSessionOptions.State` accepts pre-populated
+`InitializeParams`/`InitializedParams`) and rehydrate on
+reconnect. This would survive brief daemon restarts without
+requiring the MCP client to re-initialize.
+
 ### Implementation Note: http.Flusher
 
 The SDK's `writeEvent()` type-asserts `w.(http.Flusher)` to

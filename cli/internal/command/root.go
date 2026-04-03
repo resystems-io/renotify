@@ -69,6 +69,7 @@ back to the originating pipeline.`,
 		newRevokeCmd(app),
 		newAPKCmd(app),
 		newConfigCmd(app),
+		newMCPCmd(app),
 	)
 
 	return root
