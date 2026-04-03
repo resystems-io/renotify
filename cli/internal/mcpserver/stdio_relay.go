@@ -10,6 +10,12 @@ import (
 	"go.resystems.io/renotify/internal/broker"
 )
 
+// sessionIDPayload is the JSON envelope for stdio MCP session
+// open and close messages.
+type sessionIDPayload struct {
+	SessionID string `json:"session_id"`
+}
+
 // stdioSession tracks a single stdio relay session on the
 // daemon side.
 type stdioSession struct {
@@ -52,9 +58,7 @@ func (s *Server) startStdioRelay(ctx context.Context) error {
 // handleStdioOpen processes a session open message. The
 // payload is a JSON object with a "session_id" field.
 func (s *Server) handleStdioOpen(ctx context.Context, msg *nats.Msg) {
-	var payload struct {
-		SessionID string `json:"session_id"`
-	}
+	var payload sessionIDPayload
 	if err := json.Unmarshal(msg.Data, &payload); err != nil {
 		s.logger.Error("stdio open: invalid payload", "err", err)
 		return
@@ -117,9 +121,7 @@ func (s *Server) handleStdioOpen(ctx context.Context, msg *nats.Msg) {
 
 // handleStdioClose processes a session close message.
 func (s *Server) handleStdioClose(msg *nats.Msg) {
-	var payload struct {
-		SessionID string `json:"session_id"`
-	}
+	var payload sessionIDPayload
 	if err := json.Unmarshal(msg.Data, &payload); err != nil {
 		s.logger.Error("stdio close: invalid payload", "err", err)
 		return

@@ -71,11 +71,6 @@ func ConnectShared(cfg config.SharedBrokerConfig, logger *slog.Logger) (*nats.Co
 			MinVersion: tls.VersionTLS12,
 		}
 		if cfg.CACert != "" {
-			caCert, err := os.ReadFile(cfg.CACert)
-			if err != nil {
-				return nil, fmt.Errorf("read CA cert: %w", err)
-			}
-			_ = caCert // CACert pool setup would go here.
 			opts = append(opts, nats.RootCAs(cfg.CACert))
 		}
 		if cfg.ClientCert != "" && cfg.ClientKey != "" {

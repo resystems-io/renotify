@@ -53,13 +53,11 @@ type Server struct {
 	stdioCloseSub *nats.Subscription
 }
 
-// New creates an MCP server that will register its handler on
-// the shared HTTP server at /mcp. Dependencies that require the
-// NATS connection are bound in Start().
 // New creates an MCP server. The dbFunc parameter is a lazy
 // accessor for the ledger DB — it must return non-nil after
 // the ledger subsystem has started. This allows construction
-// before the ledger's Start() is called.
+// before the ledger's Start() is called. Dependencies that
+// require the NATS connection are bound in Start().
 func New(
 	httpSrv *httpserver.Server,
 	logger *slog.Logger,
