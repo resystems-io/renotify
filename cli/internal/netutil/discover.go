@@ -23,6 +23,9 @@ func DiscoverIPs() ([]net.IP, error) {
 		if iface.Flags&net.FlagUp == 0 {
 			continue
 		}
+		if iface.Flags&net.FlagRunning == 0 {
+			continue // no carrier (e.g. virtual bridges, disconnected ethernet)
+		}
 		if iface.Flags&net.FlagLoopback != 0 {
 			continue
 		}

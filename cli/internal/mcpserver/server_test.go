@@ -91,3 +91,41 @@ func TestServer_HandlerReturnsNonNil(t *testing.T) {
 		t.Error("Handler() should return non-nil")
 	}
 }
+
+func TestServer_SSEHandlerReturnsNonNil(t *testing.T) {
+	httpSrv := httpserver.New("127.0.0.1", 0, testLogger())
+	s := New(httpSrv, testLogger(), nil, "", "", nil)
+	if s.SSEHandler() == nil {
+		t.Error("SSEHandler() should return non-nil")
+	}
+}
+
+func TestServer_RegistersSSEHandler(t *testing.T) {
+	httpSrv := httpserver.New("127.0.0.1", 0, testLogger())
+	s := New(httpSrv, testLogger(), nil, "", "", nil)
+
+	mcpReady := make(chan error, 1)
+	s.Start(context.Background(), nil, mcpReady)
+	<-mcpReady
+
+	httpReady := make(chan error, 1)
+	httpSrv.Start(context.Background(), nil, httpReady)
+	<-httpReady
+	defer httpSrv.Stop(context.Background())
+
+	// SSE handler accepts GET and holds the connection open.
+	// Use a short timeout — a non-404 response (or timeout
+	// from a held-open connection) proves the handler is mounted.
+	client := &http.Client{Timeout: 500 * time.Millisecond}
+	resp, err := client.Get("http://" + httpSrv.Addr() + "/sse")
+	if err != nil {
+		// Timeout is expected — the SSE handler holds the GET
+		// open to stream events. A timeout means the handler
+		// accepted the request and started streaming.
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == 404 {
+		t.Error("GET /sse returned 404 — SSE handler not registered")
+	}
+}

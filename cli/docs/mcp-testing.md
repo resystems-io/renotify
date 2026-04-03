@@ -276,3 +276,126 @@ The mobile response may not have reached the daemon. Check the
 daemon logs for "decision resolved" messages. If the mobile app
 shows the notification but tapping a button does nothing, check
 the Android logcat for `ActionReceiver` or `NatsService` errors.
+
+---
+
+## 5. Google Antigravity Configuration (Experimental)
+
+> **Status: experimental.** The `/sse` endpoint passes curl
+> and integration tests but has not yet been proven end-to-end
+> with Antigravity. Initial testing (2026-04-03) showed
+> Antigravity sending `POST /sse` (Streamable HTTP dialect)
+> rather than the expected `GET /sse` (Standard SSE dialect),
+> and failing Accept-header validation on `/mcp`. Further
+> investigation is needed to determine which transport and
+> headers Antigravity actually requires.
+
+The Renotify daemon serves Standard SSE transport at `/sse`
+alongside the Streamable HTTP transport at `/mcp`.
+
+**Config file:** `~/.gemini/antigravity/mcp_config.json`
+
+```json
+{
+  "mcpServers": {
+    "renotify": {
+      "serverUrl": "http://127.0.0.1:4224/sse"
+    }
+  }
+}
+```
+
+Note: Antigravity uses `serverUrl` (not `url`/`type`).
+
+### 5.1 Verify SSE Handshake with curl
+
+```bash
+curl -N http://127.0.0.1:4224/sse
+```
+
+Expected output (connection stays open):
+```
+event: endpoint
+data: /sse?sessionid=XXXXXXXXX
+```
+
+POST an `initialize` request to the session endpoint:
+
+```bash
+curl -s -X POST "http://127.0.0.1:4224/sse?sessionid=XXXXXXXXX" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {},
+      "clientInfo": {"name": "curl-test", "version": "1.0"}
+    }
+  }'
+```
+
+The response appears on the SSE stream (first terminal),
+not in the POST response (which returns `202 Accepted`).
+
+See: [Antigravity MCP Integration Analysis](mcp-antigravity-integration.md)
+
+---
+
+## 6. Stdio Transport (`renotify mcp`)
+
+The `renotify mcp` command provides a stdio-to-daemon MCP
+bridge. MCP clients that support stdio transport launch it
+as a subprocess and communicate via stdin/stdout (NDJSON).
+
+### 6.1 Client Configuration
+
+**Antigravity** (`~/.gemini/antigravity/mcp_config.json`):
+```json
+{
+  "mcpServers": {
+    "renotify": {
+      "command": "renotify",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Same pattern for Claude Desktop, Cursor, Windsurf, and any
+MCP client supporting stdio transport.
+
+### 6.2 Manual Test
+
+With the daemon running:
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize",
+  "params":{"protocolVersion":"2025-03-26",
+  "capabilities":{},
+  "clientInfo":{"name":"test","version":"1.0"}}}' \
+  | renotify mcp
+```
+
+Expected: JSON-RPC response with `serverInfo.name:
+"renotify"` and the available tools/capabilities.
+
+### 6.3 Architecture
+
+The CLI is a raw NDJSON byte relay — it has no MCP logic.
+stdin lines are published to NATS, and NATS messages are
+written to stdout. The daemon's `mcp.Server` handles all
+JSON-RPC dispatch via a NATS-backed `Connection`.
+
+```
+MCP Client → stdin → renotify mcp → NATS → daemon
+             stdout ← renotify mcp ← NATS ← mcp.Server
+```
+
+### 6.4 Daemon Restart Behaviour
+
+The CLI exits immediately on NATS disconnect. The MCP
+client detects the subprocess exit and relaunches it. See
+`mcp-antigravity-integration.md` for future session state
+persistence notes.

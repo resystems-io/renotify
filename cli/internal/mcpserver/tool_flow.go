@@ -68,7 +68,13 @@ Always call terminate_flow when done. Flows are automatically
 reaped after 5 minutes of inactivity if you forget.
 
 For long-running tasks (> 5 min between tool calls), call
-refresh_flow periodically to prevent reaping.`,
+refresh_flow periodically to prevent reaping.
+
+Interjection resource: after registration, the resource at
+renotify://interjections/{flow_id} is immediately available.
+Read it between work steps to check for user signals (stop,
+note). If you support resource subscriptions, subscribe to
+it for push notifications when the user sends a signal.`,
 	}, s.handleRegisterFlow)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -79,7 +85,15 @@ label and metadata on the mobile dashboard. Call this between
 major work steps if your task may exceed 5 minutes.
 
 You do NOT need to call this if you are actively calling post
-or ask — any tool interaction with the flow resets the timer.`,
+or ask — any tool interaction with the flow resets the timer.
+
+For long-running tasks, you should call this tool periodically
+and pass in metadata (key, value) pair that are informative to
+the user and describe how the task is progressing.
+
+Returns an error if the flow has been reaped (expired due to
+inactivity). If this happens, call register_flow to start a
+new flow.`,
 	}, s.handleRefreshFlow)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -180,13 +194,18 @@ func (s *Server) handleRefreshFlow(
 			break
 		}
 	}
-	if event.FlowID != "" {
-		msgID := fmt.Sprintf("%s-refresh-%d",
-			args.FlowID, now.UnixMilli())
-		broker.PublishJSON(s.js,
-			broker.FlowLifecycleSubject(s.username, args.FlowID),
-			msgID, &event)
+	if event.FlowID == "" {
+		return nil, nil, fmt.Errorf(
+			"flow %q not found (may have been reaped after "+
+				"inactivity) — call register_flow to start a new flow",
+			args.FlowID)
 	}
+
+	msgID := fmt.Sprintf("%s-refresh-%d",
+		args.FlowID, now.UnixMilli())
+	broker.PublishJSON(s.js,
+		broker.FlowLifecycleSubject(s.username, args.FlowID),
+		msgID, &event)
 
 	result := &refreshFlowResult{
 		FlowID:    args.FlowID,

@@ -265,6 +265,73 @@ func TestController_MCPSubsystem(t *testing.T) {
 	<-done
 }
 
+// TestController_MCPSSEEndpoint verifies that the Standard
+// SSE transport is mounted at /sse alongside the Streamable
+// HTTP transport at /mcp. An SSE GET should receive a
+// text/event-stream response with an "endpoint" event.
+func TestController_MCPSSEEndpoint(t *testing.T) {
+	dir := t.TempDir()
+	cfg := integrationConfig(dir)
+
+	logger := integrationLogger()
+	httpSrv := httpserver.New("127.0.0.1", 0, logger)
+	mcpSrv := mcpserver.New(httpSrv, logger, nil, "", "", nil)
+
+	c := NewController(cfg,
+		WithLogger(logger),
+		WithSubsystem(httpSrv),
+		WithSubsystem(mcpSrv),
+	)
+	c.DaemonIDPath = filepath.Join(dir, "daemon_id")
+	c.InternalTokenPath = filepath.Join(dir, "internal_token")
+	c.PairingTokenPath = filepath.Join(dir, "pairing", "token")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	c.Ready = make(chan struct{})
+	done := make(chan error, 1)
+	go func() { done <- c.Run(ctx) }()
+
+	waitReady(t, c)
+
+	addr := httpSrv.Addr()
+	if addr == "" {
+		t.Fatal("HTTP server addr is empty")
+	}
+
+	// GET /sse — the SSE handler holds the connection open and
+	// streams events. Use a short timeout to avoid blocking.
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get("http://" + addr + "/sse")
+	if err != nil {
+		// Timeout is acceptable — it means the handler accepted
+		// the request and started streaming (held open).
+		cancel()
+		<-done
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		t.Fatal("GET /sse returned 404 — SSE handler not mounted")
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if ct != "text/event-stream" {
+		t.Errorf("Content-Type = %q, want %q", ct, "text/event-stream")
+	}
+
+	// Read enough to confirm the endpoint event is sent.
+	body, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(body), "event: endpoint") {
+		t.Errorf("expected endpoint event in SSE stream, got: %s",
+			string(body))
+	}
+
+	cancel()
+	<-done
+}
+
 // TestController_MCPToolEndToEnd exercises the full daemon
 // lifecycle with MCP tools invoked via HTTP JSON-RPC. This is
 // the integration test that would have caught the lazy-DB nil

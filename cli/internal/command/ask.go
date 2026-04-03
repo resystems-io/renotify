@@ -343,13 +343,7 @@ func handleResponse(
 	data []byte,
 	title, format string,
 ) error {
-	// Discriminate: check for "code" field (ErrorResponse).
-	var probe struct {
-		Code string `json:"code"`
-	}
-	json.Unmarshal(data, &probe)
-
-	if probe.Code != "" {
+	if isErrorResponse(data) {
 		var errResp payload.ErrorResponse
 		json.Unmarshal(data, &errResp)
 		return handleErrorResponse(cmd, &errResp, title, fc)

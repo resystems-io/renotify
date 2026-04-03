@@ -52,3 +52,33 @@ func DeviceControlSubject(username, deviceID string) string {
 	return fmt.Sprintf("resystems.renotify.%s.device.%s.control",
 		username, deviceID)
 }
+
+// MCP stdio relay subjects. These carry raw JSON-RPC messages
+// between the `renotify mcp` CLI process and the daemon's
+// mcp.Server via Core NATS Pub/Sub (ephemeral, not JetStream).
+
+// MCPClientToServerSubject returns the subject the CLI
+// publishes JSON-RPC messages to (stdin → NATS → daemon).
+func MCPClientToServerSubject(username, sessionID string) string {
+	return fmt.Sprintf("resystems.renotify.%s.mcp.%s.c2s",
+		username, sessionID)
+}
+
+// MCPServerToClientSubject returns the subject the daemon
+// publishes JSON-RPC messages to (daemon → NATS → stdout).
+func MCPServerToClientSubject(username, sessionID string) string {
+	return fmt.Sprintf("resystems.renotify.%s.mcp.%s.s2c",
+		username, sessionID)
+}
+
+// MCPSessionOpenSubject returns the subject the CLI publishes
+// to when a new stdio MCP session starts.
+func MCPSessionOpenSubject(username string) string {
+	return fmt.Sprintf("resystems.renotify.%s.mcp.open", username)
+}
+
+// MCPSessionCloseSubject returns the subject the CLI publishes
+// to when a stdio MCP session ends.
+func MCPSessionCloseSubject(username string) string {
+	return fmt.Sprintf("resystems.renotify.%s.mcp.close", username)
+}

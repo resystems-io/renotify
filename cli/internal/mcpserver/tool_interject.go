@@ -45,6 +45,11 @@ abort. A "note" includes context the user wants you to consider.
 Non-blocking — returns immediately. For blocking wait, use
 await_interjection instead.
 
+Alternative: if you support MCP resource subscriptions, you
+can read renotify://interjections/{flow_id} directly instead
+of calling this tool. The resource is available immediately
+after register_flow (returns [] when empty).
+
 Requires a flow_id from a prior register_flow call.`,
 	}, s.handleCheckInterjections)
 

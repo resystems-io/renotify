@@ -939,17 +939,31 @@ workspace monitoring).*
 ### Phase 7: Final Assembly & Verification
 *(Goal: The cohesive single-binary cross-platform distribution).*
 
-- [ ] **P-02: Artifact Embedding:** Update the Go CLI tooling to use `go:embed`
-  referencing the Android `app/build/outputs/apk/release/` directory.
-- [ ] **P-03: APK Management Commands:** Add a `renotify apk` command group
+- [x] **P-02: Artefact Embedding:** Update the Go CLI tooling to use `go:embed`
+  referencing the Android APK via an `internal/embed` package. The `dist/`
+  subdirectory is embedded at build time; a `.gitignore` in `dist/` prevents
+  APK files from being tracked. Default `go build` succeeds without the APK
+  (the embedded FS contains only `.gitignore`); `make` copies the real APK
+  into `dist/` before building. The `app` command group (`renotify app apk`)
+  nests under a future-extensible parent (for `ios` later).
+- [x] **P-03: APK Management Commands:** Implemented as `renotify app apk`
   with two subcommands: `extract` writes the embedded APK to disk, and `serve`
   starts a temporary HTTP server hosting the APK with a QR code containing the
-  download URL for easy phone-side installation.
-- [ ] **V-01: End-to-End Tests:** Extend V-00 to cover the full CLI -> real
-  Android client -> CLI roundtrip, including pairing, notification rendering,
-  and response dispatch.
-- [ ] **V-02: Documentation Updates:** Update README with comprehensive setup
-  instructions, architecture diagram, and CLI usage examples.
+  download URL for easy phone-side installation. Uses `http.ServeContent` for
+  Range request support (required by Firefox). Includes ufw hints on Linux.
+- [x] **V-01: End-to-End Tests:** Full CLI → real Android client → CLI
+  roundtrip demonstrated manually on LG (Android 10) and Samsung (Android 16)
+  during Phases 5-6, covering pairing, notification rendering, response
+  dispatch, interjections, silent mode, and history. Automated test coverage
+  extended with error-path tests, broker subject tests, error discrimination
+  helper extraction, and code quality cleanup. V&V method: demonstration +
+  test (see change log).
+- [x] **V-02: Documentation Updates:** README rewritten with quick start,
+  agent integration configs (Claude Code HTTP, Antigravity stdio, hooks),
+  CLI command table, and links to guides. New `docs/renotify-architecture.md`
+  with system context, design principles, Mermaid block diagram (showing
+  concurrent HTTP MCP, stdio, and terminal connections), and sequence
+  diagrams for post, ask, and interjection flows.
 
 ---
 
@@ -1091,6 +1105,14 @@ Record completed items here with the date.
 | 2026-04-02 | M-07 | Remote History Viewer UI implemented. Tab toggle ("Dashboard · History") below the status line swaps the RecyclerView between the live dashboard and paginated notification history. `HistoryAdapter` renders record rows (title, timestamp, priority, response summary) with "Load more" pagination footer. `HistoryQueryResult` and `HistoryRecord` Kotlin data classes parse the `svc.history` wire format. `NatsConnectionManager.queryHistory()` uses Core NATS Request-Reply. `NatsService` exposes `historyState: StateFlow<HistoryQueryResult?>` with `ACTION_QUERY_HISTORY` intent and append-mode pagination. 7 parsing tests. R-MOB-07 satisfied. |
 | 2026-04-02 | C-16 | Remote Silent Mode implemented. CLI `renotify silent --device <id> on\|off` publishes `deviceControl` message (`command: "set_silent"`) to `resystems.renotify.{username}.device.{device_id}.control` via Core NATS Pub/Sub. Android `NatsConnectionManager` subscribes to the device-specific control subject on connect/reconnect. `NatsService.handleDeviceControl()` parses the command and calls `setSilentMode()` to update StateFlow + SharedPreferences. `--all` flag targets all paired devices. Device ID displayed on dashboard in small grey text below status line. No ACL changes needed — existing wildcards cover the new subject. 8 CLI tests. |
 | 2026-04-02 | M-05 | UI & Branding implemented. Resystems SVG logo converted to Android VectorDrawable (`res/drawable/ic_resystems_logo.xml`). Dancing Script Bold and Montserrat Regular fonts bundled in `assets/fonts/`. New `Brand.kt` centralises colour constants (13 named colours), font loading with caching, and `brandedName()` SpannableString builder using `CustomTypefaceSpan` with `RelativeSizeSpan(1.4f)` for the "Re" prefix. System ActionBar replaced with programmatic dark header (`#202020`) containing logo + branded "Renotify" text. Small "Resystems" footer right-justified below the button bar. All hardcoded hex colour literals (~25 occurrences) across `MainActivity`, `DashboardAdapter`, and `HistoryAdapter` extracted to `Brand` constants. Status bar coloured to match header. |
+| 2026-04-03 | — | Standard SSE transport (`/sse`) added alongside Streamable HTTP (`/mcp`) using go-sdk's built-in `mcp.SSEHandler`. Fixed `http.Flusher` forwarding in `httpserver` log middleware. SSE endpoint experimental — Antigravity testing showed protocol dialect mismatch (sends Streamable HTTP POST-first, not SSE GET-first). |
+| 2026-04-03 | — | Stdio MCP gateway (`renotify mcp`) implemented. NATS-backed `mcp.Connection` bridges stdin/stdout to the daemon's `mcp.Server` via Core NATS Pub/Sub. CLI is a raw NDJSON byte relay — zero tool duplication. 4 NATS subject helpers, session open/close lifecycle, daemon-side `natsConn`/`natsTransport`. Compatible with Antigravity, Cursor, Windsurf, Claude Desktop. 4 relay tests. |
+| 2026-04-03 | — | Interjection resource now returns `[]` (empty array) for registered flows with no interjections, instead of "Resource not found". Enables MCP clients to subscribe immediately after `register_flow`. Tool descriptions updated to guide resource-capable agents toward `read_resource` and subscriptions. |
+| 2026-04-03 | — | `refresh_flow` returns error when flow has expired (was silently succeeding). Enables agents to detect reaped flows and call `register_flow` to recover. |
+| 2026-04-03 | P-02 | Artefact embedding implemented. New `internal/embed` package with `//go:embed all:dist` embeds the APK directory at build time. Default checkout: `dist/` contains only `.gitignore` (ignores `*.apk`), so `go build` and `go install` succeed without the APK. Full `make` build copies the real APK into `dist/` before compiling. `renotify app` command group introduced for future platform extensibility (iOS). |
+| 2026-04-03 | P-03 | APK management commands implemented as `renotify app apk extract` and `renotify app apk serve`. Extract writes the embedded APK to disk. Serve starts a temporary HTTP server with QR code download URL, uses `http.ServeContent` for Range request support (required by Firefox), and prints ufw firewall hints on Linux. IP discovery fixed: `FlagRunning` check filters virtual bridges (virbr0, docker0) that lack carrier. |
+| 2026-04-03 | V-01 | Test gap analysis and code quality pass. Removed dead `caCert` ReadFile in `broker/client.go`. Fixed duplicate `New()` comment in `mcpserver/server.go`. Extracted `sessionIDPayload` type in `stdio_relay.go`. Extracted shared `isErrorResponse()` helper from duplicated inline probes in `ask.go` and `dispatch.go` with 5 unit tests. Added 7 broker subject unit tests (service, device, MCP). Added MCP tool error-path tests (expired flow, terminated flow). Added APK extract write-path test (skipped when APK absent). |
+| 2026-04-03 | V-02 | README rewritten (~110 lines) with quick start, agent integration configs (Claude Code HTTP MCP, Antigravity/Cursor stdio, Claude Code hooks), CLI command table, and links to testing guides. New `docs/renotify-architecture.md` with system context prose, design principles, Mermaid system block diagram (concurrent HTTP MCP + stdio + terminal + multi-device), and sequence diagrams for post, ask, and interjection flows. Port architecture table and NATS subject namespace reference. Phase 7 complete. |
 
 ## 6. References
 
