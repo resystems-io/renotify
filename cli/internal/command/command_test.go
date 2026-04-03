@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	apkembed "go.resystems.io/renotify/internal/embed"
 	"go.resystems.io/renotify/internal/xdg"
 )
 
@@ -402,17 +403,45 @@ func TestRevoke_JSONOutput_WithDevice(t *testing.T) {
 }
 
 func TestAPKExtractNoAPK(t *testing.T) {
+	// Skip if APK is present (full build on this machine).
+	if _, err := apkembed.FS.ReadFile(apkembed.APKName); err == nil {
+		t.Skip("APK is embedded (full build); skipping no-APK test")
+	}
+
 	t.Setenv("RENOTIFY_USERNAME", "testuser")
 	_, _, err := executeCommand("app", "apk", "extract",
 		"--output", "/tmp/test.apk",
 	)
-	// Without a full make build, the APK is not embedded.
-	// The command should return an error.
 	if err == nil {
 		t.Fatal("expected error for missing APK")
 	}
 	if !strings.Contains(err.Error(), "no APK embedded") {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestAPKExtractWritesFile(t *testing.T) {
+	t.Setenv("RENOTIFY_USERNAME", "testuser")
+
+	// Skip if APK not embedded (default checkout).
+	if _, err := apkembed.FS.ReadFile(apkembed.APKName); err != nil {
+		t.Skip("APK not embedded (dev build); skipping write test")
+	}
+
+	output := filepath.Join(t.TempDir(), "test.apk")
+	_, _, err := executeCommand("app", "apk", "extract",
+		"--output", output,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	info, err := os.Stat(output)
+	if err != nil {
+		t.Fatalf("stat output: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Error("extracted APK is empty")
 	}
 }
 

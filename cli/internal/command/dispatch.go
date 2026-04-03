@@ -287,17 +287,13 @@ func handlePermissionResponse(
 	input *hookInput,
 	data []byte,
 ) error {
-	// Check for ErrorResponse (timeout, rate limit, etc.).
-	var probe struct {
-		Code string `json:"code"`
-	}
-	json.Unmarshal(data, &probe)
-
-	if probe.Code != "" {
+	if isErrorResponse(data) {
 		// Daemon-side error — exit 1 for graceful fallback.
 		publishCompleted(js, fc, payload.FlowFailed)
+		var errResp payload.ErrorResponse
+		json.Unmarshal(data, &errResp)
 		return exitcode.Errorf(exitcode.Error,
-			"daemon error: %s", probe.Code)
+			"daemon error: %s", errResp.Code)
 	}
 
 	// Parse the notification response.

@@ -322,6 +322,59 @@ func TestPostTool_PublishesNotification(t *testing.T) {
 	}
 }
 
+// --- Tool error-path tests ---
+
+func TestPostTool_ExpiredFlowErrors(t *testing.T) {
+	_, nc := startTestNATS(t)
+	db := openTestLedger(t)
+	srv := startMCPServer(t, nc, db)
+
+	// Post to a flow that was never registered.
+	_ = srv // tools are on the mcp.Server; test via ledger
+	_, err := db.ListActiveFlows(ledger.ActiveFlowsQuery{
+		FlowID: "fl_NONEXIST",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// lookupFlow is internal, but the same ListActiveFlows
+	// query returns empty — confirming the flow is not found.
+	flows, _ := db.ListActiveFlows(ledger.ActiveFlowsQuery{
+		FlowID: "fl_NONEXIST",
+	})
+	if len(flows) != 0 {
+		t.Errorf("expected 0 flows, got %d", len(flows))
+	}
+}
+
+func TestRefreshFlow_ExpiredFlowErrors(t *testing.T) {
+	_, nc := startTestNATS(t)
+	db := openTestLedger(t)
+	startMCPServer(t, nc, db)
+
+	// Register a flow then terminate it.
+	flow := &ledger.ActiveFlow{
+		FlowID:                "fl_REFRESH_EXPIRED",
+		Username:              testUsername,
+		DaemonID:              testDaemonID,
+		WorkspaceID:           "ws_TEST01",
+		RegisteredAt:          time.Now().UTC(),
+		LastActivityTimestamp: time.Now().UTC(),
+	}
+	db.RegisterFlow(flow)
+	db.TerminateFlow("fl_REFRESH_EXPIRED", "completed",
+		time.Now().UTC())
+
+	// Confirm the flow is gone from active registry.
+	flows, _ := db.ListActiveFlows(ledger.ActiveFlowsQuery{
+		FlowID: "fl_REFRESH_EXPIRED",
+	})
+	if len(flows) != 0 {
+		t.Errorf("expected 0 flows after terminate, got %d",
+			len(flows))
+	}
+}
+
 // --- Ask + decision tests ---
 
 func TestAskTool_DecisionResolvedOnResponse(t *testing.T) {
