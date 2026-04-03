@@ -477,6 +477,24 @@ func TestInterjectionStore_Notified(t *testing.T) {
 	}
 }
 
+func TestInterjectionStore_Registered(t *testing.T) {
+	is := mcpserver.NewInterjectionStore()
+
+	if is.Registered("fl_NOREG") {
+		t.Error("unregistered flow should return false")
+	}
+
+	is.Register("fl_REG01")
+	if !is.Registered("fl_REG01") {
+		t.Error("registered flow should return true")
+	}
+
+	// Registered but empty — Get returns nil, Registered true.
+	if is.Get("fl_REG01") != nil {
+		t.Error("expected nil Get before any interjections")
+	}
+}
+
 func TestInterjectionStore_Remove(t *testing.T) {
 	is := mcpserver.NewInterjectionStore()
 	is.Register("fl_INT04")
@@ -487,6 +505,9 @@ func TestInterjectionStore_Remove(t *testing.T) {
 	}
 	if is.Notified("fl_INT04") != nil {
 		t.Error("expected nil channel after remove")
+	}
+	if is.Registered("fl_INT04") {
+		t.Error("expected false after remove")
 	}
 }
 

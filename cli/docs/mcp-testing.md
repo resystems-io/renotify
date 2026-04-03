@@ -340,3 +340,62 @@ The response appears on the SSE stream (first terminal),
 not in the POST response (which returns `202 Accepted`).
 
 See: [Antigravity MCP Integration Analysis](mcp-antigravity-integration.md)
+
+---
+
+## 6. Stdio Transport (`renotify mcp`)
+
+The `renotify mcp` command provides a stdio-to-daemon MCP
+bridge. MCP clients that support stdio transport launch it
+as a subprocess and communicate via stdin/stdout (NDJSON).
+
+### 6.1 Client Configuration
+
+**Antigravity** (`~/.gemini/antigravity/mcp_config.json`):
+```json
+{
+  "mcpServers": {
+    "renotify": {
+      "command": "renotify",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Same pattern for Claude Desktop, Cursor, Windsurf, and any
+MCP client supporting stdio transport.
+
+### 6.2 Manual Test
+
+With the daemon running:
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize",
+  "params":{"protocolVersion":"2025-03-26",
+  "capabilities":{},
+  "clientInfo":{"name":"test","version":"1.0"}}}' \
+  | renotify mcp
+```
+
+Expected: JSON-RPC response with `serverInfo.name:
+"renotify"` and the available tools/capabilities.
+
+### 6.3 Architecture
+
+The CLI is a raw NDJSON byte relay — it has no MCP logic.
+stdin lines are published to NATS, and NATS messages are
+written to stdout. The daemon's `mcp.Server` handles all
+JSON-RPC dispatch via a NATS-backed `Connection`.
+
+```
+MCP Client → stdin → renotify mcp → NATS → daemon
+             stdout ← renotify mcp ← NATS ← mcp.Server
+```
+
+### 6.4 Daemon Restart Behaviour
+
+The CLI exits immediately on NATS disconnect. The MCP
+client detects the subprocess exit and relaunches it. See
+`mcp-antigravity-integration.md` for future session state
+persistence notes.
