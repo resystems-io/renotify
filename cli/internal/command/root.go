@@ -67,7 +67,7 @@ back to the originating pipeline.`,
 		newPairCmd(app),
 		newPairingsCmd(app),
 		newRevokeCmd(app),
-		newAPKCmd(app),
+		newAppCmd(app),
 		newConfigCmd(app),
 		newMCPCmd(app),
 	)
