@@ -27,6 +27,15 @@ data class HistoryRecord(
             !responseAction.isNullOrEmpty() ||
             !responseText.isNullOrEmpty()
 
+    /**
+     * True when the record has content worth showing in an
+     * expanded view — a body or a response text that was
+     * truncated in the summary.
+     */
+    val isExpandable: Boolean
+        get() = !body.isNullOrEmpty() ||
+            (!responseText.isNullOrEmpty() && responseText.length > 30)
+
     /** Human-readable response summary for display. */
     val responseSummary: String
         get() = when {
