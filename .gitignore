@@ -29,7 +29,6 @@ go.work.sum
 
 # Build artifacts
 cli/build/
-cli/embed/
 clients/android/app/build/
 clients/android/.gradle/
 clients/android/build/

@@ -37,7 +37,7 @@ render them.
 
 Specify a device with --device or target all paired devices
 with --all. Use 'renotify pairings' to list device IDs.`,
-		Args: cobra.ExactArgs(1),
+		Args:      cobra.ExactArgs(1),
 		ValidArgs: []string{"on", "off"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := app.Config
@@ -109,8 +109,8 @@ with --all. Use 'renotify pairings' to list device IDs.`,
 
 			// Publish control message to each target.
 			msg := deviceControl{
-				Command:   "set_silent",
-				Value:     silent,
+				Command: "set_silent",
+				Value:   silent,
 				Timestamp: time.Now().UTC().Format(
 					time.RFC3339),
 			}

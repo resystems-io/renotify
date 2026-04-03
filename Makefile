@@ -26,9 +26,8 @@ build-android:
 	$(MAKE) -C clients/android build
 
 build-cli: build-android
-	@mkdir -p cli/embed
 	cp clients/android/app/build/outputs/apk/release/app-release.apk \
-		cli/embed/app-release.apk
+		cli/internal/embed/dist/app-release.apk
 	$(MAKE) -C cli build
 
 build-cli-dev:
@@ -51,4 +50,4 @@ test-all: test
 clean:
 	$(MAKE) -C cli clean
 	$(MAKE) -C clients/android clean
-	rm -rf cli/embed
+	rm -f cli/internal/embed/dist/app-release.apk

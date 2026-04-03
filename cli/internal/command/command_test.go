@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	apkembed "go.resystems.io/renotify/internal/embed"
 	"go.resystems.io/renotify/internal/xdg"
 )
 
@@ -36,7 +37,7 @@ func TestRootHelp(t *testing.T) {
 	if !strings.Contains(stdout, "Available Commands") {
 		t.Error("help output missing 'Available Commands'")
 	}
-	for _, cmd := range []string{"daemon", "post", "ask", "answer", "interject", "dispatch", "flow", "flows", "history", "silent", "pair", "pairings", "revoke", "apk", "config"} {
+	for _, cmd := range []string{"daemon", "post", "ask", "answer", "interject", "dispatch", "flow", "flows", "history", "silent", "pair", "pairings", "revoke", "app", "config", "mcp", "version"} {
 		if !strings.Contains(stdout, cmd) {
 			t.Errorf("help output missing command %q", cmd)
 		}
@@ -59,8 +60,8 @@ func TestSubcommandHelp(t *testing.T) {
 		{"pair", []string{"--ip", "--regenerate-cert", "--format"}},
 		{"pairings", []string{"--format"}},
 		{"revoke", []string{"--format", "--device", "--all"}},
-		{"apk extract", []string{"--output"}},
-		{"apk serve", []string{"--addr", "--port"}},
+		{"app apk extract", []string{"--output"}},
+		{"app apk serve", []string{"--addr", "--port"}},
 		{"config init", []string{"--full", "--force", "--output"}},
 		{"config list", []string{"--format"}},
 	}
@@ -401,34 +402,51 @@ func TestRevoke_JSONOutput_WithDevice(t *testing.T) {
 	}
 }
 
-func TestAPKExtractRuns(t *testing.T) {
+func TestAPKExtractNoAPK(t *testing.T) {
+	// Skip if APK is present (full build on this machine).
+	if _, err := apkembed.FS.ReadFile(apkembed.APKName); err == nil {
+		t.Skip("APK is embedded (full build); skipping no-APK test")
+	}
+
 	t.Setenv("RENOTIFY_USERNAME", "testuser")
-	_, stderr, err := executeCommand("apk", "extract",
+	_, _, err := executeCommand("app", "apk", "extract",
 		"--output", "/tmp/test.apk",
 	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("expected error for missing APK")
 	}
-	if !strings.Contains(stderr, "not yet implemented") {
-		t.Error("expected stub message on stderr")
+	if !strings.Contains(err.Error(), "no APK embedded") {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 
-func TestAPKServeRuns(t *testing.T) {
+func TestAPKExtractWritesFile(t *testing.T) {
 	t.Setenv("RENOTIFY_USERNAME", "testuser")
-	_, stderr, err := executeCommand("apk", "serve",
-		"--port", "8080",
+
+	// Skip if APK not embedded (default checkout).
+	if _, err := apkembed.FS.ReadFile(apkembed.APKName); err != nil {
+		t.Skip("APK not embedded (dev build); skipping write test")
+	}
+
+	output := filepath.Join(t.TempDir(), "test.apk")
+	_, _, err := executeCommand("app", "apk", "extract",
+		"--output", output,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(stderr, "not yet implemented") {
-		t.Error("expected stub message on stderr")
+
+	info, err := os.Stat(output)
+	if err != nil {
+		t.Fatalf("stat output: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Error("extracted APK is empty")
 	}
 }
 
 func TestAPKSubcommands(t *testing.T) {
-	stdout, _, err := executeCommand("apk", "--help")
+	stdout, _, err := executeCommand("app", "apk", "--help")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
