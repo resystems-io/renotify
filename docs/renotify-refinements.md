@@ -1051,7 +1051,7 @@ shared broker is in use.)*
   NATS. Test both the collocated (in-process transport) and
   separated (TCP transport to shared broker) topologies. Confirm
   existing integration tests continue to pass.
-- [ ] **V-05: Architecture Diagram Update:** Rework the system
+- [x] **V-05: Architecture Diagram Update:** Rework the system
   block diagram in `renotify-architecture.md` to remove the direct
   `MCP --> Ledger` edge and route state access through the broker
   via the state management subsystem.
@@ -1210,6 +1210,7 @@ Record completed items here with the date.
 | 2026-04-04 | C-17 | State management subsystem extracted. Registry extended with 4 write endpoints (`svc.insert-request`, `svc.insert-response`, `svc.insert-interjection`, `svc.update-activity`). New `statesvc` package with shared wire types. MCP server migrated to `stateClient` — all state access via NATS request-reply. Production `mcpserver` package has zero `ledger` import. Endpoint wire types migrated from `registry` to `statesvc`. All existing tests updated and passing (unit + integration). |
 | 2026-04-04 | C-19 | In-process NATS transport for embedded broker. `ConnectEmbedded()` now takes `*server.Server` and uses `nats.InProcessServer()` to connect via `net.Pipe()`. TCP listener remains for CLI. `HistoryRecord` wire format standardised to snake_case (was PascalCase from missing JSON tags); Android parser and tests updated to match. |
 | 2026-04-04 | V-04 | Decoupling verification. 4 write endpoint isolation tests (`TestInsertRequestEndpoint`, `TestInsertResponseEndpoint`, `TestInsertInterjectionEndpoint`, `TestUpdateActivityEndpoint`) verify NATS request-reply contract for each `svc.insert-*` endpoint. `TestController_SharedBrokerMCPRoundTrip` exercises the full MCP→stateClient→NATS TCP→registry→ledger path with the daemon connected to a shared broker (not embedded). All existing unit and integration tests continue to pass. |
+| 2026-04-04 | V-05 | Architecture document rewritten. System block diagram now shows state subsystem (registry + ledger endpoints), heartbeat publisher, and in-process NATS transport for daemon internals. Direct `MCP → Ledger` edge removed — all state access routes through the broker. New shared broker deployment section with second Mermaid diagram showing collocated + shared and separated + shared topologies. Sequence diagrams updated: post, ask, and interjection flows show state subsystem as explicit participant for ledger writes via `svc.*` NATS endpoints. Port architecture table corrected (4222 serves CLI, not daemon internal). NATS subject namespace table split into three categories (JetStream, state service, ephemeral) with 4 new `svc.insert-*` write subjects and caller attribution. Transport labels standardised throughout. Phase 8 complete. |
 
 ## 6. References
 
