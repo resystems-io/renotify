@@ -56,6 +56,7 @@ func (d *DB) QueryHistory(q HistoryQuery) (*HistoryResult, error) {
 	rows, err := d.db.Query(`
 		SELECT
 		    req.username,
+		    req.flow_label, req.workspace_name, req.workspace_path,
 		    req.id, req.flow_id, req.daemon_id, req.workspace_id,
 		    req.title, req.body, req.response_types, req.priority,
 		    req.source, req.actions, req.timeout_sec, req.timestamp,
@@ -102,6 +103,9 @@ func (d *DB) QueryHistory(q HistoryQuery) (*HistoryResult, error) {
 func scanHistoryRow(rows *sql.Rows) (HistoryRecord, error) {
 	var rec HistoryRecord
 
+	// Flow context fields (nullable — NULL for pre-V3 rows).
+	var flowLabel, wsName, wsPath sql.NullString
+
 	// Request fields.
 	var body, actions, timeoutSec sql.NullString
 	var respTypes, priority, reqTimestamp string
@@ -112,6 +116,7 @@ func scanHistoryRow(rows *sql.Rows) (HistoryRecord, error) {
 
 	err := rows.Scan(
 		&rec.Username,
+		&flowLabel, &wsName, &wsPath,
 		&rec.Request.ID, &rec.Request.FlowID,
 		&rec.Request.DaemonID, &rec.Request.WorkspaceID,
 		&rec.Request.Title, &body, &respTypes,
@@ -123,6 +128,11 @@ func scanHistoryRow(rows *sql.Rows) (HistoryRecord, error) {
 	if err != nil {
 		return rec, fmt.Errorf("ledger: scan history row: %w", err)
 	}
+
+	// Flow context fields.
+	rec.FlowLabel = flowLabel.String
+	rec.WorkspaceName = wsName.String
+	rec.WorkspacePath = wsPath.String
 
 	// Unmarshal request fields.
 	rec.Request.Body = body.String

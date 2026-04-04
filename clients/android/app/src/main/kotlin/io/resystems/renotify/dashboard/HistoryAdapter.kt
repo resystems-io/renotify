@@ -90,6 +90,14 @@ class HistoryAdapter :
                 }
                 root.addView(title)
 
+                // Flow context: label + workspace (child 1).
+                val flowContext = TextView(ctx).apply {
+                    textSize = 11f
+                    setTextColor(Brand.TEXT_SECONDARY)
+                    visibility = View.GONE
+                }
+                root.addView(flowContext)
+
                 val detail = TextView(ctx).apply {
                     textSize = 12f
                     setTextColor(Brand.TEXT_PRIMARY)
@@ -164,19 +172,31 @@ class HistoryAdapter :
         val rec = records[pos]
         val root = holder.itemView as? LinearLayout ?: return
 
-        // Title.
+        // Title (child 0).
         (root.getChildAt(0) as? TextView)?.text = rec.title
 
-        // Detail: timestamp + priority + source.
+        // Flow context (child 1): label + workspace name.
+        val ctxView = root.getChildAt(1) as? TextView
+        val ctxParts = mutableListOf<String>()
+        if (!rec.flowLabel.isNullOrEmpty()) ctxParts.add(rec.flowLabel)
+        if (!rec.workspaceName.isNullOrEmpty()) ctxParts.add(rec.workspaceName)
+        if (ctxParts.isNotEmpty()) {
+            ctxView?.text = ctxParts.joinToString(" \u00b7 ")
+            ctxView?.visibility = View.VISIBLE
+        } else {
+            ctxView?.visibility = View.GONE
+        }
+
+        // Detail (child 2): timestamp + priority + source.
         val ts = formatTimestamp(rec.timestamp)
         val parts = mutableListOf(ts)
         if (rec.priority != "normal") parts.add(rec.priority)
         if (rec.source.isNotEmpty()) parts.add(rec.source)
-        (root.getChildAt(1) as? TextView)?.text =
-            parts.joinToString(" · ")
-
-        // Response summary.
         (root.getChildAt(2) as? TextView)?.text =
+            parts.joinToString(" \u00b7 ")
+
+        // Response summary (child 3).
+        (root.getChildAt(3) as? TextView)?.text =
             if (rec.hasResponse) rec.responseSummary
             else "\u2014"
 
@@ -199,16 +219,16 @@ class HistoryAdapter :
     }
 
     /**
-     * Show or hide the expandable body (child 3) and full
-     * response (child 4) for the given record.
+     * Show or hide the expandable body (child 4) and full
+     * response (child 5) for the given record.
      */
     private fun bindExpansion(
         root: LinearLayout,
         rec: HistoryRecord,
         expanded: Boolean
     ) {
-        val bodyView = root.getChildAt(3) as? TextView
-        val fullRespView = root.getChildAt(4) as? TextView
+        val bodyView = root.getChildAt(4) as? TextView
+        val fullRespView = root.getChildAt(5) as? TextView
 
         if (!expanded) {
             bodyView?.visibility = View.GONE

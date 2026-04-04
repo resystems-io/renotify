@@ -27,8 +27,8 @@ func TestOpen_MigratesLatest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if version != 2 {
-		t.Errorf("user_version = %d, want 2", version)
+	if version != 3 {
+		t.Errorf("user_version = %d, want 3", version)
 	}
 }
 
@@ -50,8 +50,8 @@ func TestOpen_IdempotentMigration(t *testing.T) {
 
 	var version int
 	db2.db.QueryRow("PRAGMA user_version").Scan(&version)
-	if version != 2 {
-		t.Errorf("user_version = %d, want 2", version)
+	if version != 3 {
+		t.Errorf("user_version = %d, want 3", version)
 	}
 }
 

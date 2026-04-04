@@ -37,4 +37,13 @@ clients/android/local.properties
 # Editor/IDE
 .idea/
 *.iml
-# .vscode/
+.vscode/
+
+## Compilers
+.kotlin
+
+## Agents
+# (For now we will leave agent setting out of the repo;
+#  This may change in the future.)
+.agent
+.claude

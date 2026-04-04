@@ -389,10 +389,216 @@ class HistoryItemTest {
         assertNull(rec.responseTimestamp)
     }
 
+    // --- isInteractive ---
+
+    @Test
+    fun isInteractive_none_isFalse() {
+        val rec = record(responseTypes = listOf("none"))
+        assertFalse(rec.isInteractive)
+    }
+
+    @Test
+    fun isInteractive_boolean_isTrue() {
+        val rec = record(responseTypes = listOf("boolean"))
+        assertTrue(rec.isInteractive)
+    }
+
+    @Test
+    fun isInteractive_choice_isTrue() {
+        val rec = record(responseTypes = listOf("choice"))
+        assertTrue(rec.isInteractive)
+    }
+
+    @Test
+    fun isInteractive_text_isTrue() {
+        val rec = record(responseTypes = listOf("text"))
+        assertTrue(rec.isInteractive)
+    }
+
+    @Test
+    fun isInteractive_mixed_isTrue() {
+        val rec = record(responseTypes = listOf("boolean", "text"))
+        assertTrue(rec.isInteractive)
+    }
+
+    // --- isOpen ---
+
+    @Test
+    fun isOpen_interactiveNoResponse_isTrue() {
+        val rec = record(responseTypes = listOf("boolean"))
+        assertTrue(rec.isOpen)
+    }
+
+    @Test
+    fun isOpen_interactiveWithResponse_isFalse() {
+        val rec = record(
+            responseTypes = listOf("boolean"),
+            responseAccepted = true
+        )
+        assertFalse(rec.isOpen)
+    }
+
+    @Test
+    fun isOpen_fireAndForget_isFalse() {
+        val rec = record(responseTypes = listOf("none"))
+        assertFalse(rec.isOpen)
+    }
+
+    // --- fromJson: responseTypes and actions ---
+
+    @Test
+    fun parsesResponseTypes() {
+        val json = """
+            {
+                "records": [
+                    {
+                        "Username": "testuser",
+                        "Request": {
+                            "id": "ntf_008",
+                            "flow_id": "fl_008",
+                            "daemon_id": "dn_001",
+                            "workspace_id": "ws_001",
+                            "title": "Pick env",
+                            "response_types": ["choice"],
+                            "priority": "normal",
+                            "actions": ["staging", "prod"],
+                            "timestamp": "2026-04-01T17:00:00Z"
+                        }
+                    }
+                ],
+                "total": 1
+            }
+        """.trimIndent()
+
+        val rec = HistoryQueryResult.fromJson(json).records[0]
+        assertEquals(listOf("choice"), rec.responseTypes)
+        assertEquals(listOf("staging", "prod"), rec.actions)
+        assertTrue(rec.isInteractive)
+        assertTrue(rec.isOpen)
+    }
+
+    @Test
+    fun missingResponseTypes_defaultsToNone() {
+        val json = """
+            {
+                "records": [
+                    {
+                        "Username": "testuser",
+                        "Request": {
+                            "id": "ntf_009",
+                            "flow_id": "fl_009",
+                            "daemon_id": "dn_001",
+                            "workspace_id": "ws_001",
+                            "title": "Alert",
+                            "priority": "normal",
+                            "timestamp": "2026-04-01T18:00:00Z"
+                        }
+                    }
+                ],
+                "total": 1
+            }
+        """.trimIndent()
+
+        val rec = HistoryQueryResult.fromJson(json).records[0]
+        assertEquals(listOf("none"), rec.responseTypes)
+        assertNull(rec.actions)
+        assertFalse(rec.isInteractive)
+    }
+
+    @Test
+    fun missingActions_isNull() {
+        val json = """
+            {
+                "records": [
+                    {
+                        "Username": "testuser",
+                        "Request": {
+                            "id": "ntf_010",
+                            "flow_id": "fl_010",
+                            "daemon_id": "dn_001",
+                            "workspace_id": "ws_001",
+                            "title": "Approve?",
+                            "response_types": ["boolean"],
+                            "priority": "normal",
+                            "timestamp": "2026-04-01T19:00:00Z"
+                        }
+                    }
+                ],
+                "total": 1
+            }
+        """.trimIndent()
+
+        val rec = HistoryQueryResult.fromJson(json).records[0]
+        assertNull(rec.actions)
+    }
+
+    // --- fromJson: flow context ---
+
+    @Test
+    fun parsesFlowContext() {
+        val json = """
+            {
+                "records": [
+                    {
+                        "Username": "testuser",
+                        "FlowLabel": "CI Pipeline",
+                        "WorkspaceName": "renotify",
+                        "WorkspacePath": "/home/user/renotify",
+                        "Request": {
+                            "id": "ntf_011",
+                            "flow_id": "fl_011",
+                            "daemon_id": "dn_001",
+                            "workspace_id": "ws_001",
+                            "title": "Build done",
+                            "response_types": ["none"],
+                            "priority": "normal",
+                            "timestamp": "2026-04-01T20:00:00Z"
+                        }
+                    }
+                ],
+                "total": 1
+            }
+        """.trimIndent()
+
+        val rec = HistoryQueryResult.fromJson(json).records[0]
+        assertEquals("CI Pipeline", rec.flowLabel)
+        assertEquals("renotify", rec.workspaceName)
+    }
+
+    @Test
+    fun missingFlowContext_isNull() {
+        val json = """
+            {
+                "records": [
+                    {
+                        "Username": "testuser",
+                        "Request": {
+                            "id": "ntf_012",
+                            "flow_id": "fl_012",
+                            "daemon_id": "dn_001",
+                            "workspace_id": "ws_001",
+                            "title": "Old record",
+                            "response_types": ["none"],
+                            "priority": "normal",
+                            "timestamp": "2026-04-01T21:00:00Z"
+                        }
+                    }
+                ],
+                "total": 1
+            }
+        """.trimIndent()
+
+        val rec = HistoryQueryResult.fromJson(json).records[0]
+        assertNull(rec.flowLabel)
+        assertNull(rec.workspaceName)
+    }
+
     // --- Helper ---
 
     private fun record(
         body: String? = null,
+        responseTypes: List<String> = listOf("none"),
+        actions: List<String>? = null,
         responseAccepted: Boolean? = null,
         responseAction: String? = null,
         responseText: String? = null,
@@ -401,10 +607,14 @@ class HistoryItemTest {
         id = "ntf_test",
         flowId = "fl_test",
         workspaceId = "ws_test",
+        flowLabel = null,
+        workspaceName = null,
         title = "Test",
         body = body,
         priority = "normal",
         source = "",
+        responseTypes = responseTypes,
+        actions = actions,
         timestamp = "2026-04-01T10:00:00Z",
         responseAccepted = responseAccepted,
         responseAction = responseAction,

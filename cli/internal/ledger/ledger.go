@@ -100,5 +100,23 @@ func (d *DB) migrate() error {
 		}
 	}
 
+	if version < 3 {
+		tx, err := d.db.Begin()
+		if err != nil {
+			return fmt.Errorf("ledger: begin migration v3: %w", err)
+		}
+		if _, err := tx.Exec(schemaV3); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("ledger: apply schema v3: %w", err)
+		}
+		if _, err := tx.Exec("PRAGMA user_version = 3"); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("ledger: set user_version: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("ledger: commit migration v3: %w", err)
+		}
+	}
+
 	return nil
 }
