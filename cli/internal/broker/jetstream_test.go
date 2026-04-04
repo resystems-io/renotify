@@ -46,7 +46,7 @@ func startTestServer(t *testing.T) (*EmbeddedServer, *nats.Conn) {
 	}
 	t.Cleanup(func() { srv.Shutdown(context.Background()) })
 
-	nc, err := ConnectEmbedded(srv.ClientURL(), "testtoken", testLogger())
+	nc, err := ConnectEmbedded(srv.Server(), "testtoken", testLogger())
 	if err != nil {
 		t.Fatal(err)
 	}

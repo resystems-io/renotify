@@ -285,8 +285,8 @@ func (c *Controller) startEmbedded(_ context.Context) (*nats.Conn, *broker.Embed
 		return nil, nil, err
 	}
 
-	// Connect as NATS client.
-	nc, err := broker.ConnectEmbedded(srv.ClientURL(), internalToken, c.logger)
+	// Connect as NATS client via in-process transport (C-19).
+	nc, err := broker.ConnectEmbedded(srv.Server(), internalToken, c.logger)
 	if err != nil {
 		srv.Shutdown(context.Background())
 		return nil, nil, err

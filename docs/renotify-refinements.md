@@ -1040,7 +1040,7 @@ shared broker is in use.)*
   `s.db().InsertInterjection`) with NATS request-reply calls to the
   state management subsystem (C-17). Verify the MCP server package
   has no import dependency on the ledger package (R-CLI-21).
-- [ ] **C-19: In-Process NATS Transport:** When the embedded broker
+- [x] **C-19: In-Process NATS Transport:** When the embedded broker
   is enabled, connect daemon subsystems via `nats.InProcessConn`
   instead of TCP loopback. When the embedded broker is disabled,
   connect via NATS TCP to the shared broker address. The TCP
@@ -1136,6 +1136,7 @@ specifications.
 | D-68 | Multi-device pairing: per-device `device_id` (`mb_` + 13 Crockford Base32), per-device auth token, per-device NATS account (`mobile-{device_id}`), per-device JetStream push consumer (`mobile-{username}-{device_id}`). Device registry stored in `devices.json`. Provisioning payload v2 adds `"d"` (device_id) and `"n"` (NATS username). Legacy v1 single-token migrated on daemon startup. Daemon creates consumers at startup from registry; SIGHUP reloads auth from registry. R-SEC-02 updated from single-device to multi-device model. | [NATS Transport](analysis-nats-transport-design.md) | 2026-04-02 |
 | D-69 | Heartbeat payload extended: `WorkspaceInfo.ActiveFlows` changed from `[]string` (flow IDs only) to `[]FlowInfo` carrying `flow_id`, `label`, and `metadata` per flow. Dashboard renders label prominently with metadata key-value pairs below. Live updates on `refresh_flow` — heartbeat already fires on flow lifecycle changes via `rebuildWorkspaceSnapshot()`. | [Payload Schemas](analysis-payload-schemas.md) | 2026-04-02 |
 | D-70 | State management subsystem (C-17, R-CLI-20/21): registry extended with four NATS write endpoints (`svc.insert-request`, `svc.insert-response`, `svc.insert-interjection`, `svc.update-activity`) alongside existing read endpoints (`svc.flows`, `svc.history`). New `statesvc` package defines shared wire types for all six service endpoints, breaking the MCP-to-ledger import dependency. MCP server accesses state exclusively via `stateClient` wrapping NATS request-reply. Production `mcpserver` package has zero import of `ledger`. Endpoint wire types (`ActiveFlowEntry`, `HistoryQueryResult`, etc.) migrated from `registry` to `statesvc` so CLI commands also import the shared package. | — | 2026-04-04 |
+| D-71 | In-process NATS transport (C-19, R-CLI-22): `ConnectEmbedded()` now accepts `*server.Server` and uses `nats.InProcessServer()` to connect via `net.Pipe()` instead of TCP loopback. The TCP listener on port 4222 remains active for external CLI connections. When the embedded broker is disabled, `ConnectShared()` connects via TCP/WSS to the shared broker as before. Auth (UserInfo) works over in-process connections — the NATS CONNECT handshake still occurs over the pipe. | — | 2026-04-04 |
 
 ---
 
@@ -1207,6 +1208,7 @@ Record completed items here with the date.
 | 2026-04-03 | V-02 | README rewritten (~110 lines) with quick start, agent integration configs (Claude Code HTTP MCP, Antigravity/Cursor stdio, Claude Code hooks), CLI command table, and links to testing guides. New `docs/renotify-architecture.md` with system context prose, design principles, Mermaid system block diagram (concurrent HTTP MCP + stdio + terminal + multi-device), and sequence diagrams for post, ask, and interjection flows. Port architecture table and NATS subject namespace reference. Phase 7 complete. |
 | 2026-04-04 | — | Requirements gap analysis: R-CLI-20 (State Management Authority), R-CLI-21 (MCP Server as Broker Client), R-CLI-22 (In-Process Broker Transport) added. Phase 8 implementation plan (C-17 through C-19, V-04, V-05) defined. |
 | 2026-04-04 | C-17 | State management subsystem extracted. Registry extended with 4 write endpoints (`svc.insert-request`, `svc.insert-response`, `svc.insert-interjection`, `svc.update-activity`). New `statesvc` package with shared wire types. MCP server migrated to `stateClient` — all state access via NATS request-reply. Production `mcpserver` package has zero `ledger` import. Endpoint wire types migrated from `registry` to `statesvc`. All existing tests updated and passing (unit + integration). |
+| 2026-04-04 | C-19 | In-process NATS transport for embedded broker. `ConnectEmbedded()` now takes `*server.Server` and uses `nats.InProcessServer()` to connect via `net.Pipe()`. TCP listener remains for CLI. `HistoryRecord` wire format standardised to snake_case (was PascalCase from missing JSON tags); Android parser and tests updated to match. |
 
 ## 6. References
 

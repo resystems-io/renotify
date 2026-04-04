@@ -780,7 +780,7 @@ func TestController_JetStreamMobileReceives(t *testing.T) {
 
 	// Connect and set up JetStream (same as controller would).
 	nc, err := broker.ConnectEmbedded(
-		srv.ClientURL(), "testtoken", integrationLogger())
+		srv.Server(), "testtoken", integrationLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
