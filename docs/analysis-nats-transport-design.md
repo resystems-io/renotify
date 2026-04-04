@@ -23,15 +23,15 @@ collisions without encoding workspace or daemon identity in the subject.
 
 ### 1.1 Subject Registry
 
-| Subject Pattern | Transport | Publisher | Subscriber(s) | Payload | Persistence | Req Trace |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `resystems.renotify.{username}.flow.{flow_id}.request` | JetStream | CLI / MCP Agent | Mobile app | `NotificationRequest` | Memory, 30-min TTL | R-API-01, R-API-07 |
-| `resystems.renotify.{username}.flow.{flow_id}.response` | JetStream | Mobile app | CLI / MCP Agent | `NotificationResponse` | Memory, 30-min TTL | R-API-02, R-API-07 |
-| `resystems.renotify.{username}.flow.{flow_id}.lifecycle` | JetStream | CLI / MCP Agent | Daemon, Mobile app | `FlowLifecycleEvent` | Memory, 30-min TTL | R-API-10 |
-| `resystems.renotify.{username}.flow.{flow_id}.interject` | JetStream | Mobile app | Daemon | `InterjectionCommand` | Memory, 30-min TTL | R-API-09 |
-| `resystems.renotify.{username}.daemon.{daemon_id}.heartbeat` | Core NATS Pub/Sub | Daemon | Mobile app | `DaemonHeartbeat` | None (ephemeral) | R-CLI-14 |
-| `resystems.renotify.{username}.svc.flows` | Core NATS Request-Reply | Mobile app | Daemon | `ActiveFlowsQuery` / `ActiveFlowsResult` | None (synchronous) | R-CLI-14, R-MOB-09 |
-| `resystems.renotify.{username}.svc.history` | Core NATS Request-Reply | Mobile app | Daemon | `HistoryQueryRequest` / `HistoryQueryResult` | None (synchronous) | R-CLI-13, R-MOB-07 |
+| Subject Pattern                                              | Transport               | Publisher       | Subscriber(s)      | Payload                                      | Persistence        | Req Trace          |
+|:-------------------------------------------------------------|:------------------------|:----------------|:-------------------|:---------------------------------------------|:-------------------|:-------------------|
+| `resystems.renotify.{username}.flow.{flow_id}.request`       | JetStream               | CLI / MCP Agent | Mobile app         | `NotificationRequest`                        | Memory, 30-min TTL | R-API-01, R-API-07 |
+| `resystems.renotify.{username}.flow.{flow_id}.response`      | JetStream               | Mobile app      | CLI / MCP Agent    | `NotificationResponse`                       | Memory, 30-min TTL | R-API-02, R-API-07 |
+| `resystems.renotify.{username}.flow.{flow_id}.lifecycle`     | JetStream               | CLI / MCP Agent | Daemon, Mobile app | `FlowLifecycleEvent`                         | Memory, 30-min TTL | R-API-10           |
+| `resystems.renotify.{username}.flow.{flow_id}.interject`     | JetStream               | Mobile app      | Daemon             | `InterjectionCommand`                        | Memory, 30-min TTL | R-API-09           |
+| `resystems.renotify.{username}.daemon.{daemon_id}.heartbeat` | Core NATS Pub/Sub       | Daemon          | Mobile app         | `DaemonHeartbeat`                            | None (ephemeral)   | R-CLI-14           |
+| `resystems.renotify.{username}.svc.flows`                    | Core NATS Request-Reply | Mobile app      | Daemon             | `ActiveFlowsQuery` / `ActiveFlowsResult`     | None (synchronous) | R-CLI-14, R-MOB-09 |
+| `resystems.renotify.{username}.svc.history`                  | Core NATS Request-Reply | Mobile app      | Daemon             | `HistoryQueryRequest` / `HistoryQueryResult` | None (synchronous) | R-CLI-13, R-MOB-07 |
 
 **Design rule:** All subjects under `resystems.renotify.{username}.flow.*` use
 JetStream for durable delivery within the TTL window. All other subjects use
@@ -39,13 +39,13 @@ Core NATS (best-effort pub/sub or synchronous request-reply).
 
 ### 1.2 Subscription Patterns
 
-| Subscriber | Subject Pattern | Transport | Purpose |
-| :--- | :--- | :--- | :--- |
-| Mobile app | `resystems.renotify.{username}.>` | JetStream + Core NATS | Receives all user traffic: notifications, responses, lifecycle events, heartbeats |
-| Daemon (flow registry) | `resystems.renotify.{username}.flow.*.lifecycle` | JetStream consumer | Maintains the active flow registry in SQLite |
-| Daemon (interjections) | `resystems.renotify.{username}.flow.*.interject` | JetStream consumer | Routes interjection commands to the correct flow handler |
-| Daemon (services) | `resystems.renotify.{username}.svc.>` | Core NATS | Serves active-flows and history query endpoints |
-| CLI (`ask`, blocking) | `resystems.renotify.{username}.flow.{flow_id}.response` | JetStream consumer | Waits for the human's decision on one specific flow |
+| Subscriber             | Subject Pattern                                         | Transport             | Purpose                                                                           |
+|:-----------------------|:--------------------------------------------------------|:----------------------|:----------------------------------------------------------------------------------|
+| Mobile app             | `resystems.renotify.{username}.>`                       | JetStream + Core NATS | Receives all user traffic: notifications, responses, lifecycle events, heartbeats |
+| Daemon (flow registry) | `resystems.renotify.{username}.flow.*.lifecycle`        | JetStream consumer    | Maintains the active flow registry in SQLite                                      |
+| Daemon (interjections) | `resystems.renotify.{username}.flow.*.interject`        | JetStream consumer    | Routes interjection commands to the correct flow handler                          |
+| Daemon (services)      | `resystems.renotify.{username}.svc.>`                   | Core NATS             | Serves active-flows and history query endpoints                                   |
+| CLI (`ask`, blocking)  | `resystems.renotify.{username}.flow.{flow_id}.response` | JetStream consumer    | Waits for the human's decision on one specific flow                               |
 
 ---
 
@@ -56,19 +56,19 @@ Core NATS (best-effort pub/sub or synchronous request-reply).
 The embedded broker creates a single JetStream stream to hold all flow-scoped
 messages. The stream is memory-backed (R-CLI-12) and bounded by age and size.
 
-| Parameter | Value | Rationale |
-| :--- | :--- | :--- |
-| Name | `RENOTIFY` | Single stream; shared broker operators may create per-user streams at their discretion |
-| Subjects | `resystems.renotify.*.flow.>` | Captures all flow-scoped traffic for all users on this broker |
-| Storage | `Memory` | R-CLI-12: no filesystem persistence for JetStream |
-| Retention | `Limits` | Messages retained until age/size limits are hit, regardless of consumer interest |
-| Max Age | 30 minutes (configurable) | R-CLI-12 default TTL; balances resilience against brief mobile disconnections with bounded memory |
-| Max Bytes | 128 MB (configurable) | Bounds total stream memory consumption |
-| Max Message Size | 64 KB | R-SYS-01 payload size limit |
-| Max Messages Per Subject | 1,000 | Prevents a single runaway flow from consuming all stream capacity |
-| Discard Policy | `Old` | When limits are reached, the oldest messages are discarded first |
-| Duplicate Window | 2 minutes | Prevents accidental re-publish from CLI retry logic; `Nats-Msg-Id` header used for deduplication |
-| Num Replicas | 1 | Embedded broker is single-node; shared brokers configure replication independently |
+| Parameter                | Value                         | Rationale                                                                                         |
+|:-------------------------|:------------------------------|:--------------------------------------------------------------------------------------------------|
+| Name                     | `RENOTIFY`                    | Single stream; shared broker operators may create per-user streams at their discretion            |
+| Subjects                 | `resystems.renotify.*.flow.>` | Captures all flow-scoped traffic for all users on this broker                                     |
+| Storage                  | `Memory`                      | R-CLI-12: no filesystem persistence for JetStream                                                 |
+| Retention                | `Limits`                      | Messages retained until age/size limits are hit, regardless of consumer interest                  |
+| Max Age                  | 30 minutes (configurable)     | R-CLI-12 default TTL; balances resilience against brief mobile disconnections with bounded memory |
+| Max Bytes                | 128 MB (configurable)         | Bounds total stream memory consumption                                                            |
+| Max Message Size         | 64 KB                         | R-SYS-01 payload size limit                                                                       |
+| Max Messages Per Subject | 1,000                         | Prevents a single runaway flow from consuming all stream capacity                                 |
+| Discard Policy           | `Old`                         | When limits are reached, the oldest messages are discarded first                                  |
+| Duplicate Window         | 2 minutes                     | Prevents accidental re-publish from CLI retry logic; `Nats-Msg-Id` header used for deduplication  |
+| Num Replicas             | 1                             | Embedded broker is single-node; shared brokers configure replication independently                |
 
 ```go
 // JetStreamConfig holds the configurable parameters for the RENOTIFY stream.
@@ -88,12 +88,12 @@ type JetStreamConfig struct {
 Four consumers operate against the `RENOTIFY` stream. Consumer names include the
 username or flow ID to scope their state.
 
-| Consumer Name | Type | Filter Subject | Ack Policy | Max Deliver | Max Ack Pending | Deliver Policy | Inactive Threshold | Purpose |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `mobile-{username}` | Durable | `resystems.renotify.{username}.flow.>` | Explicit | 3 | 256 | All | None | Mobile app: receives all flow events; persists until device revoked |
-| `daemon-lifecycle-{username}` | Durable | `resystems.renotify.{username}.flow.*.lifecycle` | Explicit | 3 | 64 | All | 5 minutes | Daemon: maintains the active flow registry |
-| `daemon-interject-{username}` | Durable | `resystems.renotify.{username}.flow.*.interject` | Explicit | 3 | 64 | All | 5 minutes | Daemon: routes interjections to flow handlers |
-| `cli-response-{flow_id}` | Ephemeral | `resystems.renotify.{username}.flow.{flow_id}.response` | Explicit | 1 | 1 | New | N/A | CLI `ask`: blocks for exactly one response |
+| Consumer Name                 | Type      | Filter Subject                                          | Ack Policy | Max Deliver | Max Ack Pending | Deliver Policy | Inactive Threshold | Purpose                                                             |
+|:------------------------------|:----------|:--------------------------------------------------------|:-----------|:------------|:----------------|:---------------|:-------------------|:--------------------------------------------------------------------|
+| `mobile-{username}`           | Durable   | `resystems.renotify.{username}.flow.>`                  | Explicit   | 3           | 256             | All            | None               | Mobile app: receives all flow events; persists until device revoked |
+| `daemon-lifecycle-{username}` | Durable   | `resystems.renotify.{username}.flow.*.lifecycle`        | Explicit   | 3           | 64              | All            | 5 minutes          | Daemon: maintains the active flow registry                          |
+| `daemon-interject-{username}` | Durable   | `resystems.renotify.{username}.flow.*.interject`        | Explicit   | 3           | 64              | All            | 5 minutes          | Daemon: routes interjections to flow handlers                       |
+| `cli-response-{flow_id}`      | Ephemeral | `resystems.renotify.{username}.flow.{flow_id}.response` | Explicit   | 1           | 1               | New            | N/A                | CLI `ask`: blocks for exactly one response                          |
 
 **Mobile consumer:** Durable push consumer with a deliver subject
 (`resystems.renotify.{username}.mobile.deliver`). The deliver subject is within
@@ -127,23 +127,23 @@ starts waiting.
 
 ### 3.1 Per-Transport Guarantees
 
-| Transport | Delivery Guarantee | Loss Window | Mitigation |
-| :--- | :--- | :--- | :--- |
-| JetStream (flow events) | At-least-once within TTL | Message expires after 30 min with no connected consumer; or MaxDeliver exhausted | Mobile app: reconnection retrieves unacked messages. CLI: ephemeral consumer lives only during blocking period. |
-| Core NATS Pub/Sub (heartbeat) | At-most-once | Any moment the subscriber is disconnected | Next heartbeat (30s max) or on-change trigger supersedes. Heartbeats are idempotent snapshots. |
-| Core NATS Request-Reply (services) | At-most-once, synchronous | Request times out if daemon is unreachable | Mobile app retries the query. Request-reply is inherently idempotent for read-only operations. |
+| Transport                          | Delivery Guarantee        | Loss Window                                                                      | Mitigation                                                                                                      |
+|:-----------------------------------|:--------------------------|:---------------------------------------------------------------------------------|:----------------------------------------------------------------------------------------------------------------|
+| JetStream (flow events)            | At-least-once within TTL  | Message expires after 30 min with no connected consumer; or MaxDeliver exhausted | Mobile app: reconnection retrieves unacked messages. CLI: ephemeral consumer lives only during blocking period. |
+| Core NATS Pub/Sub (heartbeat)      | At-most-once              | Any moment the subscriber is disconnected                                        | Next heartbeat (30s max) or on-change trigger supersedes. Heartbeats are idempotent snapshots.                  |
+| Core NATS Request-Reply (services) | At-most-once, synchronous | Request times out if daemon is unreachable                                       | Mobile app retries the query. Request-reply is inherently idempotent for read-only operations.                  |
 
 ### 3.2 Idempotency Analysis
 
-| Payload | Idempotent? | Key Field | Notes |
-| :--- | :--- | :--- | :--- |
-| `NotificationRequest` | Yes | `id` | Mobile app deduplicates on `id` if the same message is delivered more than once (at-least-once JetStream). |
-| `NotificationResponse` | Yes | `request_id` | CLI consumes exactly one response (MaxDeliver=1). Duplicate delivery to the daemon history ledger is a no-op if `request_id` is already recorded. |
-| `FlowLifecycleEvent` | Yes | `flow_id` + `status` | Re-delivering a "status: active" event for an already-active flow is a no-op in the registry. |
-| `InterjectionCommand` | **No** | `flow_id` | A duplicate "stop" command could trigger redundant termination logic. Mitigations: the 2-minute JetStream dedup window prevents accidental republish; the daemon tracks the most recent interjection timestamp per flow and ignores duplicates within a configurable debounce window (default: 5 seconds). |
-| `DaemonHeartbeat` | Yes | (timestamp) | Latest heartbeat always supersedes all prior. |
-| `ActiveFlowsQuery`/`Result` | Yes | (stateless) | Pure read operation. |
-| `HistoryQueryRequest`/`Result` | Yes | (stateless) | Pure read operation. |
+| Payload                        | Idempotent? | Key Field            | Notes                                                                                                                                                                                                                                                                                                      |
+|:-------------------------------|:------------|:---------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `NotificationRequest`          | Yes         | `id`                 | Mobile app deduplicates on `id` if the same message is delivered more than once (at-least-once JetStream).                                                                                                                                                                                                 |
+| `NotificationResponse`         | Yes         | `request_id`         | CLI consumes exactly one response (MaxDeliver=1). Duplicate delivery to the daemon history ledger is a no-op if `request_id` is already recorded.                                                                                                                                                          |
+| `FlowLifecycleEvent`           | Yes         | `flow_id` + `status` | Re-delivering a "status: active" event for an already-active flow is a no-op in the registry.                                                                                                                                                                                                              |
+| `InterjectionCommand`          | **No**      | `flow_id`            | A duplicate "stop" command could trigger redundant termination logic. Mitigations: the 2-minute JetStream dedup window prevents accidental republish; the daemon tracks the most recent interjection timestamp per flow and ignores duplicates within a configurable debounce window (default: 5 seconds). |
+| `DaemonHeartbeat`              | Yes         | (timestamp)          | Latest heartbeat always supersedes all prior.                                                                                                                                                                                                                                                              |
+| `ActiveFlowsQuery`/`Result`    | Yes         | (stateless)          | Pure read operation.                                                                                                                                                                                                                                                                                       |
+| `HistoryQueryRequest`/`Result` | Yes         | (stateless)          | Pure read operation.                                                                                                                                                                                                                                                                                       |
 
 ### 3.3 Timeout Semantics
 
@@ -185,10 +185,10 @@ The embedded NATS server exposes two listeners to serve the two transport
 requirements (R-API-04): native TCP for co-located clients and WebSocket for
 remote clients.
 
-| Listener | Protocol | Bind Address | Default Port | TLS | Clients |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| Native TCP | `nats://` | `127.0.0.1` | 4222 | No (loopback only) | CLI commands, MCP server bridge |
-| WebSocket | `wss://` | `0.0.0.0` | 4223 | Yes (mandatory) | Mobile app over network |
+| Listener   | Protocol  | Bind Address | Default Port | TLS                | Clients                         |
+|:-----------|:----------|:-------------|:-------------|:-------------------|:--------------------------------|
+| Native TCP | `nats://` | `127.0.0.1`  | 4222         | No (loopback only) | CLI commands, MCP server bridge |
+| WebSocket  | `wss://`  | `0.0.0.0`    | 4223         | Yes (mandatory)    | Mobile app over network         |
 
 The native TCP listener binds to the loopback interface because co-located CLI
 processes do not cross a network boundary and do not need TLS overhead. The
@@ -244,23 +244,23 @@ by co-located CLI processes that read it from the daemon's local configuration.
 The daemon generates a self-signed TLS certificate on first pairing. The
 certificate secures the WSS listener for mobile app connections.
 
-| Parameter | Value | Rationale |
-| :--- | :--- | :--- |
-| Key Algorithm | ECDSA P-256 (secp256r1) | Modern, fast, compact key and cert. Go stdlib `crypto/ecdsa` + `crypto/elliptic` provide native support with no external dependencies. |
-| Signature Algorithm | ECDSA with SHA-256 | Matches the key type. |
-| Validity Period | 3 years (1,095 days) | Long enough to avoid operational churn for a personal dev tool; short enough to encourage periodic re-pairing. |
-| Subject CN | `renotify-{daemon_id}` | Ties the certificate to a specific daemon instance for log traceability. |
-| Subject Alternative Names | All discovered non-loopback IPs + `127.0.0.1` + `localhost` | Required for hostname/IP verification during TLS handshake. The mobile app connects by IP address. |
-| Serial Number | Random 128-bit integer | Standard practice for self-signed certificates. |
+| Parameter                 | Value                                                       | Rationale                                                                                                                              |
+|:--------------------------|:------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------|
+| Key Algorithm             | ECDSA P-256 (secp256r1)                                     | Modern, fast, compact key and cert. Go stdlib `crypto/ecdsa` + `crypto/elliptic` provide native support with no external dependencies. |
+| Signature Algorithm       | ECDSA with SHA-256                                          | Matches the key type.                                                                                                                  |
+| Validity Period           | 3 years (1,095 days)                                        | Long enough to avoid operational churn for a personal dev tool; short enough to encourage periodic re-pairing.                         |
+| Subject CN                | `renotify-{daemon_id}`                                      | Ties the certificate to a specific daemon instance for log traceability.                                                               |
+| Subject Alternative Names | All discovered non-loopback IPs + `127.0.0.1` + `localhost` | Required for hostname/IP verification during TLS handshake. The mobile app connects by IP address.                                     |
+| Serial Number             | Random 128-bit integer                                      | Standard practice for self-signed certificates.                                                                                        |
 
 ### 5.2 Storage
 
 All TLS artifacts are stored under the XDG state directory (R-CLI-09):
 
-| Artifact | Path | Permissions |
-| :--- | :--- | :--- |
-| TLS certificate (PEM) | `$XDG_STATE_HOME/renotify/tls/cert.pem` | 0644 |
-| TLS private key (PEM) | `$XDG_STATE_HOME/renotify/tls/key.pem` | 0600 |
+| Artifact              | Path                                    | Permissions |
+|:----------------------|:----------------------------------------|:------------|
+| TLS certificate (PEM) | `$XDG_STATE_HOME/renotify/tls/cert.pem` | 0644        |
+| TLS private key (PEM) | `$XDG_STATE_HOME/renotify/tls/key.pem`  | 0600        |
 
 `$XDG_STATE_HOME` defaults to `~/.local/state` per the XDG Base Directory
 specification.
@@ -279,12 +279,12 @@ is never transmitted.
 
 ### 5.4 Certificate Lifecycle
 
-| Event | Behaviour |
-| :--- | :--- |
-| First `renotify pair` | Generate new ECDSA P-256 key pair and self-signed certificate. Store in XDG state. |
-| Subsequent `renotify pair` | Reuse existing certificate (fingerprint unchanged). Generate new auth token only. |
-| `renotify pair --regenerate-cert` | Generate new key pair and certificate. Invalidates any prior mobile pairing (fingerprint changes). |
-| Daemon startup | Load certificate and key from XDG state. If missing, the WSS listener cannot start; the daemon logs a warning and operates in TCP-only mode (no mobile connectivity). |
+| Event                             | Behaviour                                                                                                                                                             |
+|:----------------------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| First `renotify pair`             | Generate new ECDSA P-256 key pair and self-signed certificate. Store in XDG state.                                                                                    |
+| Subsequent `renotify pair`        | Reuse existing certificate (fingerprint unchanged). Generate new auth token only.                                                                                     |
+| `renotify pair --regenerate-cert` | Generate new key pair and certificate. Invalidates any prior mobile pairing (fingerprint changes).                                                                    |
+| Daemon startup                    | Load certificate and key from XDG state. If missing, the WSS listener cannot start; the daemon logs a warning and operates in TCP-only mode (no mobile connectivity). |
 
 ### 5.5 Android TLS Trust Bootstrap
 
@@ -392,13 +392,13 @@ separate internal token that is never exposed outside the loopback interface
 
 ### 6.1 Token Format
 
-| Component | Value |
-| :--- | :--- |
-| Prefix | `rn_tk_` (6 characters) |
-| Random body | 32 bytes from `crypto/rand`, encoded as 52 Crockford Base32 characters |
-| Total length | 58 characters |
-| Entropy | 256 bits |
-| Example | `rn_tk_0A1B2C3D4E5F6G7H8J9K0M1N2P3Q4R5S6T7V8W9X0Y1Z2A3B4C5D` |
+| Component    | Value                                                                  |
+|:-------------|:-----------------------------------------------------------------------|
+| Prefix       | `rn_tk_` (6 characters)                                                |
+| Random body  | 32 bytes from `crypto/rand`, encoded as 52 Crockford Base32 characters |
+| Total length | 58 characters                                                          |
+| Entropy      | 256 bits                                                               |
+| Example      | `rn_tk_0A1B2C3D4E5F6G7H8J9K0M1N2P3Q4R5S6T7V8W9X0Y1Z2A3B4C5D`           |
 
 The `rn_tk_` prefix makes tokens grep-friendly in logs, consistent with the
 project's identifier prefix convention (`dn_`, `ws_`, `fl_`, `mb_`). Crockford
@@ -413,10 +413,10 @@ practical brute-force threshold.
 
 ### 6.3 Storage
 
-| Artifact | Path | Permissions |
-| :--- | :--- | :--- |
-| Active pairing token | `$XDG_STATE_HOME/renotify/pairing/token` | 0600 |
-| Associated username | `$XDG_STATE_HOME/renotify/pairing/username` | 0600 |
+| Artifact             | Path                                        | Permissions |
+|:---------------------|:--------------------------------------------|:------------|
+| Active pairing token | `$XDG_STATE_HOME/renotify/pairing/token`    | 0600        |
+| Associated username  | `$XDG_STATE_HOME/renotify/pairing/username` | 0600        |
 
 ### 6.4 NATS Auth Integration (Embedded Broker)
 
@@ -452,9 +452,9 @@ once on first daemon startup using the same algorithm as the
 pairing token (`rn_tk_` prefix + 52 Crockford Base32 characters,
 256-bit entropy) and persisted to:
 
-| Artifact | Path | Permissions |
-| :--- | :--- | :--- |
-| Internal token | `$XDG_STATE_HOME/renotify/internal_token` | 0600 |
+| Artifact       | Path                                      | Permissions |
+|:---------------|:------------------------------------------|:------------|
+| Internal token | `$XDG_STATE_HOME/renotify/internal_token` | 0600        |
 
 The token is reused across daemon restarts. Co-located CLI
 processes (`renotify post`, `renotify ask`, `renotify history`)
@@ -475,12 +475,12 @@ permissions as defined in Section 7.
 
 ### 6.6 Token Lifecycle
 
-| Event | Action |
-| :--- | :--- |
-| `renotify pair` (no existing token) | Generate new token, store in XDG state, configure embedded NATS auth, include in QR payload |
-| `renotify pair` (existing token) | Revoke old token (R-SEC-02: re-pairing supersedes prior token), generate new token |
-| `renotify revoke` | Remove token from NATS auth configuration, send client disconnect signal, delete stored token file |
-| Daemon startup | Load stored token from XDG state, configure embedded NATS auth. If no token exists, the broker starts without a mobile account (no mobile connectivity until `renotify pair`). |
+| Event                               | Action                                                                                                                                                                         |
+|:------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `renotify pair` (no existing token) | Generate new token, store in XDG state, configure embedded NATS auth, include in QR payload                                                                                    |
+| `renotify pair` (existing token)    | Revoke old token (R-SEC-02: re-pairing supersedes prior token), generate new token                                                                                             |
+| `renotify revoke`                   | Remove token from NATS auth configuration, send client disconnect signal, delete stored token file                                                                             |
+| Daemon startup                      | Load stored token from XDG state, configure embedded NATS auth. If no token exists, the broker starts without a mobile account (no mobile connectivity until `renotify pair`). |
 
 ### 6.7 Why Token Authentication Over NKeys
 
@@ -516,37 +516,37 @@ identity).
 
 ### 7.1 Actor Roles
 
-| Role | Connection Type | Auth Credential | Typical Client |
-| :--- | :--- | :--- | :--- |
+| Role              | Connection Type        | Auth Credential                                | Typical Client               |
+|:------------------|:-----------------------|:-----------------------------------------------|:-----------------------------|
 | Daemon (internal) | Native TCP on loopback | Internal token (auto-generated, never exposed) | Daemon process, CLI commands |
-| Mobile client | WSS over network | Pairing token (`rn_tk_...`) | Android app |
+| Mobile client     | WSS over network       | Pairing token (`rn_tk_...`)                    | Android app                  |
 
 ### 7.2 Daemon (Internal) Permissions
 
 The daemon account has full access within its user's namespace:
 
-| Direction | Subject Pattern | Purpose |
-| :--- | :--- | :--- |
-| Publish | `resystems.renotify.{username}.>` | All subjects (heartbeat, lifecycle, service responses) |
+| Direction | Subject Pattern                   | Purpose                                                          |
+|:----------|:----------------------------------|:-----------------------------------------------------------------|
+| Publish   | `resystems.renotify.{username}.>` | All subjects (heartbeat, lifecycle, service responses)           |
 | Subscribe | `resystems.renotify.{username}.>` | All subjects (lifecycle events, interjections, service requests) |
-| Publish | `$JS.API.>` | JetStream management (stream and consumer creation) |
-| Subscribe | `$JS.API.>` | JetStream management responses |
+| Publish   | `$JS.API.>`                       | JetStream management (stream and consumer creation)              |
+| Subscribe | `$JS.API.>`                       | JetStream management responses                                   |
 
 ### 7.3 Mobile Client Permissions
 
 The mobile account has scoped access — it can subscribe broadly but can only
 publish to subjects that represent legitimate user actions:
 
-| Direction | Subject Pattern | Purpose |
-| :--- | :--- | :--- |
-| Subscribe | `resystems.renotify.{username}.>` | Receive all user traffic (notifications, heartbeats, lifecycle) |
-| Publish | `resystems.renotify.{username}.flow.*.response` | Send notification responses |
-| Publish | `resystems.renotify.{username}.flow.*.interject` | Send interjection commands |
-| Publish | `resystems.renotify.{username}.svc.*` | Send service requests (active flows, history queries) |
-| Publish | `$JS.ACK.>` | Acknowledge JetStream messages |
-| Publish | `$JS.FC.>` | JetStream flow control |
-| Publish | `$JS.API.CONSUMER.INFO.>` | Look up consumer info for push subscription binding |
-| Subscribe | `_INBOX.>` | Receive Core NATS request-reply responses |
+| Direction | Subject Pattern                                  | Purpose                                                         |
+|:----------|:-------------------------------------------------|:----------------------------------------------------------------|
+| Subscribe | `resystems.renotify.{username}.>`                | Receive all user traffic (notifications, heartbeats, lifecycle) |
+| Publish   | `resystems.renotify.{username}.flow.*.response`  | Send notification responses                                     |
+| Publish   | `resystems.renotify.{username}.flow.*.interject` | Send interjection commands                                      |
+| Publish   | `resystems.renotify.{username}.svc.*`            | Send service requests (active flows, history queries)           |
+| Publish   | `$JS.ACK.>`                                      | Acknowledge JetStream messages                                  |
+| Publish   | `$JS.FC.>`                                       | JetStream flow control                                          |
+| Publish   | `$JS.API.CONSUMER.INFO.>`                        | Look up consumer info for push subscription binding             |
+| Subscribe | `_INBOX.>`                                       | Receive Core NATS request-reply responses                       |
 
 **Security property:** The mobile client cannot publish to `*.request`,
 `*.lifecycle`, or `*.heartbeat` subjects. This prevents a compromised mobile
@@ -814,11 +814,11 @@ retained for forward compatibility.
 to both `.response` and `.interject` for its flow (Section 8.6,
 steps 5-6). It waits concurrently on both consumers:
 
-| Event | CLI Behaviour |
-| :--- | :--- |
-| `.response` arrives | Normal exit: print response, publish `FlowLifecycleEvent` (`completed`), exit 0 |
-| `.interject` with `stop` arrives | Print "Flow stopped by user" to stderr, publish `FlowLifecycleEvent` (`failed`), exit 1 |
-| `.interject` with `note` arrives | Print context to stderr, continue waiting |
+| Event                                                      | CLI Behaviour                                                                                        |
+|:-----------------------------------------------------------|:-----------------------------------------------------------------------------------------------------|
+| `.response` arrives                                        | Normal exit: print response, publish `FlowLifecycleEvent` (`completed`), exit 0                      |
+| `.interject` with `stop` arrives                           | Print "Flow stopped by user" to stderr, publish `FlowLifecycleEvent` (`failed`), exit 1              |
+| `.interject` with `note` arrives                           | Print context to stderr, continue waiting                                                            |
 | `ErrorResponse` (`code: "timeout"`) arrives on `.response` | Print timeout error to stderr, exit 3. Daemon has already published `FlowLifecycleEvent` (`failed`). |
 
 The CLI `post` command does not subscribe to `.interject` because
@@ -837,22 +837,22 @@ based on its own logic.
 
 ## 9. Deployment Model Comparison
 
-| Aspect | Embedded Broker | Shared Broker |
-| :--- | :--- | :--- |
-| **NATS server** | In-process, managed by daemon | External, managed by operator |
-| **Listener configuration** | Daemon configures TCP + WSS (Section 4.1) | Operator's responsibility (Section 4.2) |
-| **JetStream stream** | Daemon creates `RENOTIFY` stream on startup | Operator pre-provisions or daemon creates if permitted |
-| **Consumer creation** | Daemon creates all consumers | Daemon creates its consumers; mobile consumer may be operator-managed |
-| **TLS certificates** | Self-signed ECDSA P-256, generated by `renotify pair` | Operator-managed (CA-signed or self-signed) |
-| **Auth token** | Daemon manages via embedded NATS server API | Operator provisions into broker's auth configuration |
-| **ACL enforcement** | Daemon configures two-account model via embedded API | Operator configures in `nats-server.conf` or auth callout |
-| **Mobile connection target** | Daemon's IP:`4223` (WSS) | Shared broker's address and WSS port |
-| **`renotify pair` output** | QR with daemon's local IP and WSS port | QR with shared broker's address and WSS port (from daemon config) |
-| **`renotify revoke`** | Daemon removes token and disconnects client | Daemon deletes local token; operator must revoke on broker |
-| **CLI connection target** | Loopback TCP (`127.0.0.1:4222`) | Shared broker URL (from `shared_broker.url` in config) |
-| **CLI auth credential** | Internal token (from `$XDG_STATE_HOME/renotify/internal_token`) | Shared broker credentials (from `shared_broker` config section) |
-| **Multi-user** | Single user (the daemon owner) | Multiple users, each with own namespace |
-| **Multi-daemon** | N/A (one embedded broker per daemon) | Multiple daemons connect as clients; mobile discovers them via heartbeats |
+| Aspect                       | Embedded Broker                                                 | Shared Broker                                                             |
+|:-----------------------------|:----------------------------------------------------------------|:--------------------------------------------------------------------------|
+| **NATS server**              | In-process, managed by daemon                                   | External, managed by operator                                             |
+| **Listener configuration**   | Daemon configures TCP + WSS (Section 4.1)                       | Operator's responsibility (Section 4.2)                                   |
+| **JetStream stream**         | Daemon creates `RENOTIFY` stream on startup                     | Operator pre-provisions or daemon creates if permitted                    |
+| **Consumer creation**        | Daemon creates all consumers                                    | Daemon creates its consumers; mobile consumer may be operator-managed     |
+| **TLS certificates**         | Self-signed ECDSA P-256, generated by `renotify pair`           | Operator-managed (CA-signed or self-signed)                               |
+| **Auth token**               | Daemon manages via embedded NATS server API                     | Operator provisions into broker's auth configuration                      |
+| **ACL enforcement**          | Daemon configures two-account model via embedded API            | Operator configures in `nats-server.conf` or auth callout                 |
+| **Mobile connection target** | Daemon's IP:`4223` (WSS)                                        | Shared broker's address and WSS port                                      |
+| **`renotify pair` output**   | QR with daemon's local IP and WSS port                          | QR with shared broker's address and WSS port (from daemon config)         |
+| **`renotify revoke`**        | Daemon removes token and disconnects client                     | Daemon deletes local token; operator must revoke on broker                |
+| **CLI connection target**    | Loopback TCP (`127.0.0.1:4222`)                                 | Shared broker URL (from `shared_broker.url` in config)                    |
+| **CLI auth credential**      | Internal token (from `$XDG_STATE_HOME/renotify/internal_token`) | Shared broker credentials (from `shared_broker` config section)           |
+| **Multi-user**               | Single user (the daemon owner)                                  | Multiple users, each with own namespace                                   |
+| **Multi-daemon**             | N/A (one embedded broker per daemon)                            | Multiple daemons connect as clients; mobile discovers them via heartbeats |
 
 The mobile app's behaviour is identical in both models. It connects
 to whatever `host:port` was provisioned, authenticates with the

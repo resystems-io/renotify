@@ -396,16 +396,16 @@ The daemon writes to SQLite at the same time it publishes to (or
 receives from) NATS. The NATS message provides ephemeral delivery
 (30-minute TTL); the SQLite row provides permanent persistence.
 
-| Event | NATS Action | SQLite Action |
-| :--- | :--- | :--- |
-| CLI/agent sends notification | Publish `NotificationRequest` to JetStream | `INSERT OR IGNORE INTO notification_requests` |
-| Mobile app responds | Receive `NotificationResponse` from JetStream | `INSERT OR IGNORE INTO notification_responses` |
-| Flow registered | Publish `FlowLifecycleEvent` (`active`) | Insert into `flow_lifecycle_events` + `active_flows` |
-| Flow refreshed | Publish `FlowLifecycleEvent` (`active`) | Insert into `flow_lifecycle_events`; update `active_flows.last_activity_timestamp` |
-| Flow terminated | Publish `FlowLifecycleEvent` (`completed`/`failed`) | Insert into `flow_lifecycle_events`; delete from `active_flows` |
-| Stale reaping | Publish `FlowLifecycleEvent` (`failed`) | Insert into `flow_lifecycle_events`; delete from `active_flows` |
-| Any tool call on a flow | (varies) | Update `active_flows.last_activity_timestamp` |
-| Interjection received | Receive `InterjectionCommand` from JetStream | `INSERT OR IGNORE INTO interjections`; for `stop`: also insert `flow_lifecycle_events` (`failed`) + delete `active_flows` |
+| Event                        | NATS Action                                         | SQLite Action                                                                                                             |
+|:-----------------------------|:----------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------|
+| CLI/agent sends notification | Publish `NotificationRequest` to JetStream          | `INSERT OR IGNORE INTO notification_requests`                                                                             |
+| Mobile app responds          | Receive `NotificationResponse` from JetStream       | `INSERT OR IGNORE INTO notification_responses`                                                                            |
+| Flow registered              | Publish `FlowLifecycleEvent` (`active`)             | Insert into `flow_lifecycle_events` + `active_flows`                                                                      |
+| Flow refreshed               | Publish `FlowLifecycleEvent` (`active`)             | Insert into `flow_lifecycle_events`; update `active_flows.last_activity_timestamp`                                        |
+| Flow terminated              | Publish `FlowLifecycleEvent` (`completed`/`failed`) | Insert into `flow_lifecycle_events`; delete from `active_flows`                                                           |
+| Stale reaping                | Publish `FlowLifecycleEvent` (`failed`)             | Insert into `flow_lifecycle_events`; delete from `active_flows`                                                           |
+| Any tool call on a flow      | (varies)                                            | Update `active_flows.last_activity_timestamp`                                                                             |
+| Interjection received        | Receive `InterjectionCommand` from JetStream        | `INSERT OR IGNORE INTO interjections`; for `stop`: also insert `flow_lifecycle_events` (`failed`) + delete `active_flows` |
 
 ### 5.2 Active Flow Lifecycle
 

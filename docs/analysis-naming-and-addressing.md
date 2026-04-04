@@ -19,12 +19,12 @@ conversation. All examples in this document use uppercase Crockford Base32.
 (26-character) representation. The appropriate length depends on the population
 size and collision-risk context of each identifier:
 
-| Identifier | Base32 Length | Entropy | Population Rationale |
-| :--- | :--- | :--- | :--- |
-| `flow_id` | 26 chars (full 128-bit UUIDv7) | 128 bits | Highest-volume identifier. Thousands created per day across all daemons. Appears in NATS subjects where a collision would silently cross-contaminate flows. Must carry full UUID guarantees. |
-| `workspace_id` | 16 chars (80 bits from SHA-256) | 80 bits | Already a hash truncation. A single daemon manages at most tens of workspaces. 80 bits gives ~1.2 x 10^24 values — collision probability negligible at this population. |
-| `daemon_id` | 13 chars (65 bits from UUIDv4) | 65 bits | A user accumulates at most tens of daemon installations over their career. 65 bits gives ~3.7 x 10^19 values — collision risk astronomically low. |
-| `device_id` | 13 chars (65 bits from UUIDv4) | 65 bits | A user pairs single-digit mobile devices. Same reasoning as daemon_id. |
+| Identifier     | Base32 Length                   | Entropy  | Population Rationale                                                                                                                                                                         |
+|:---------------|:--------------------------------|:---------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `flow_id`      | 26 chars (full 128-bit UUIDv7)  | 128 bits | Highest-volume identifier. Thousands created per day across all daemons. Appears in NATS subjects where a collision would silently cross-contaminate flows. Must carry full UUID guarantees. |
+| `workspace_id` | 16 chars (80 bits from SHA-256) | 80 bits  | Already a hash truncation. A single daemon manages at most tens of workspaces. 80 bits gives ~1.2 x 10^24 values — collision probability negligible at this population.                      |
+| `daemon_id`    | 13 chars (65 bits from UUIDv4)  | 65 bits  | A user accumulates at most tens of daemon installations over their career. 65 bits gives ~3.7 x 10^19 values — collision risk astronomically low.                                            |
+| `device_id`    | 13 chars (65 bits from UUIDv4)  | 65 bits  | A user pairs single-digit mobile devices. Same reasoning as daemon_id.                                                                                                                       |
 
 ---
 
@@ -209,16 +209,16 @@ messages unambiguously.
 
 ## 3. Identifier Summary Table
 
-| Element | Identifier | Format | Uniqueness Scope | Generation | Stable Across Restarts |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| NATS Broker | Connection URL | `host:port` | Global (DNS/IP) | Infrastructure config | Yes |
-| User | `username` | Alphanumeric string | Per broker | Configured | Yes |
-| Daemon Instance | `daemon_id` | `dn_` + 13 Base32 (65 bits) | Global | Auto-generated, persisted | Yes |
-| Workspace | `workspace_id` | `ws_` + 16 Base32 (80 bits) | Global | Deterministic hash | Yes (same daemon + path) |
-| Workspace (display) | `display_name` | Directory basename | NOT unique | Derived from path | Yes |
-| Flow | `flow_id` | `fl_` + 26 Base32 (128 bits) | Global | Generated at flow start | N/A (single-use) |
-| Notification | `notification_id` | `ntf_` + 16 Base32 (80 bits) | Global | Generated per notification (UUIDv7 truncated) | N/A (single-use) |
-| Mobile Client | `device_id` | `mb_` + 13 Base32 (65 bits) | Per user | Generated at pairing | Yes |
+| Element             | Identifier        | Format                       | Uniqueness Scope | Generation                                    | Stable Across Restarts   |
+|:--------------------|:------------------|:-----------------------------|:-----------------|:----------------------------------------------|:-------------------------|
+| NATS Broker         | Connection URL    | `host:port`                  | Global (DNS/IP)  | Infrastructure config                         | Yes                      |
+| User                | `username`        | Alphanumeric string          | Per broker       | Configured                                    | Yes                      |
+| Daemon Instance     | `daemon_id`       | `dn_` + 13 Base32 (65 bits)  | Global           | Auto-generated, persisted                     | Yes                      |
+| Workspace           | `workspace_id`    | `ws_` + 16 Base32 (80 bits)  | Global           | Deterministic hash                            | Yes (same daemon + path) |
+| Workspace (display) | `display_name`    | Directory basename           | NOT unique       | Derived from path                             | Yes                      |
+| Flow                | `flow_id`         | `fl_` + 26 Base32 (128 bits) | Global           | Generated at flow start                       | N/A (single-use)         |
+| Notification        | `notification_id` | `ntf_` + 16 Base32 (80 bits) | Global           | Generated per notification (UUIDv7 truncated) | N/A (single-use)         |
+| Mobile Client       | `device_id`       | `mb_` + 13 Base32 (65 bits)  | Per user         | Generated at pairing                          | Yes                      |
 
 ---
 
@@ -268,13 +268,13 @@ resystems.renotify.{username}.svc.history                  HistoryQueryRequest /
 
 ### 4.3 Subscription Patterns
 
-| Subscriber | Subject Pattern | Purpose |
-| :--- | :--- | :--- |
-| Mobile app | `resystems.renotify.{username}.>` | Receives all traffic for this user |
-| Daemon (flow registry) | `resystems.renotify.{username}.flow.*.lifecycle` | Maintains the active flow registry |
-| Daemon (interjections) | `resystems.renotify.{username}.flow.*.interject` | Routes interjections to the correct flow |
-| Daemon (service) | `resystems.renotify.{username}.svc.>` | Serves query endpoints |
-| CLI (`ask`, blocking) | `resystems.renotify.{username}.flow.{flow_id}.response` | Waits for the human's decision on this specific flow |
+| Subscriber             | Subject Pattern                                         | Purpose                                              |
+|:-----------------------|:--------------------------------------------------------|:-----------------------------------------------------|
+| Mobile app             | `resystems.renotify.{username}.>`                       | Receives all traffic for this user                   |
+| Daemon (flow registry) | `resystems.renotify.{username}.flow.*.lifecycle`        | Maintains the active flow registry                   |
+| Daemon (interjections) | `resystems.renotify.{username}.flow.*.interject`        | Routes interjections to the correct flow             |
+| Daemon (service)       | `resystems.renotify.{username}.svc.>`                   | Serves query endpoints                               |
+| CLI (`ask`, blocking)  | `resystems.renotify.{username}.flow.{flow_id}.response` | Waits for the human's decision on this specific flow |
 
 ### 4.4 Benefits Over Current Design
 
@@ -460,12 +460,12 @@ serves a distinct operational context:
 
 ### 7.2 Pairing Scenarios
 
-| Scenario | Broker | Pairing Behaviour |
-| :--- | :--- | :--- |
-| Single daemon, solo developer | Embedded | One pairing, mobile connects to daemon directly |
-| Single daemon, enterprise | Shared | One pairing to the shared broker |
-| Multiple daemons, enterprise | Shared | One pairing to the shared broker, all daemons publish there |
-| Multiple daemons, each embedded | Embedded | Multiple pairings needed (one per daemon) |
+| Scenario                        | Broker   | Pairing Behaviour                                           |
+|:--------------------------------|:---------|:------------------------------------------------------------|
+| Single daemon, solo developer   | Embedded | One pairing, mobile connects to daemon directly             |
+| Single daemon, enterprise       | Shared   | One pairing to the shared broker                            |
+| Multiple daemons, enterprise    | Shared   | One pairing to the shared broker, all daemons publish there |
+| Multiple daemons, each embedded | Embedded | Multiple pairings needed (one per daemon)                   |
 
 The provisioning payload is the same in all cases — it provides the connection
 target (whether that is an embedded daemon or a shared broker), an auth token,
@@ -483,19 +483,19 @@ app behaviour is the same regardless of broker topology.
 
 ## 8. Terminology Rename Summary
 
-| Current Term | Proposed Term | Reason |
-| :--- | :--- | :--- |
-| Session | Flow | Avoids collision with MCP sessions, agent sessions, HTTP sessions |
-| session_id | flow_id | Follows from above |
-| SessionLifecycleEvent | FlowLifecycleEvent | Follows from above |
-| SessionStatus | FlowStatus | Follows from above |
-| register_session | register_flow | MCP tool name |
-| terminate_session | terminate_flow | MCP tool name |
-| ActiveSessionsQuery | ActiveFlowsQuery | Follows from above |
-| ActiveSessionsResult | ActiveFlowsResult | Follows from above |
-| Active Session Registry | Active Flow Registry | Daemon component name |
-| Workspace View | Workspace View | **Unchanged** — this is a UI label, not a data model term |
-| Workspaces Dashboard | Workspaces Dashboard | **Unchanged** — still groups by workspace, now using workspace_id |
+| Current Term            | Proposed Term        | Reason                                                            |
+|:------------------------|:---------------------|:------------------------------------------------------------------|
+| Session                 | Flow                 | Avoids collision with MCP sessions, agent sessions, HTTP sessions |
+| session_id              | flow_id              | Follows from above                                                |
+| SessionLifecycleEvent   | FlowLifecycleEvent   | Follows from above                                                |
+| SessionStatus           | FlowStatus           | Follows from above                                                |
+| register_session        | register_flow        | MCP tool name                                                     |
+| terminate_session       | terminate_flow       | MCP tool name                                                     |
+| ActiveSessionsQuery     | ActiveFlowsQuery     | Follows from above                                                |
+| ActiveSessionsResult    | ActiveFlowsResult    | Follows from above                                                |
+| Active Session Registry | Active Flow Registry | Daemon component name                                             |
+| Workspace View          | Workspace View       | **Unchanged** — this is a UI label, not a data model term         |
+| Workspaces Dashboard    | Workspaces Dashboard | **Unchanged** — still groups by workspace, now using workspace_id |
 
 ---
 
