@@ -11,10 +11,14 @@ data class HistoryRecord(
     val id: String,
     val flowId: String,
     val workspaceId: String,
+    val flowLabel: String?,
+    val workspaceName: String?,
     val title: String,
     val body: String?,
     val priority: String,
     val source: String,
+    val responseTypes: List<String>,
+    val actions: List<String>?,
     val timestamp: String,
     val responseAccepted: Boolean?,
     val responseAction: String?,
@@ -26,6 +30,20 @@ data class HistoryRecord(
         get() = responseAccepted != null ||
             !responseAction.isNullOrEmpty() ||
             !responseText.isNullOrEmpty()
+
+    /**
+     * True when the notification expects a human response
+     * (boolean, choice, or text — not fire-and-forget).
+     */
+    val isInteractive: Boolean
+        get() = responseTypes.any { it != "none" }
+
+    /**
+     * True when the notification expects a response but none
+     * has been received yet.
+     */
+    val isOpen: Boolean
+        get() = isInteractive && !hasResponse
 
     /**
      * True when the record has content worth showing in an
@@ -61,11 +79,31 @@ data class HistoryRecord(
                 id = req.getString("id"),
                 flowId = req.getString("flow_id"),
                 workspaceId = req.getString("workspace_id"),
+                flowLabel = obj.optString("FlowLabel", "")
+                    .ifEmpty { null },
+                workspaceName = obj.optString("WorkspaceName", "")
+                    .ifEmpty { null },
                 title = req.getString("title"),
                 body = req.optString("body", "")
                     .ifEmpty { null },
                 priority = req.optString("priority", "normal"),
                 source = req.optString("source", ""),
+                responseTypes = run {
+                    val arr = req.optJSONArray("response_types")
+                    if (arr != null)
+                        (0 until arr.length()).map {
+                            arr.getString(it)
+                        }
+                    else listOf("none")
+                },
+                actions = run {
+                    val arr = req.optJSONArray("actions")
+                    if (arr != null)
+                        (0 until arr.length()).map {
+                            arr.getString(it)
+                        }
+                    else null
+                },
                 timestamp = req.getString("timestamp"),
                 responseAccepted = resp?.let {
                     if (it.has("accepted") && !it.isNull("accepted"))

@@ -10,7 +10,10 @@ import (
 // alongside the payload but not part of the NATS wire format.
 // Passed to ledger write methods that create new records.
 type WriteContext struct {
-	Username string
+	Username      string
+	FlowLabel     string
+	WorkspaceName string
+	WorkspacePath string
 }
 
 // ActiveFlow maps to the active_flows table. This is a storage
@@ -41,11 +44,16 @@ type HistoryQuery struct {
 
 // HistoryRecord pairs a request with its optional response.
 // Username is included so records are self-describing when
-// histories from multiple daemons are aggregated.
+// histories from multiple daemons are aggregated. FlowLabel,
+// WorkspaceName, and WorkspacePath are snapshots captured at
+// notification time from the active flow context.
 type HistoryRecord struct {
-	Username string
-	Request  payload.NotificationRequest
-	Response *payload.NotificationResponse
+	Username      string
+	FlowLabel     string
+	WorkspaceName string
+	WorkspacePath string
+	Request       payload.NotificationRequest
+	Response      *payload.NotificationResponse
 }
 
 // HistoryResult holds the paginated query result.

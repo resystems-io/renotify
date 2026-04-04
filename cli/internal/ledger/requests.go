@@ -41,12 +41,16 @@ func (d *DB) InsertRequest(wc WriteContext, r *payload.NotificationRequest) erro
 		INSERT OR IGNORE INTO notification_requests
 		    (id, username, flow_id, daemon_id, workspace_id,
 		     title, body, response_types, priority, source,
-		     actions, timeout_sec, timestamp)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		     actions, timeout_sec, timestamp,
+		     flow_label, workspace_name, workspace_path)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		r.ID, wc.Username, r.FlowID, r.DaemonID, r.WorkspaceID,
 		r.Title, body,
 		string(responseTypes), string(r.Priority), r.Source, actions,
 		timeoutSec, r.Timestamp.UTC().Format(time.RFC3339),
+		nullString(wc.FlowLabel),
+		nullString(wc.WorkspaceName),
+		nullString(wc.WorkspacePath),
 	)
 	if err != nil {
 		return fmt.Errorf("ledger: insert request: %w", err)
