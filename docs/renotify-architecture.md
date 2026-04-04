@@ -262,11 +262,11 @@ sequenceDiagram
 
 ## Port Architecture
 
-| Port | Protocol | Bind Address | Purpose | TLS |
-|:-----|:---------|:-------------|:--------|:----|
-| 4222 | NATS TCP | `127.0.0.1` | CLI commands and external clients | No (loopback) |
-| 4223 | NATS WSS | `0.0.0.0` | Mobile device connections | Yes (self-signed, TOFU pinning) |
-| 4224 | HTTP | `127.0.0.1` | MCP server (`/mcp`, `/sse`) | No (loopback) |
+| Port | Protocol | Bind Address | Purpose                           | TLS                             |
+|:-----|:---------|:-------------|:----------------------------------|:--------------------------------|
+| 4222 | NATS TCP | `127.0.0.1`  | CLI commands and external clients | No (loopback)                   |
+| 4223 | NATS WSS | `0.0.0.0`    | Mobile device connections         | Yes (self-signed, TOFU pinning) |
+| 4224 | HTTP     | `127.0.0.1`  | MCP server (`/mcp`, `/sse`)       | No (loopback)                   |
 
 Separate trust boundaries justify separate listeners. Mobile
 connections cross untrusted networks and require TLS. CLI and
@@ -287,29 +287,29 @@ resystems.renotify.{username}.{scope}.{id}.{event}
 
 ### Flow-scoped subjects (JetStream)
 
-| Subject | Direction | Purpose |
-|:--------|:----------|:--------|
-| `...flow.{id}.request` | MCP Server → Mobile | Notification delivery |
-| `...flow.{id}.response` | Mobile → MCP Server | User's decision |
-| `...flow.{id}.lifecycle` | MCP Server → State Subsystem | Flow state changes |
-| `...flow.{id}.interject` | Mobile → MCP Server | Stop/note signals |
+| Subject                  | Direction                    | Purpose               |
+|:-------------------------|:-----------------------------|:----------------------|
+| `...flow.{id}.request`   | MCP Server → Mobile          | Notification delivery |
+| `...flow.{id}.response`  | Mobile → MCP Server          | User's decision       |
+| `...flow.{id}.lifecycle` | MCP Server → State Subsystem | Flow state changes    |
+| `...flow.{id}.interject` | Mobile → MCP Server          | Stop/note signals     |
 
 ### State service subjects (Core NATS Request-Reply)
 
-| Subject | Callers | Purpose |
-|:--------|:--------|:--------|
-| `...svc.flows` | MCP Server, CLI, Mobile | Active flow queries |
-| `...svc.history` | CLI, Mobile | History queries |
-| `...svc.insert-request` | MCP Server | Insert notification request |
-| `...svc.insert-response` | MCP Server | Insert notification response |
-| `...svc.insert-interjection` | MCP Server | Insert interjection audit |
-| `...svc.update-activity` | MCP Server | Update flow activity timestamp |
+| Subject                      | Callers                 | Purpose                        |
+|:-----------------------------|:------------------------|:-------------------------------|
+| `...svc.flows`               | MCP Server, CLI, Mobile | Active flow queries            |
+| `...svc.history`             | CLI, Mobile             | History queries                |
+| `...svc.insert-request`      | MCP Server              | Insert notification request    |
+| `...svc.insert-response`     | MCP Server              | Insert notification response   |
+| `...svc.insert-interjection` | MCP Server              | Insert interjection audit      |
+| `...svc.update-activity`     | MCP Server              | Update flow activity timestamp |
 
 ### Ephemeral subjects (Core NATS)
 
-| Subject | Direction | Purpose |
-|:--------|:----------|:--------|
+| Subject                    | Direction                    | Purpose           |
+|:---------------------------|:-----------------------------|:------------------|
 | `...daemon.{id}.heartbeat` | Heartbeat Publisher → Mobile | Dashboard updates |
-| `...device.{id}.control` | Daemon → Mobile | Silent mode, etc. |
-| `...mcp.{id}.c2s` | CLI → MCP Server | Stdio MCP relay |
-| `...mcp.{id}.s2c` | MCP Server → CLI | Stdio MCP relay |
+| `...device.{id}.control`   | Daemon → Mobile              | Silent mode, etc. |
+| `...mcp.{id}.c2s`          | CLI → MCP Server             | Stdio MCP relay   |
+| `...mcp.{id}.s2c`          | MCP Server → CLI             | Stdio MCP relay   |

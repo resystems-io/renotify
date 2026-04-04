@@ -41,26 +41,26 @@ Each payload's **Transport** identifies the delivery mechanism and its
 * **Any (contextual)** — transport depends on the originating
   request.
 
-| Payload Name | Transport | Direction | Requirement Cross-Ref | ConOps Workflow | Description |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| [**NotificationRequest**](#notificationrequest) | NATS JetStream | CLI/Agent -> App | R-API-01, N-01 | W2, W3 | The core domain model representing an interrupt or alert. Contains the title, body, priority, source, and the type of response required. |
-| [**NotificationResponse**](#notificationresponse) | NATS JetStream | App -> CLI/Agent | R-API-02, N-03 | W3 | The human decision. Correlates to a `NotificationRequest` ID, capturing the selected action or free-form text input alongside the decision timestamp. |
-| [**FlowLifecycleEvent**](#flowlifecycleevent) | NATS JetStream | CLI/Agent -> Daemon | R-API-10, N-04 | W3, W5 | A structured event indicating the birth or death of a distinct pipeline flow. Used by the daemon to maintain the active flow registry. |
-| [**RegisterFlowRequest/Result**](#register_flow-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08 | W3, W5 | MCP tool to begin a new flow. Agent provides `workspace_path`; daemon computes `workspace_id`, generates `flow_id`, publishes `FlowLifecycleEvent`. |
-| [**RefreshFlowRequest/Result**](#refresh_flow-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08 | W5 | MCP tool to signal continued activity and update flow label/metadata. Resets stale reaping timer. |
-| [**TerminateFlowRequest/Result**](#terminate_flow-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08 | W3, W5 | MCP tool to end a flow with `completed` or `failed` status. |
-| [**PostNotificationRequest/Result**](#post-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08 | W2 | MCP tool for fire-and-forget notification within an active flow. Daemon fills system fields from flow context. |
-| [**AskNotificationRequest/Result**](#ask-mcp-tool) | MCP Tool | Agent -> Daemon | R-CLI-08, R-CLI-10 | W3 | MCP tool for non-blocking interactive prompt. Returns `resource_uri` for async `DecisionResource` polling. |
-| [**ProvisioningPayload**](#provisioningpayload) | Offline (QR) | CLI -> App | R-API-08, N-01 | W1 | The secure handshake payload containing the target IP, port, auth token, and required TLS certificate fingerprints in a minified JSON map. |
-| [**InterjectionCommand**](#interjectioncommand) | NATS JetStream | App -> Daemon/Agent | R-API-09, N-05 | W5 | An asynchronous, unprompted control signal emitted by the user targeting a specific flow by its globally unique flow_id. |
-| [**DaemonHeartbeat**](#daemonheartbeat) | NATS Pub/Sub | Daemon -> App | R-CLI-14 | W5 | Periodic structural context (daemon identity, hostname, workspaces, active flows) enabling the mobile dashboard to group and display the system hierarchy. |
-| [**ActiveFlowsQuery**](#activeflowsquery) | NATS Request-Reply | App -> Daemon | R-CLI-14, R-MOB-09 | W5 | Core NATS query sent by the Android app to list all currently running flows across the host. |
-| [**ActiveFlowsResult**](#activeflowsresult) | NATS Request-Reply | Daemon -> App | R-CLI-14, R-MOB-09 | W5 | The daemon's reply containing the array of currently active `FlowLifecycleEvent` contexts. |
-| [**HistoryQueryRequest**](#historyqueryrequest) | NATS Request-Reply | App -> Daemon | R-CLI-13, R-MOB-07 | W4 | Core NATS query sent by the Android app requesting the historical ledger of past notifications and decisions. |
-| [**HistoryQueryResult**](#historyqueryresult) | NATS Request-Reply | Daemon -> App | R-CLI-13, R-MOB-07 | W4 | The daemon's structured payload wrapping the requested SQLite history records to be rendered native on the device. |
-| [**ErrorResponse**](#errorresponse) | Any (contextual) | Daemon -> Caller | R-API-11, N-04 | W2, W3, W4, W5 | A generic error envelope returned when any request fails at the daemon or broker level. Contains a correlation ID, error code, human-readable message, and timestamp. |
-| [**DecisionResource**](#decisionresource) | MCP Resource | Daemon -> Agent | R-CLI-10 | W3 | The MCP dynamic resource exposing a decision result that agents read after receiving the `notifications/resources/updated` notification. |
-| [**InterjectionResource**](#interjectionresource) | MCP Resource | Daemon -> Agent | R-API-09, R-CLI-10 | W5 | The MCP dynamic resource exposing the most recent interjection for a flow, enabling agents to react to out-of-band stop/note signals from the mobile user. |
+| Payload Name                                                | Transport          | Direction           | Requirement Cross-Ref | ConOps Workflow | Description                                                                                                                                                           |
+|:------------------------------------------------------------|:-------------------|:--------------------|:----------------------|:----------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [**NotificationRequest**](#notificationrequest)             | NATS JetStream     | CLI/Agent -> App    | R-API-01, N-01        | W2, W3          | The core domain model representing an interrupt or alert. Contains the title, body, priority, source, and the type of response required.                              |
+| [**NotificationResponse**](#notificationresponse)           | NATS JetStream     | App -> CLI/Agent    | R-API-02, N-03        | W3              | The human decision. Correlates to a `NotificationRequest` ID, capturing the selected action or free-form text input alongside the decision timestamp.                 |
+| [**FlowLifecycleEvent**](#flowlifecycleevent)               | NATS JetStream     | CLI/Agent -> Daemon | R-API-10, N-04        | W3, W5          | A structured event indicating the birth or death of a distinct pipeline flow. Used by the daemon to maintain the active flow registry.                                |
+| [**RegisterFlowRequest/Result**](#register_flow-mcp-tool)   | MCP Tool           | Agent -> Daemon     | R-CLI-08              | W3, W5          | MCP tool to begin a new flow. Agent provides `workspace_path`; daemon computes `workspace_id`, generates `flow_id`, publishes `FlowLifecycleEvent`.                   |
+| [**RefreshFlowRequest/Result**](#refresh_flow-mcp-tool)     | MCP Tool           | Agent -> Daemon     | R-CLI-08              | W5              | MCP tool to signal continued activity and update flow label/metadata. Resets stale reaping timer.                                                                     |
+| [**TerminateFlowRequest/Result**](#terminate_flow-mcp-tool) | MCP Tool           | Agent -> Daemon     | R-CLI-08              | W3, W5          | MCP tool to end a flow with `completed` or `failed` status.                                                                                                           |
+| [**PostNotificationRequest/Result**](#post-mcp-tool)        | MCP Tool           | Agent -> Daemon     | R-CLI-08              | W2              | MCP tool for fire-and-forget notification within an active flow. Daemon fills system fields from flow context.                                                        |
+| [**AskNotificationRequest/Result**](#ask-mcp-tool)          | MCP Tool           | Agent -> Daemon     | R-CLI-08, R-CLI-10    | W3              | MCP tool for non-blocking interactive prompt. Returns `resource_uri` for async `DecisionResource` polling.                                                            |
+| [**ProvisioningPayload**](#provisioningpayload)             | Offline (QR)       | CLI -> App          | R-API-08, N-01        | W1              | The secure handshake payload containing the target IP, port, auth token, and required TLS certificate fingerprints in a minified JSON map.                            |
+| [**InterjectionCommand**](#interjectioncommand)             | NATS JetStream     | App -> Daemon/Agent | R-API-09, N-05        | W5              | An asynchronous, unprompted control signal emitted by the user targeting a specific flow by its globally unique flow_id.                                              |
+| [**DaemonHeartbeat**](#daemonheartbeat)                     | NATS Pub/Sub       | Daemon -> App       | R-CLI-14              | W5              | Periodic structural context (daemon identity, hostname, workspaces, active flows) enabling the mobile dashboard to group and display the system hierarchy.            |
+| [**ActiveFlowsQuery**](#activeflowsquery)                   | NATS Request-Reply | App -> Daemon       | R-CLI-14, R-MOB-09    | W5              | Core NATS query sent by the Android app to list all currently running flows across the host.                                                                          |
+| [**ActiveFlowsResult**](#activeflowsresult)                 | NATS Request-Reply | Daemon -> App       | R-CLI-14, R-MOB-09    | W5              | The daemon's reply containing the array of currently active `FlowLifecycleEvent` contexts.                                                                            |
+| [**HistoryQueryRequest**](#historyqueryrequest)             | NATS Request-Reply | App -> Daemon       | R-CLI-13, R-MOB-07    | W4              | Core NATS query sent by the Android app requesting the historical ledger of past notifications and decisions.                                                         |
+| [**HistoryQueryResult**](#historyqueryresult)               | NATS Request-Reply | Daemon -> App       | R-CLI-13, R-MOB-07    | W4              | The daemon's structured payload wrapping the requested SQLite history records to be rendered native on the device.                                                    |
+| [**ErrorResponse**](#errorresponse)                         | Any (contextual)   | Daemon -> Caller    | R-API-11, N-04        | W2, W3, W4, W5  | A generic error envelope returned when any request fails at the daemon or broker level. Contains a correlation ID, error code, human-readable message, and timestamp. |
+| [**DecisionResource**](#decisionresource)                   | MCP Resource       | Daemon -> Agent     | R-CLI-10              | W3              | The MCP dynamic resource exposing a decision result that agents read after receiving the `notifications/resources/updated` notification.                              |
+| [**InterjectionResource**](#interjectionresource)           | MCP Resource       | Daemon -> Agent     | R-API-09, R-CLI-10    | W5              | The MCP dynamic resource exposing the most recent interjection for a flow, enabling agents to react to out-of-band stop/note signals from the mobile user.            |
 
 ---
 
@@ -341,14 +341,14 @@ its work, and calls `terminate_flow` to end. The daemon generates
 the `flow_id` and publishes the underlying `FlowLifecycleEvent`
 on the agent's behalf.
 
-| Operation | CLI Path | MCP Path |
-| :--- | :--- | :--- |
-| Start a flow | Implicit: CLI derives `workspace_id` from cwd, generates `flow_id`, publishes `FlowLifecycleEvent` (`active`) | Explicit: agent calls `register_flow` with `workspace_path`; daemon computes `workspace_id`, generates `flow_id`, publishes event |
-| Send fire-and-forget | `renotify post` (flow_id set internally) | Agent calls `post` tool with `flow_id`; daemon returns `notification_id` |
-| Send blocking prompt | `renotify ask` (blocks until response or timeout) | Agent calls `ask` tool (non-blocking); daemon returns `notification_id` + `resource_uri`; agent reads `DecisionResource` asynchronously via `notifications/resources/updated` |
-| Signal progress | N/A (CLI flows are short-lived) | Agent calls `refresh_flow` with optional label/metadata update; resets reaping timer |
-| End a flow | Implicit: CLI publishes `FlowLifecycleEvent` (`completed` or `failed`) on exit | Explicit: agent calls `terminate_flow` tool; daemon publishes event |
-| Stale reaping | Daemon detects CLI process termination (5-min grace, R-CLI-18) | Daemon detects absence of any tool call referencing the flow (5-min grace, R-CLI-18) |
+| Operation            | CLI Path                                                                                                      | MCP Path                                                                                                                                                                      |
+|:---------------------|:--------------------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Start a flow         | Implicit: CLI derives `workspace_id` from cwd, generates `flow_id`, publishes `FlowLifecycleEvent` (`active`) | Explicit: agent calls `register_flow` with `workspace_path`; daemon computes `workspace_id`, generates `flow_id`, publishes event                                             |
+| Send fire-and-forget | `renotify post` (flow_id set internally)                                                                      | Agent calls `post` tool with `flow_id`; daemon returns `notification_id`                                                                                                      |
+| Send blocking prompt | `renotify ask` (blocks until response or timeout)                                                             | Agent calls `ask` tool (non-blocking); daemon returns `notification_id` + `resource_uri`; agent reads `DecisionResource` asynchronously via `notifications/resources/updated` |
+| Signal progress      | N/A (CLI flows are short-lived)                                                                               | Agent calls `refresh_flow` with optional label/metadata update; resets reaping timer                                                                                          |
+| End a flow           | Implicit: CLI publishes `FlowLifecycleEvent` (`completed` or `failed`) on exit                                | Explicit: agent calls `terminate_flow` tool; daemon publishes event                                                                                                           |
+| Stale reaping        | Daemon detects CLI process termination (5-min grace, R-CLI-18)                                                | Daemon detects absence of any tool call referencing the flow (5-min grace, R-CLI-18)                                                                                          |
 
 #### `register_flow` MCP Tool
 
@@ -426,10 +426,10 @@ correlation) but is not required for subsequent tool calls.
 
 **Error conditions:**
 
-| Error Code | Condition |
-| :--- | :--- |
+| Error Code     | Condition                                                                            |
+|:---------------|:-------------------------------------------------------------------------------------|
 | `rate_limited` | The agent has exceeded the maximum number of concurrent active flows (R-SYS-01: 20). |
-| `internal` | Unexpected daemon-side failure during flow registration. |
+| `internal`     | Unexpected daemon-side failure during flow registration.                             |
 
 Errors are returned as MCP tool error responses. The daemon does
 not publish a `FlowLifecycleEvent` when registration fails.
@@ -486,10 +486,10 @@ type TerminateFlowResult struct {
 
 **Error conditions:**
 
-| Error Code | Condition |
-| :--- | :--- |
+| Error Code  | Condition                                                                                           |
+|:------------|:----------------------------------------------------------------------------------------------------|
 | `not_found` | The `flow_id` is not in the active flow registry (already terminated, reaped, or never registered). |
-| `internal` | Unexpected daemon-side failure during termination. |
+| `internal`  | Unexpected daemon-side failure during termination.                                                  |
 
 #### `refresh_flow` MCP Tool
 
@@ -548,10 +548,10 @@ type RefreshFlowResult struct {
 
 **Error conditions:**
 
-| Error Code | Condition |
-| :--- | :--- |
+| Error Code  | Condition                                         |
+|:------------|:--------------------------------------------------|
 | `not_found` | The `flow_id` is not in the active flow registry. |
-| `internal` | Unexpected daemon-side failure. |
+| `internal`  | Unexpected daemon-side failure.                   |
 
 A typical MCP agent workflow using `refresh_flow`:
 
@@ -639,11 +639,11 @@ type PostNotificationResult struct {
 
 **Error conditions:**
 
-| Error Code | Condition |
-| :--- | :--- |
-| `not_found` | The `flow_id` is not in the active flow registry. |
+| Error Code     | Condition                                                              |
+|:---------------|:-----------------------------------------------------------------------|
+| `not_found`    | The `flow_id` is not in the active flow registry.                      |
 | `rate_limited` | The flow has exceeded the per-flow notification rate limit (R-CLI-16). |
-| `internal` | Unexpected daemon-side failure. |
+| `internal`     | Unexpected daemon-side failure.                                        |
 
 #### `ask` MCP Tool
 
@@ -727,12 +727,12 @@ type AskNotificationResult struct {
 
 **Error conditions:**
 
-| Error Code | Condition |
-| :--- | :--- |
-| `not_found` | The `flow_id` is not in the active flow registry. |
+| Error Code     | Condition                                                              |
+|:---------------|:-----------------------------------------------------------------------|
+| `not_found`    | The `flow_id` is not in the active flow registry.                      |
 | `rate_limited` | The flow has exceeded the per-flow notification rate limit (R-CLI-16). |
-| `unroutable` | No mobile client is connected to receive the notification. |
-| `internal` | Unexpected daemon-side failure. |
+| `unroutable`   | No mobile client is connected to receive the notification.             |
+| `internal`     | Unexpected daemon-side failure.                                        |
 
 #### MCP `ask` Decision Flow
 
@@ -858,13 +858,13 @@ The minified JSON payload above is approximately 175 bytes. The
 following parameters govern how it is encoded and rendered as a QR code
 during `renotify pair`:
 
-| Parameter | Value | Rationale |
-| :--- | :--- | :--- |
-| Library | [`mdp/qrterminal`][qrterminal] | Terminal-native API, actively maintained (v3.2.1, March 2025), half-block rendering is first-class. Underlying encoder is `rsc.io/qr` (Russ Cox). |
-| Error correction | Level L (7% recovery) | The QR code is displayed on a screen and scanned at close range in a controlled environment. Level L minimises module count for a given payload, producing a smaller and faster-to-scan code. |
-| QR version | ~7 (45x45 modules) | 170 bytes of alphanumeric/byte data at EC level L fits comfortably in version 7 (capacity: 224 bytes binary). The library selects the minimum version automatically. |
-| Terminal rendering | Unicode half-block characters | Uses `U+2580` / `U+2584` / `U+2588` to pack two module rows per terminal line, halving the vertical footprint to ~23 terminal rows for a version 7 code. |
-| Quiet zone | 1 module (library default) | The ISO 18004 standard specifies a 4-module quiet zone, but 1 module is sufficient for screen-to-camera scanning where the terminal background provides contrast. |
+| Parameter          | Value                          | Rationale                                                                                                                                                                                     |
+|:-------------------|:-------------------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Library            | [`mdp/qrterminal`][qrterminal] | Terminal-native API, actively maintained (v3.2.1, March 2025), half-block rendering is first-class. Underlying encoder is `rsc.io/qr` (Russ Cox).                                             |
+| Error correction   | Level L (7% recovery)          | The QR code is displayed on a screen and scanned at close range in a controlled environment. Level L minimises module count for a given payload, producing a smaller and faster-to-scan code. |
+| QR version         | ~7 (45x45 modules)             | 170 bytes of alphanumeric/byte data at EC level L fits comfortably in version 7 (capacity: 224 bytes binary). The library selects the minimum version automatically.                          |
+| Terminal rendering | Unicode half-block characters  | Uses `U+2580` / `U+2584` / `U+2588` to pack two module rows per terminal line, halving the vertical footprint to ~23 terminal rows for a version 7 code.                                      |
+| Quiet zone         | 1 module (library default)     | The ISO 18004 standard specifies a 4-module quiet zone, but 1 module is sufficient for screen-to-camera scanning where the terminal background provides contrast.                             |
 
 Terminal output (single function call in the `pair` command):
 

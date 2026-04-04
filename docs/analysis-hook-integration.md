@@ -63,14 +63,14 @@ the user (e.g., "Allow Bash: `npm test`?").
 
 **Input fields (stdin JSON):**
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `session_id` | string | Current Claude Code session |
-| `cwd` | string | Working directory |
-| `hook_event_name` | string | Always `"PermissionRequest"` |
-| `tool_name` | string | Tool requesting permission |
-| `tool_input` | object | Tool-specific parameters |
-| `permission_suggestions` | array | "Always allow" options the user would normally see |
+| Field                    | Type   | Description                                        |
+|:-------------------------|:-------|:---------------------------------------------------|
+| `session_id`             | string | Current Claude Code session                        |
+| `cwd`                    | string | Working directory                                  |
+| `hook_event_name`        | string | Always `"PermissionRequest"`                       |
+| `tool_name`              | string | Tool requesting permission                         |
+| `tool_input`             | object | Tool-specific parameters                           |
+| `permission_suggestions` | array  | "Always allow" options the user would normally see |
 
 **Output (stdout JSON) — decision control:**
 
@@ -104,14 +104,14 @@ back to the hook decision JSON.
 
 **Input fields (stdin JSON):**
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `session_id` | string | Current Claude Code session |
-| `cwd` | string | Working directory |
-| `hook_event_name` | string | Always `"Notification"` |
-| `message` | string | Notification body text |
-| `title` | string | Notification title |
-| `notification_type` | string | Event subtype |
+| Field               | Type   | Description                 |
+|:--------------------|:-------|:----------------------------|
+| `session_id`        | string | Current Claude Code session |
+| `cwd`               | string | Working directory           |
+| `hook_event_name`   | string | Always `"Notification"`     |
+| `message`           | string | Notification body text      |
+| `title`             | string | Notification title          |
+| `notification_type` | string | Event subtype               |
 
 **Output:** No decision control. The hook runs for side effects only.
 
@@ -124,13 +124,13 @@ mobile device as-is.
 The following events are architecturally compatible but not in scope for
 the initial implementation:
 
-| Event | Potential Renotify mapping | Notes |
-| :--- | :--- | :--- |
-| `PreToolUse` | Auto-approve rules based on mobile-configured policy | Requires mobile UI for rule management |
-| `AskUserQuestion` | Route Claude's questions to mobile via `ask` | Needs `updatedInput` with answers |
-| `Elicitation` | Route MCP elicitations to mobile | Needs form schema rendering |
-| `Stop` | Notify user when agent finishes | Low priority — covered by Notification |
-| `StopFailure` | Alert user on API errors | Useful for unattended runs |
+| Event             | Potential Renotify mapping                           | Notes                                  |
+|:------------------|:-----------------------------------------------------|:---------------------------------------|
+| `PreToolUse`      | Auto-approve rules based on mobile-configured policy | Requires mobile UI for rule management |
+| `AskUserQuestion` | Route Claude's questions to mobile via `ask`         | Needs `updatedInput` with answers      |
+| `Elicitation`     | Route MCP elicitations to mobile                     | Needs form schema rendering            |
+| `Stop`            | Notify user when agent finishes                      | Low priority — covered by Notification |
+| `StopFailure`     | Alert user on API errors                             | Useful for unattended runs             |
 
 ---
 
@@ -279,19 +279,19 @@ The `tool_input` object is tool-specific. The dispatch command should
 extract a concise, human-readable summary for the mobile notification
 body. The following table defines the extraction rules:
 
-| Tool Name | Body Template | Example |
-| :--- | :--- | :--- |
-| `Bash` | `{command}` | `rm -rf node_modules` |
-| `Edit` | `{file_path}` | `/home/user/src/main.go` |
-| `Write` | `{file_path}` | `/home/user/src/new_file.go` |
-| `Read` | `{file_path}` | `/home/user/src/config.json` |
-| `Glob` | `{pattern}` in `{path}` | `**/*.ts` in `/home/user/src` |
-| `Grep` | `/{pattern}/` in `{path}` | `/TODO.*fix/` in `/home/user/src` |
-| `Agent` | `{subagent_type}: {description}` | `Explore: Find API endpoints` |
-| `WebFetch` | `{url}` | `https://docs.example.com/api` |
-| `WebSearch` | `{query}` | `react hooks best practices` |
-| MCP tools | `{tool_name}` with raw input | `mcp__github__search_repositories` |
-| Other | JSON-serialised `tool_input` | Fallback for unknown tools |
+| Tool Name   | Body Template                    | Example                            |
+|:------------|:---------------------------------|:-----------------------------------|
+| `Bash`      | `{command}`                      | `rm -rf node_modules`              |
+| `Edit`      | `{file_path}`                    | `/home/user/src/main.go`           |
+| `Write`     | `{file_path}`                    | `/home/user/src/new_file.go`       |
+| `Read`      | `{file_path}`                    | `/home/user/src/config.json`       |
+| `Glob`      | `{pattern}` in `{path}`          | `**/*.ts` in `/home/user/src`      |
+| `Grep`      | `/{pattern}/` in `{path}`        | `/TODO.*fix/` in `/home/user/src`  |
+| `Agent`     | `{subagent_type}: {description}` | `Explore: Find API endpoints`      |
+| `WebFetch`  | `{url}`                          | `https://docs.example.com/api`     |
+| `WebSearch` | `{query}`                        | `react hooks best practices`       |
+| MCP tools   | `{tool_name}` with raw input     | `mcp__github__search_repositories` |
+| Other       | JSON-serialised `tool_input`     | Fallback for unknown tools         |
 
 ### 4.5 Timeout and Error Handling
 
@@ -307,14 +307,14 @@ defaults.
 
 **Graceful fallback on error:**
 
-| Condition | Exit code | Claude Code behaviour |
-| :--- | :--- | :--- |
-| NATS unreachable | 1 | Non-blocking error; falls back to terminal prompt |
-| Timeout (no mobile response) | 1 | Non-blocking error; falls back to terminal prompt |
-| Mobile user allows | 0 | Permission granted |
-| Mobile user denies | 0 | Permission denied with message |
-| Stdin parse error | 1 | Non-blocking error; falls back to terminal prompt |
-| Unsupported event type | 0 | Silent no-op; no stdout output |
+| Condition                    | Exit code | Claude Code behaviour                             |
+|:-----------------------------|:----------|:--------------------------------------------------|
+| NATS unreachable             | 1         | Non-blocking error; falls back to terminal prompt |
+| Timeout (no mobile response) | 1         | Non-blocking error; falls back to terminal prompt |
+| Mobile user allows           | 0         | Permission granted                                |
+| Mobile user denies           | 0         | Permission denied with message                    |
+| Stdin parse error            | 1         | Non-blocking error; falls back to terminal prompt |
+| Unsupported event type       | 0         | Silent no-op; no stdout output                    |
 
 The exit code 1 (non-blocking error) strategy is deliberate: it ensures
 that hook failures never prevent Claude Code from functioning. The user
@@ -421,10 +421,10 @@ implementation. The configuration is static JSON and can be documented.
 The dispatch command does not introduce new transport primitives. It
 reuses the existing infrastructure:
 
-| Dispatch action | Renotify equivalent | Shared infrastructure |
-| :--- | :--- | :--- |
+| Dispatch action   | Renotify equivalent       | Shared infrastructure                                             |
+|:------------------|:--------------------------|:------------------------------------------------------------------|
 | PermissionRequest | `renotify ask -r boolean` | `setupFlow`, JetStream publish, ephemeral consumer, response wait |
-| Notification | `renotify post` | `setupFlow`, JetStream publish, lifecycle events |
+| Notification      | `renotify post`           | `setupFlow`, JetStream publish, lifecycle events                  |
 
 Internally, `renotify dispatch` calls the same `flow.go` setup path and
 NATS publish logic as the `ask` and `post` commands. The differences are:
