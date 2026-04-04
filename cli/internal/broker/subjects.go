@@ -45,6 +45,40 @@ func ServiceHistorySubject(username string) string {
 	return fmt.Sprintf("resystems.renotify.%s.svc.history", username)
 }
 
+// ServiceInsertRequestSubject returns the Core NATS
+// Request-Reply subject for inserting a notification request
+// into the ledger (C-17).
+func ServiceInsertRequestSubject(username string) string {
+	return fmt.Sprintf("resystems.renotify.%s.svc.insert-request",
+		username)
+}
+
+// ServiceInsertResponseSubject returns the Core NATS
+// Request-Reply subject for inserting a notification response
+// into the ledger (C-17).
+func ServiceInsertResponseSubject(username string) string {
+	return fmt.Sprintf("resystems.renotify.%s.svc.insert-response",
+		username)
+}
+
+// ServiceInsertInterjectionSubject returns the Core NATS
+// Request-Reply subject for inserting an interjection audit
+// record into the ledger (C-17).
+func ServiceInsertInterjectionSubject(username string) string {
+	return fmt.Sprintf(
+		"resystems.renotify.%s.svc.insert-interjection",
+		username)
+}
+
+// ServiceUpdateActivitySubject returns the Core NATS
+// Request-Reply subject for updating a flow's last activity
+// timestamp (C-17).
+func ServiceUpdateActivitySubject(username string) string {
+	return fmt.Sprintf(
+		"resystems.renotify.%s.svc.update-activity",
+		username)
+}
+
 // DeviceControlSubject returns the Core NATS Pub/Sub subject
 // for sending control commands to a specific mobile device
 // (C-16).

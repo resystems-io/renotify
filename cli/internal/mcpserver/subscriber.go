@@ -135,9 +135,9 @@ func (s *Server) handleResponse(
 
 		s.decisions.Resolve(notificationID, &resp)
 
-		// Insert into ledger.
-		if s.db != nil && s.db() != nil {
-			s.db().InsertResponse(&resp)
+		// Insert into ledger via state service.
+		if s.state != nil {
+			s.state.InsertResponse(&resp)
 		}
 
 		// Note: we do NOT publish FlowCompleted here. A flow
