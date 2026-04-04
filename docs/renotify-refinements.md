@@ -1046,7 +1046,7 @@ shared broker is in use.)*
   connect via NATS TCP to the shared broker address. The TCP
   listener on port 4222 remains available for external CLI
   connections (R-CLI-22).
-- [ ] **V-04: Decoupling Verification:** Verify that the MCP server
+- [x] **V-04: Decoupling Verification:** Verify that the MCP server
   operates correctly when the ledger subsystem is reachable only via
   NATS. Test both the collocated (in-process transport) and
   separated (TCP transport to shared broker) topologies. Confirm
@@ -1209,6 +1209,7 @@ Record completed items here with the date.
 | 2026-04-04 | — | Requirements gap analysis: R-CLI-20 (State Management Authority), R-CLI-21 (MCP Server as Broker Client), R-CLI-22 (In-Process Broker Transport) added. Phase 8 implementation plan (C-17 through C-19, V-04, V-05) defined. |
 | 2026-04-04 | C-17 | State management subsystem extracted. Registry extended with 4 write endpoints (`svc.insert-request`, `svc.insert-response`, `svc.insert-interjection`, `svc.update-activity`). New `statesvc` package with shared wire types. MCP server migrated to `stateClient` — all state access via NATS request-reply. Production `mcpserver` package has zero `ledger` import. Endpoint wire types migrated from `registry` to `statesvc`. All existing tests updated and passing (unit + integration). |
 | 2026-04-04 | C-19 | In-process NATS transport for embedded broker. `ConnectEmbedded()` now takes `*server.Server` and uses `nats.InProcessServer()` to connect via `net.Pipe()`. TCP listener remains for CLI. `HistoryRecord` wire format standardised to snake_case (was PascalCase from missing JSON tags); Android parser and tests updated to match. |
+| 2026-04-04 | V-04 | Decoupling verification. 4 write endpoint isolation tests (`TestInsertRequestEndpoint`, `TestInsertResponseEndpoint`, `TestInsertInterjectionEndpoint`, `TestUpdateActivityEndpoint`) verify NATS request-reply contract for each `svc.insert-*` endpoint. `TestController_SharedBrokerMCPRoundTrip` exercises the full MCP→stateClient→NATS TCP→registry→ledger path with the daemon connected to a shared broker (not embedded). All existing unit and integration tests continue to pass. |
 
 ## 6. References
 

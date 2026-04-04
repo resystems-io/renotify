@@ -26,6 +26,7 @@ import (
 	"go.resystems.io/renotify/internal/ledger"
 	"go.resystems.io/renotify/internal/mcpserver"
 	"go.resystems.io/renotify/internal/registry"
+	"go.resystems.io/renotify/internal/testutil"
 )
 
 func integrationLogger() *slog.Logger {
@@ -610,6 +611,194 @@ func TestController_SharedBrokerMode(t *testing.T) {
 	err = <-done
 	if err != nil {
 		t.Fatalf("shared broker mode failed: %v", err)
+	}
+}
+
+// TestController_SharedBrokerMCPRoundTrip verifies that the MCP
+// server operates correctly when the daemon connects to an
+// external shared broker via TCP instead of using the embedded
+// broker's in-process transport (V-04).
+func TestController_SharedBrokerMCPRoundTrip(t *testing.T) {
+	// Start a standalone embedded server as the "shared broker".
+	shared, err := broker.NewEmbeddedServer(broker.EmbeddedConfig{
+		TCPHost:         "127.0.0.1",
+		TCPPort:         -1,
+		Username:        "testuser",
+		InternalToken:   "shared_internal_tok",
+		JetStreamMaxMem: 256 * 1024 * 1024,
+	}, integrationLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := shared.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer shared.Shutdown(context.Background())
+
+	dir := t.TempDir()
+	cfg := integrationConfig(dir)
+	cfg.Broker.Enabled = false
+	cfg.SharedBroker.URL = shared.ClientURL()
+	cfg.SharedBroker.Username = "daemon"
+	cfg.SharedBroker.Password = "shared_internal_tok"
+
+	logger := integrationLogger()
+
+	// Build full subsystem chain — same as runDaemon() but with
+	// shared broker configuration.
+	ledgerSub := ledger.NewSubsystem(cfg.Daemon.DBPath, logger)
+	httpSrv := httpserver.New("127.0.0.1", 0, logger)
+	mcpSrv := mcpserver.New(httpSrv, logger,
+		cfg.Username, "dn_SHARED01", cfg)
+	hbPub := heartbeat.New("dn_SHARED01", cfg.Username,
+		"test-host", 30*time.Second, logger)
+	regSvc := registry.New(ledgerSub.DB, hbPub,
+		cfg.Username, "dn_SHARED01",
+		cfg.Reaping, logger)
+
+	c := NewController(cfg,
+		WithLogger(logger),
+		WithSubsystem(ledgerSub),
+		WithSubsystem(httpSrv),
+		WithSubsystem(mcpSrv),
+		WithSubsystem(hbPub),
+		WithSubsystem(regSvc),
+	)
+	c.DaemonIDPath = filepath.Join(dir, "daemon_id")
+	c.InternalTokenPath = filepath.Join(dir, "internal_token")
+	c.PairingTokenPath = filepath.Join(dir, "pairing", "token")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	c.Ready = make(chan struct{})
+	done := make(chan error, 1)
+	go func() { done <- c.Run(ctx) }()
+
+	waitReady(t, c)
+
+	addr := httpSrv.Addr()
+	if addr == "" {
+		cancel()
+		t.Fatal("HTTP server addr is empty")
+	}
+	mcpURL := "http://" + addr + "/mcp"
+
+	// 1. Initialize MCP session.
+	initResp := mcpPost(t, mcpURL, "", `{
+		"jsonrpc": "2.0", "id": 1,
+		"method": "initialize",
+		"params": {
+			"protocolVersion": "2025-06-18",
+			"capabilities": {},
+			"clientInfo": {"name": "test", "version": "1.0"}
+		}
+	}`)
+	initResp.Body.Close()
+	sessionID := initResp.Header.Get("Mcp-Session-Id")
+	if sessionID == "" {
+		cancel()
+		t.Fatal("no Mcp-Session-Id header")
+	}
+
+	mcpPost(t, mcpURL, sessionID, `{
+		"jsonrpc": "2.0",
+		"method": "notifications/initialized"
+	}`)
+
+	// 2. Register a flow.
+	regBody := mcpPostBody(t, mcpURL, sessionID, `{
+		"jsonrpc": "2.0", "id": 2,
+		"method": "tools/call",
+		"params": {
+			"name": "register_flow",
+			"arguments": {
+				"workspace_path": "/tmp/shared-broker-test",
+				"label": "Shared Broker V-04"
+			}
+		}
+	}`)
+
+	var regResult struct {
+		Result struct {
+			StructuredContent json.RawMessage `json:"structuredContent"`
+			Content           []struct {
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"result"`
+	}
+	json.Unmarshal([]byte(regBody), &regResult)
+	var flowResult struct {
+		FlowID string `json:"flow_id"`
+	}
+	if len(regResult.Result.StructuredContent) > 0 {
+		json.Unmarshal(regResult.Result.StructuredContent, &flowResult)
+	} else if len(regResult.Result.Content) > 0 {
+		json.Unmarshal(
+			[]byte(regResult.Result.Content[0].Text), &flowResult)
+	}
+	if flowResult.FlowID == "" {
+		cancel()
+		t.Fatalf("register_flow returned no flow_id: %s", regBody)
+	}
+	flowID := flowResult.FlowID
+
+	// Wait for the registry's lifecycle consumer to write the
+	// flow to the DB. The register_flow tool publishes a
+	// lifecycle event to JetStream; the registry consumes it
+	// asynchronously.
+	db := ledgerSub.DB()
+	if !testutil.WaitFor(t, 5*time.Second, func() bool {
+		flows, _ := db.ListActiveFlows(ledger.ActiveFlowsQuery{
+			FlowID: flowID,
+		})
+		return len(flows) == 1
+	}) {
+		cancel()
+		t.Fatal("flow not registered in DB after register_flow")
+	}
+
+	// 3. Post a notification — exercises the full
+	// MCP→stateClient→NATS TCP→registry→ledger write path.
+	postBody := mcpPostBody(t, mcpURL, sessionID, fmt.Sprintf(`{
+		"jsonrpc": "2.0", "id": 3,
+		"method": "tools/call",
+		"params": {
+			"name": "post",
+			"arguments": {
+				"flow_id": %q,
+				"title": "Shared Broker Test",
+				"body": "V-04 verification"
+			}
+		}
+	}`, flowID))
+	if strings.Contains(postBody, `"error"`) {
+		t.Errorf("post returned error: %s", postBody)
+	}
+
+	// 4. Verify the notification reached the ledger via the
+	// registry's svc.insert-request endpoint over TCP NATS.
+	if !testutil.WaitFor(t, 5*time.Second, func() bool {
+		hist, err := db.QueryHistory(ledger.HistoryQuery{Limit: 10})
+		return err == nil && hist.Total > 0
+	}) {
+		t.Error("notification not found in ledger after post")
+	}
+
+	// 5. Terminate and shut down.
+	mcpPostBody(t, mcpURL, sessionID, fmt.Sprintf(`{
+		"jsonrpc": "2.0", "id": 4,
+		"method": "tools/call",
+		"params": {
+			"name": "terminate_flow",
+			"arguments": {
+				"flow_id": %q,
+				"status": "completed"
+			}
+		}
+	}`, flowID))
+
+	cancel()
+	if shutErr := <-done; shutErr != nil {
+		t.Fatalf("daemon error: %v", shutErr)
 	}
 }
 
