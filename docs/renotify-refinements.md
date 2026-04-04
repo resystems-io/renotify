@@ -593,6 +593,61 @@ error ensures graceful fallback to the local terminal prompt.
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
+#### R-CLI-20: State Management Authority
+**Statement:** The daemon must provide a dedicated state management
+subsystem that is the sole authority for all reads from and writes
+to the SQLite ledger. This subsystem must expose its capabilities
+via NATS service subjects (request-reply for queries, JetStream
+consumption for event-driven writes). No other subsystem may hold
+a direct reference to the database.
+* **Rationale (A1):** Without a single state authority, collocated
+  subsystems (e.g. the MCP server) can bypass the broker and access
+  the database directly, creating an implicit in-process coupling
+  that prevents the subsystem from operating in a separate process
+  when a shared broker is in use. Funnelling all state access
+  through NATS ensures that every subsystem is a broker client
+  regardless of deployment topology.
+* **Trace to Parent (A4):** N-04, R-CLI-13, R-CLI-14
+* **Allocation (A8):** Go CLI Application
+* **V&V Method (A2):** Test — verify the MCP server subsystem
+  functions correctly when the ledger subsystem is reachable only
+  via NATS (no shared process memory).
+
+#### R-CLI-21: MCP Server as Broker Client
+**Statement:** The MCP server must access all persistent state
+(active flows, notification history, interjection records) and
+submit all state mutations (insert request, insert response, insert
+interjection) exclusively via NATS subjects served by the state
+management subsystem (R-CLI-20). The MCP server must not receive or
+hold a reference to the database or any database accessor.
+* **Rationale (A1):** The CLI and mobile app already interact with
+  the daemon solely through NATS. Applying the same constraint to
+  the MCP server ensures it can be deployed as a separate process
+  connected to a shared broker — a topology that R-CLI-02 enables
+  but that direct database access prevents.
+* **Trace to Parent (A4):** R-CLI-08, R-CLI-20
+* **Allocation (A8):** Go CLI Application
+* **V&V Method (A2):** Test — confirm that the MCP server package
+  has no import dependency on the ledger package.
+
+#### R-CLI-22: In-Process Broker Transport
+**Statement:** When the embedded NATS broker is enabled and
+subsystems are collocated in the same daemon process, those
+subsystems must connect to the broker via the NATS in-process
+transport (e.g. `nats.InProcessConn`) rather than TCP or WebSocket
+loopback. When the embedded broker is disabled, subsystems must
+connect via NATS TCP to the configured shared broker address.
+* **Rationale (A1):** The in-process transport eliminates
+  serialisation overhead and avoids binding the TCP listener solely
+  for internal daemon traffic. It also makes the collocated topology
+  indistinguishable from the shared-broker topology at the NATS API
+  level, ensuring subsystem code is transport-agnostic.
+* **Trace to Parent (A4):** R-CLI-02, R-CLI-01
+* **Allocation (A8):** Go CLI Application
+* **V&V Method (A2):** Test — verify the daemon starts and operates
+  correctly with the in-process transport when the embedded broker
+  is enabled.
+
 ### 2.4 Android Application
 
 #### R-MOB-01: Programming Language
@@ -964,6 +1019,42 @@ workspace monitoring).*
   with system context, design principles, Mermaid block diagram (showing
   concurrent HTTP MCP, stdio, and terminal connections), and sequence
   diagrams for post, ask, and interjection flows.
+
+### Phase 8: State Management Decoupling
+*(Goal: The MCP server communicates with persistent state
+exclusively via NATS, enabling out-of-process deployment when a
+shared broker is in use.)*
+
+- [ ] **C-17: State Management Subsystem:** Extract a dedicated
+  state management subsystem that is the sole owner of the SQLite
+  ledger. Expose ledger reads (active flow lookups, history queries)
+  via NATS request-reply subjects and ledger writes (insert request,
+  insert response, insert interjection) via NATS request-reply or
+  JetStream consumption. Consolidate the existing `svc.flows` and
+  `svc.history` endpoints (C-09, C-10) into this subsystem
+  alongside new write-path subjects (R-CLI-20).
+- [ ] **C-18: MCP Server NATS Migration:** Remove the direct
+  `func() *ledger.DB` accessor from the MCP server. Replace all
+  in-process database calls (`s.db().ListActiveFlows`,
+  `s.db().InsertRequest`, `s.db().InsertResponse`,
+  `s.db().InsertInterjection`) with NATS request-reply calls to the
+  state management subsystem (C-17). Verify the MCP server package
+  has no import dependency on the ledger package (R-CLI-21).
+- [ ] **C-19: In-Process NATS Transport:** When the embedded broker
+  is enabled, connect daemon subsystems via `nats.InProcessConn`
+  instead of TCP loopback. When the embedded broker is disabled,
+  connect via NATS TCP to the shared broker address. The TCP
+  listener on port 4222 remains available for external CLI
+  connections (R-CLI-22).
+- [ ] **V-04: Decoupling Verification:** Verify that the MCP server
+  operates correctly when the ledger subsystem is reachable only via
+  NATS. Test both the collocated (in-process transport) and
+  separated (TCP transport to shared broker) topologies. Confirm
+  existing integration tests continue to pass.
+- [ ] **V-05: Architecture Diagram Update:** Rework the system
+  block diagram in `renotify-architecture.md` to remove the direct
+  `MCP --> Ledger` edge and route state access through the broker
+  via the state management subsystem.
 
 ---
 
