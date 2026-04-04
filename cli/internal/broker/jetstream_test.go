@@ -149,8 +149,9 @@ func TestMobileConsumerConfig(t *testing.T) {
 	if cc.DeliverPolicy != natsjs.DeliverAllPolicy {
 		t.Errorf("deliver = %v, want all", cc.DeliverPolicy)
 	}
-	if cc.InactiveThreshold != 35*time.Minute {
-		t.Errorf("inactive = %v, want 35m", cc.InactiveThreshold)
+	if cc.InactiveThreshold != 0 {
+		t.Errorf("inactive = %v, want 0 (no auto-deletion)",
+			cc.InactiveThreshold)
 	}
 }
 

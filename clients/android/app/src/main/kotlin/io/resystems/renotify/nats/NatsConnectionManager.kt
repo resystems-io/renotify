@@ -144,8 +144,11 @@ class NatsConnectionManager(
                 delay(1000)
             }
 
-            // Connection lost — enter reconnection loop.
+            // Connection lost — close explicitly to release the
+            // push consumer's deliver-subject binding on the
+            // server, then enter reconnection loop.
             Log.w(TAG, "Connection lost, status: ${nc.status}")
+            closeQuietly(nc)
             connection = null
             reconnect(payload)
 
@@ -314,6 +317,7 @@ class NatsConnectionManager(
                     delay(1000)
                 }
                 Log.w(TAG, "Connection lost again")
+                closeQuietly(nc)
                 connection = null
                 attempt = 0 // reset backoff after a period of
                             // successful connection
@@ -323,6 +327,7 @@ class NatsConnectionManager(
             } catch (e: Exception) {
                 Log.w(TAG, "Reconnect attempt $attempt failed: " +
                     "${e.message}")
+                closeQuietly(connection)
                 connection = null
             }
         }
@@ -345,6 +350,20 @@ class NatsConnectionManager(
         } catch (e: Exception) {
             Log.w(TAG, "History query failed: ${e.message}")
             null
+        }
+    }
+
+    /**
+     * Close a NATS connection without propagating exceptions.
+     * Sends a proper disconnect frame to the server so it
+     * immediately releases the push consumer's deliver-subject
+     * binding instead of waiting for the ping timeout.
+     */
+    private fun closeQuietly(nc: Connection?) {
+        try {
+            nc?.close()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error closing stale connection", e)
         }
     }
 
