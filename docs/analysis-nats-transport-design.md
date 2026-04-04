@@ -90,7 +90,7 @@ username or flow ID to scope their state.
 
 | Consumer Name | Type | Filter Subject | Ack Policy | Max Deliver | Max Ack Pending | Deliver Policy | Inactive Threshold | Purpose |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `mobile-{username}` | Durable | `resystems.renotify.{username}.flow.>` | Explicit | 3 | 256 | All | 35 minutes | Mobile app: receives all flow events; survives reconnection within TTL window |
+| `mobile-{username}` | Durable | `resystems.renotify.{username}.flow.>` | Explicit | 3 | 256 | All | None | Mobile app: receives all flow events; persists until device revoked |
 | `daemon-lifecycle-{username}` | Durable | `resystems.renotify.{username}.flow.*.lifecycle` | Explicit | 3 | 64 | All | 5 minutes | Daemon: maintains the active flow registry |
 | `daemon-interject-{username}` | Durable | `resystems.renotify.{username}.flow.*.interject` | Explicit | 3 | 64 | All | 5 minutes | Daemon: routes interjections to flow handlers |
 | `cli-response-{flow_id}` | Ephemeral | `resystems.renotify.{username}.flow.{flow_id}.response` | Explicit | 1 | 1 | New | N/A | CLI `ask`: blocks for exactly one response |
@@ -101,8 +101,11 @@ the user's namespace so it falls under the mobile account's existing subscribe
 ACL. Push delivery is required because the jnats client library's
 `PushSubscribeOptions.bind()` expects a deliver subject to subscribe to; without
 one the consumer would be pull-only and require a different subscription API.
-The 35-minute inactive threshold exceeds the 30-minute message TTL to ensure
-the consumer is not garbage-collected before its messages expire. AckExplicit
+No inactive threshold is set — the consumer persists until the device is
+explicitly revoked via `renotify revoke`. An inactive threshold would cause the
+consumer to be auto-deleted during prolonged disconnections (e.g. overnight),
+preventing the app from rebinding on reconnect without a daemon restart.
+AckExplicit
 ensures the mobile app positively acknowledges each message after rendering; if
 the app crashes mid-render, the message is redelivered on reconnect (up to
 MaxDeliver=3). MaxAckPending=256 allows the app to process a backlog of
