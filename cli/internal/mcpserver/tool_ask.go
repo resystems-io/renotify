@@ -113,7 +113,12 @@ func (s *Server) handleAsk(
 	// Insert into ledger.
 	if s.db != nil && s.db() != nil {
 		s.db().InsertRequest(
-			ledger.WriteContext{Username: s.username}, req)
+			ledger.WriteContext{
+				Username:      s.username,
+				FlowLabel:     flow.Label,
+				WorkspaceName: flow.DisplayName,
+				WorkspacePath: flow.AbsPath,
+			}, req)
 	}
 
 	// Create pending DecisionResource.

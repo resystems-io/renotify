@@ -216,6 +216,26 @@ class MainActivity : ComponentActivity() {
                 }
             startService(intent)
         }
+        dashboardAdapter.onFlowExpanded = { flowId ->
+            queryFlowHistory(flowId)
+        }
+        dashboardAdapter.onNotificationResponse = {
+            notificationId, flowId, actionType, actionValue, text ->
+            val intent = Intent(this, NatsService::class.java)
+                .apply {
+                    action = NatsService.ACTION_PUBLISH_RESPONSE
+                    putExtra(NatsService.EXTRA_NOTIFICATION_ID,
+                        notificationId)
+                    putExtra(NatsService.EXTRA_FLOW_ID, flowId)
+                    putExtra(NatsService.EXTRA_ACTION_TYPE,
+                        actionType)
+                    putExtra(NatsService.EXTRA_ACTION_VALUE,
+                        actionValue)
+                    if (text != null) putExtra(
+                        NatsService.EXTRA_TEXT, text)
+                }
+            startService(intent)
+        }
 
         // History adapter (M-07).
         historyAdapter = HistoryAdapter()
@@ -324,6 +344,25 @@ class MainActivity : ComponentActivity() {
             NatsService.historyState.collect { result ->
                 if (result != null) {
                     historyAdapter.update(result)
+                }
+            }
+        }
+
+        // Observe flow-scoped history for dashboard drill-down.
+        lifecycleScope.launch {
+            NatsService.flowHistoryState.collect { pair ->
+                if (pair != null) {
+                    dashboardAdapter.updateFlowNotifications(
+                        pair.first, pair.second)
+                }
+            }
+        }
+
+        // Refresh expanded flow when a new notification arrives.
+        lifecycleScope.launch {
+            NatsService.lastNotificationFlowId.collect { pair ->
+                if (pair != null) {
+                    queryFlowHistory(pair.first)
                 }
             }
         }
@@ -478,6 +517,16 @@ class MainActivity : ComponentActivity() {
                 HISTORY_PAGE_SIZE)
             .putExtra(NatsService.EXTRA_HISTORY_OFFSET, offset)
             .putExtra(NatsService.EXTRA_HISTORY_APPEND, append)
+        startService(intent)
+    }
+
+    private fun queryFlowHistory(flowId: String) {
+        val intent = Intent(this, NatsService::class.java)
+            .setAction(NatsService.ACTION_QUERY_FLOW_HISTORY)
+            .putExtra(
+                NatsService.EXTRA_FLOW_HISTORY_FLOW_ID, flowId)
+            .putExtra(
+                NatsService.EXTRA_FLOW_HISTORY_LIMIT, 10)
         startService(intent)
     }
 

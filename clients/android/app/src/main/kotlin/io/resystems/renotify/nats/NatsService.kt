@@ -98,6 +98,10 @@ class NatsService : Service() {
             handleQueryHistory(intent)
             return START_STICKY
         }
+        if (intent?.action == ACTION_QUERY_FLOW_HISTORY) {
+            handleQueryFlowHistory(intent)
+            return START_STICKY
+        }
 
         val payload = store.load()
         if (payload == null) {
@@ -179,6 +183,11 @@ class NatsService : Service() {
         }
         manager.markRendered(payload.id)
         ack()
+
+        // Signal that a notification arrived for this flow so
+        // the dashboard can refresh if the flow is expanded.
+        _lastNotificationFlowId.value =
+            Pair(payload.flowId, ++notificationSeq)
     }
 
     /**
@@ -288,6 +297,43 @@ class NatsService : Service() {
                 }
             } else {
                 Log.w(TAG, "History query returned null")
+            }
+        }
+    }
+
+    // --- Flow-scoped history query ---
+
+    /**
+     * Handle a flow-scoped history query from the dashboard.
+     * Queries svc.history filtered by flow_id and updates the
+     * [flowHistoryState] StateFlow (separate from the global
+     * history tab state).
+     */
+    private fun handleQueryFlowHistory(intent: Intent) {
+        val flowId = intent.getStringExtra(
+            EXTRA_FLOW_HISTORY_FLOW_ID) ?: return
+        val limitVal = intent.getIntExtra(
+            EXTRA_FLOW_HISTORY_LIMIT, 10)
+
+        val reqObj = JSONObject()
+        reqObj.put("flow_id", flowId)
+        reqObj.put("limit", limitVal)
+        reqObj.put("offset", 0)
+
+        serviceScope.launch(Dispatchers.IO) {
+            val data = manager.queryHistory(
+                reqObj.toString().toByteArray())
+            if (data != null) {
+                try {
+                    val json = String(data, Charsets.UTF_8)
+                    val result = HistoryQueryResult.fromJson(json)
+                    _flowHistoryState.value = Pair(flowId, result)
+                    Log.i(TAG, "Flow history ($flowId): " +
+                        "${result.records.size} records " +
+                        "(total ${result.total})")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error parsing flow history", e)
+                }
             }
         }
     }
@@ -508,6 +554,12 @@ class NatsService : Service() {
         const val EXTRA_HISTORY_OFFSET = "history_offset"
         const val EXTRA_HISTORY_APPEND = "history_append"
 
+        // Intent action and extras for flow-scoped history.
+        const val ACTION_QUERY_FLOW_HISTORY =
+            "io.resystems.renotify.QUERY_FLOW_HISTORY"
+        const val EXTRA_FLOW_HISTORY_FLOW_ID = "flow_history_flow_id"
+        const val EXTRA_FLOW_HISTORY_LIMIT = "flow_history_limit"
+
         // Intent action and extras for M-08 interjections.
         const val ACTION_PUBLISH_INTERJECTION =
             "io.resystems.renotify.PUBLISH_INTERJECTION"
@@ -593,6 +645,33 @@ class NatsService : Service() {
             .MutableStateFlow<HistoryQueryResult?>(null)
         val historyState: StateFlow<HistoryQueryResult?> =
             _historyState
+
+        /**
+         * Flow-scoped history for dashboard drill-down. Carries
+         * the flow ID and its query result; null before any
+         * flow-scoped query. Separate from [historyState] to
+         * avoid clobbering the History tab.
+         */
+        private val _flowHistoryState = kotlinx.coroutines.flow
+            .MutableStateFlow<Pair<String, HistoryQueryResult>?>(
+                null)
+        val flowHistoryState:
+            StateFlow<Pair<String, HistoryQueryResult>?> =
+            _flowHistoryState
+
+        /**
+         * Flow ID and sequence counter for the most recently
+         * received notification. The counter ensures StateFlow
+         * re-emits even when consecutive notifications share
+         * the same flow ID.
+         */
+        private var notificationSeq = 0L
+        private val _lastNotificationFlowId =
+            kotlinx.coroutines.flow
+                .MutableStateFlow<Pair<String, Long>?>(null)
+        val lastNotificationFlowId:
+            StateFlow<Pair<String, Long>?> =
+            _lastNotificationFlowId
 
         /**
          * Silent mode suppresses notification rendering while
