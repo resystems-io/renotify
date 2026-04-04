@@ -636,7 +636,8 @@ subsystems are collocated in the same daemon process, those
 subsystems must connect to the broker via the NATS in-process
 transport (e.g. `nats.InProcessConn`) rather than TCP or WebSocket
 loopback. When the embedded broker is disabled, subsystems must
-connect via NATS TCP to the configured shared broker address.
+connect to the configured shared broker address (TCP, TLS, or
+WSS as determined by the URL scheme).
 * **Rationale (A1):** The in-process transport eliminates
   serialisation overhead and avoids binding the TCP listener solely
   for internal daemon traffic. It also makes the collocated topology
