@@ -124,17 +124,19 @@ graph TB
 ## Shared Broker Deployment
 
 When the embedded broker is disabled (`broker.enabled: false`),
-the daemon connects to an external shared NATS broker via TCP
-(or WSS). All NATS subjects, payload formats, and subsystem
-behaviour are identical — the only difference is the transport
-between subsystems and the broker.
+the daemon connects to an external shared NATS broker. The
+`shared_broker.url` field accepts `nats://` (TCP), `tls://`
+(TCP + TLS), or `wss://` (WebSocket + TLS) schemes. All NATS
+subjects, payload formats, and subsystem behaviour are
+identical — the only difference is the transport between
+subsystems and the broker.
 
 This enables two additional topologies:
 
 - **Collocated + shared broker.** The daemon process contains
-  all subsystems but connects to an external broker via NATS
-  TCP instead of in-process transport. Useful when a team
-  shares a centralised NATS cluster.
+  all subsystems but connects to an external broker instead of
+  using in-process transport. Useful when a team shares a
+  centralised NATS cluster.
 - **Separated + shared broker.** The MCP server and state
   subsystem run in different processes, both connected to the
   shared broker. The MCP server accesses state exclusively via
@@ -167,11 +169,11 @@ graph TB
     CC -->|"JSON-RPC over HTTP"| HTTP
     HTTP --> MCP
     AG -->|"stdin/stdout (NDJSON)"| Stdio
-    Stdio -->|"NATS TCP"| SharedBroker
-    Term -->|"NATS TCP"| SharedBroker
-    MCP -->|"NATS TCP"| SharedBroker
-    State -->|"NATS TCP"| SharedBroker
-    HB -->|"NATS TCP"| SharedBroker
+    Stdio -->|"NATS TCP or WSS"| SharedBroker
+    Term -->|"NATS TCP or WSS"| SharedBroker
+    MCP -->|"NATS TCP or WSS"| SharedBroker
+    State -->|"NATS TCP or WSS"| SharedBroker
+    HB -->|"NATS TCP or WSS"| SharedBroker
     State --> Ledger
     SharedBroker -->|"NATS WSS + TLS"| Phone
 ```

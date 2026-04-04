@@ -205,7 +205,7 @@ string (e.g., `"30m"`, `"2h"`, `"300s"`) in JSON and a
 // NATS broker. Used only when broker.enabled is false. All fields
 // are ignored when the embedded broker is active.
 type SharedBrokerConfig struct {
-	URL        string `json:"url"`                    // e.g., "nats://broker.example.com:4222"
+	URL        string `json:"url"`                    // e.g., "nats://broker:4222" or "wss://broker:4223"
 	Username   string `json:"username,omitempty"`      // NATS auth username
 	Password   string `json:"password,omitempty"`      // NATS auth password
 	Token      string `json:"token,omitempty"`         // NATS auth token (alternative to user/pass)
@@ -218,7 +218,7 @@ type SharedBrokerConfig struct {
 
 | Field | Default | Notes |
 | :--- | :--- | :--- |
-| `url` | none | Required when `broker.enabled` is false |
+| `url` | none | Required when `broker.enabled` is false. Supports `nats://` (TCP), `tls://` (TCP + TLS), and `wss://` (WebSocket + TLS) schemes. |
 | `username` | none | Basic auth; mutually exclusive with `token` |
 | `password` | none | Basic auth |
 | `token` | none | Token auth; mutually exclusive with `username`/`password` |
@@ -341,6 +341,28 @@ connection details.
 }
 ```
 
+When the shared broker exposes only a WebSocket listener
+(common in cloud-hosted or firewall-restricted environments),
+use a `wss://` URL instead:
+
+```json
+{
+  "username": "stewart",
+  "broker": {
+    "enabled": false
+  },
+  "shared_broker": {
+    "url": "wss://nats.example.com:443",
+    "token": "org-issued-nats-token"
+  }
+}
+```
+
+The `wss://` scheme implies TLS — no separate `tls_enabled`
+flag is needed. The `ca_cert` field can still be used to pin
+a specific CA if the broker uses a private certificate
+authority.
+
 ---
 
 ## 4. Viper Binding Model
@@ -431,7 +453,7 @@ to stderr.
 | `broker.wss_port` | int | 1–65535; must differ from `tcp_port` | "wss_port out of range" / "wss_port must differ from tcp_port" |
 | `broker.cert_file` | filepath | File must exist (checked at WSS listener startup, not config load) | Warning logged; WSS listener skipped |
 | `broker.key_file` | filepath | File must exist (checked at WSS listener startup) | Warning logged; WSS listener skipped |
-| `shared_broker.url` | string | Required when `broker.enabled` is false; must be a valid NATS URL | "shared_broker.url is required when embedded broker is disabled" |
+| `shared_broker.url` | string | Required when `broker.enabled` is false; must be a valid NATS URL (`nats://`, `tls://`, or `wss://`) | "shared_broker.url is required when embedded broker is disabled" |
 | `shared_broker.username` + `token` | string | Mutually exclusive (cannot set both) | "shared_broker: username/password and token are mutually exclusive" |
 | `jetstream.max_age` | duration | > 0 | "jetstream.max_age must be positive" |
 | `jetstream.max_bytes` | int64 | > 0 | "jetstream.max_bytes must be positive" |
