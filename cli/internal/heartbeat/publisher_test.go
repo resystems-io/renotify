@@ -36,7 +36,7 @@ func startTestServer(t *testing.T) *nats.Conn {
 	}
 	t.Cleanup(func() { srv.Shutdown(context.Background()) })
 
-	nc, err := broker.ConnectEmbedded(srv.ClientURL(), "testtoken",
+	nc, err := broker.ConnectEmbedded(srv.Server(), "testtoken",
 		discardLogger())
 	if err != nil {
 		t.Fatal(err)
