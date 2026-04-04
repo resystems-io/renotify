@@ -70,18 +70,18 @@ data class HistoryRecord(
 
     companion object {
         fun fromJson(obj: JSONObject): HistoryRecord {
-            val req = obj.getJSONObject("Request")
-            val resp = if (obj.has("Response") &&
-                !obj.isNull("Response")
-            ) obj.getJSONObject("Response") else null
+            val req = obj.getJSONObject("request")
+            val resp = if (obj.has("response") &&
+                !obj.isNull("response")
+            ) obj.getJSONObject("response") else null
 
             return HistoryRecord(
                 id = req.getString("id"),
                 flowId = req.getString("flow_id"),
                 workspaceId = req.getString("workspace_id"),
-                flowLabel = obj.optString("FlowLabel", "")
+                flowLabel = obj.optString("flow_label", "")
                     .ifEmpty { null },
-                workspaceName = obj.optString("WorkspaceName", "")
+                workspaceName = obj.optString("workspace_name", "")
                     .ifEmpty { null },
                 title = req.getString("title"),
                 body = req.optString("body", "")

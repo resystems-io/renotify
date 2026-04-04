@@ -29,10 +29,9 @@ type Service struct {
 	cfg      config.ReapingConfig
 	logger   *slog.Logger
 
-	nc         *nats.Conn
-	sub        *nats.Subscription
-	historySub *nats.Subscription
-	cancel     context.CancelFunc
+	nc     *nats.Conn
+	subs   []*nats.Subscription
+	cancel context.CancelFunc
 }
 
 // New creates a registry Service. The dbFunc parameter is a lazy
@@ -81,29 +80,27 @@ func (s *Service) Start(
 		return err
 	}
 
-	// Subscribe to svc.flows Core NATS endpoint.
-	sub, err := s.subscribeFlowsEndpoint()
-	if err != nil {
-		cancel()
-		if ready != nil {
-			ready <- err
-			close(ready)
-		}
-		return err
+	// Subscribe to all Core NATS service endpoints.
+	endpoints := []func() (*nats.Subscription, error){
+		s.subscribeFlowsEndpoint,
+		s.subscribeHistoryEndpoint,
+		s.subscribeInsertRequestEndpoint,
+		s.subscribeInsertResponseEndpoint,
+		s.subscribeInsertInterjectionEndpoint,
+		s.subscribeUpdateActivityEndpoint,
 	}
-	s.sub = sub
-
-	// Subscribe to svc.history Core NATS endpoint (C-09).
-	historySub, err := s.subscribeHistoryEndpoint()
-	if err != nil {
-		cancel()
-		if ready != nil {
-			ready <- err
-			close(ready)
+	for _, subscribe := range endpoints {
+		sub, err := subscribe()
+		if err != nil {
+			cancel()
+			if ready != nil {
+				ready <- err
+				close(ready)
+			}
+			return err
 		}
-		return err
+		s.subs = append(s.subs, sub)
 	}
-	s.historySub = historySub
 
 	// Start the stale flow reaper.
 	go s.runReaper(ctx)
@@ -126,11 +123,8 @@ func (s *Service) Stop(_ context.Context) error {
 	if s.cancel != nil {
 		s.cancel()
 	}
-	if s.sub != nil {
-		s.sub.Drain()
-	}
-	if s.historySub != nil {
-		s.historySub.Drain()
+	for _, sub := range s.subs {
+		sub.Drain()
 	}
 	s.logger.Info("registry stopped")
 	return nil

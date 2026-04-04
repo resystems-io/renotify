@@ -128,24 +128,25 @@ func streamConfig(cfg config.JetStreamConfig) natsjs.StreamConfig {
 }
 
 // mobileConsumerConfig builds the mobile app's durable consumer.
-// InactiveThreshold (35 min) exceeds stream MaxAge (30 min) to
-// ensure the consumer outlives its messages.
+// No InactiveThreshold — the consumer persists until the device
+// is revoked via `renotify revoke`. Auto-deletion would break
+// reconnection after prolonged disconnections (e.g. overnight).
 func mobileConsumerConfig(username string) natsjs.ConsumerConfig {
 	return natsjs.ConsumerConfig{
-		Durable:           MobileConsumerName(username),
-		DeliverSubject:    "resystems.renotify." + username + ".mobile.deliver",
-		FilterSubject:     "resystems.renotify." + username + ".flow.>",
-		AckPolicy:         natsjs.AckExplicitPolicy,
-		MaxDeliver:        3,
-		MaxAckPending:     256,
-		DeliverPolicy:     natsjs.DeliverAllPolicy,
-		InactiveThreshold: 35 * time.Minute,
+		Durable:        MobileConsumerName(username),
+		DeliverSubject: "resystems.renotify." + username + ".mobile.deliver",
+		FilterSubject:  "resystems.renotify." + username + ".flow.>",
+		AckPolicy:      natsjs.AckExplicitPolicy,
+		MaxDeliver:     3,
+		MaxAckPending:  256,
+		DeliverPolicy:  natsjs.DeliverAllPolicy,
 	}
 }
 
 // mobileDeviceConsumerConfig builds a per-device push consumer.
 // Same config as the legacy mobile consumer but with a
-// device-specific name and deliver subject.
+// device-specific name and deliver subject. No
+// InactiveThreshold — lifecycle tied to device pairing.
 func mobileDeviceConsumerConfig(
 	username, deviceID string,
 ) natsjs.ConsumerConfig {
@@ -153,12 +154,11 @@ func mobileDeviceConsumerConfig(
 		Durable: MobileDeviceConsumerName(username, deviceID),
 		DeliverSubject: "resystems.renotify." + username +
 			".mobile." + deviceID + ".deliver",
-		FilterSubject:     "resystems.renotify." + username + ".flow.>",
-		AckPolicy:         natsjs.AckExplicitPolicy,
-		MaxDeliver:        3,
-		MaxAckPending:     256,
-		DeliverPolicy:     natsjs.DeliverAllPolicy,
-		InactiveThreshold: 35 * time.Minute,
+		FilterSubject: "resystems.renotify." + username + ".flow.>",
+		AckPolicy:     natsjs.AckExplicitPolicy,
+		MaxDeliver:    3,
+		MaxAckPending: 256,
+		DeliverPolicy: natsjs.DeliverAllPolicy,
 	}
 }
 

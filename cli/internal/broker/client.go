@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 
 	"go.resystems.io/renotify/internal/config"
@@ -14,10 +15,11 @@ import (
 )
 
 // ConnectEmbedded connects a NATS client to the embedded server
-// using the daemon account credentials on the loopback TCP
-// listener.
-func ConnectEmbedded(url, token string, logger *slog.Logger) (*nats.Conn, error) {
-	nc, err := nats.Connect(url,
+// using an in-process pipe (R-CLI-22, C-19). The daemon bypasses
+// the TCP listener entirely; CLI processes still connect via TCP.
+func ConnectEmbedded(srv *server.Server, token string, logger *slog.Logger) (*nats.Conn, error) {
+	nc, err := nats.Connect(srv.ClientURL(),
+		nats.InProcessServer(srv),
 		nats.UserInfo("daemon", token),
 		nats.Name("renotify-daemon"),
 		nats.MaxReconnects(-1),

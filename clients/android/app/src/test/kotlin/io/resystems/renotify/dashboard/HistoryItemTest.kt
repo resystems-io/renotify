@@ -15,8 +15,8 @@ class HistoryItemTest {
             {
                 "records": [
                     {
-                        "Username": "testuser",
-                        "Request": {
+                        "username": "testuser",
+                        "request": {
                             "id": "ntf_001",
                             "flow_id": "fl_001",
                             "daemon_id": "dn_001",
@@ -28,7 +28,7 @@ class HistoryItemTest {
                             "source": "ci/deploy",
                             "timestamp": "2026-04-01T10:00:00Z"
                         },
-                        "Response": {
+                        "response": {
                             "request_id": "ntf_001",
                             "accepted": true,
                             "timestamp": "2026-04-01T10:01:00Z"
@@ -61,8 +61,8 @@ class HistoryItemTest {
             {
                 "records": [
                     {
-                        "Username": "testuser",
-                        "Request": {
+                        "username": "testuser",
+                        "request": {
                             "id": "ntf_002",
                             "flow_id": "fl_002",
                             "daemon_id": "dn_001",
@@ -93,8 +93,8 @@ class HistoryItemTest {
             {
                 "records": [
                     {
-                        "Username": "testuser",
-                        "Request": {
+                        "username": "testuser",
+                        "request": {
                             "id": "ntf_003",
                             "flow_id": "fl_003",
                             "daemon_id": "dn_001",
@@ -105,7 +105,7 @@ class HistoryItemTest {
                             "actions": ["staging", "prod"],
                             "timestamp": "2026-04-01T12:00:00Z"
                         },
-                        "Response": {
+                        "response": {
                             "request_id": "ntf_003",
                             "action": "staging",
                             "timestamp": "2026-04-01T12:01:00Z"
@@ -128,8 +128,8 @@ class HistoryItemTest {
             {
                 "records": [
                     {
-                        "Username": "testuser",
-                        "Request": {
+                        "username": "testuser",
+                        "request": {
                             "id": "ntf_004",
                             "flow_id": "fl_004",
                             "daemon_id": "dn_001",
@@ -139,7 +139,7 @@ class HistoryItemTest {
                             "priority": "normal",
                             "timestamp": "2026-04-01T13:00:00Z"
                         },
-                        "Response": {
+                        "response": {
                             "request_id": "ntf_004",
                             "text": "Looks good to me",
                             "timestamp": "2026-04-01T13:01:00Z"
@@ -162,8 +162,8 @@ class HistoryItemTest {
             {
                 "records": [
                     {
-                        "Username": "testuser",
-                        "Request": {
+                        "username": "testuser",
+                        "request": {
                             "id": "ntf_005",
                             "flow_id": "fl_005",
                             "daemon_id": "dn_001",
@@ -173,7 +173,7 @@ class HistoryItemTest {
                             "priority": "high",
                             "timestamp": "2026-04-01T14:00:00Z"
                         },
-                        "Response": {
+                        "response": {
                             "request_id": "ntf_005",
                             "accepted": false,
                             "timestamp": "2026-04-01T14:00:10Z"
@@ -204,8 +204,8 @@ class HistoryItemTest {
             {
                 "records": [
                     {
-                        "Username": "testuser",
-                        "Request": {
+                        "username": "testuser",
+                        "request": {
                             "id": "ntf_A",
                             "flow_id": "fl_A",
                             "daemon_id": "dn_001",
@@ -217,8 +217,8 @@ class HistoryItemTest {
                         }
                     },
                     {
-                        "Username": "testuser",
-                        "Request": {
+                        "username": "testuser",
+                        "request": {
                             "id": "ntf_B",
                             "flow_id": "fl_B",
                             "daemon_id": "dn_001",
@@ -332,8 +332,8 @@ class HistoryItemTest {
             {
                 "records": [
                     {
-                        "Username": "testuser",
-                        "Request": {
+                        "username": "testuser",
+                        "request": {
                             "id": "ntf_006",
                             "flow_id": "fl_006",
                             "daemon_id": "dn_001",
@@ -343,7 +343,7 @@ class HistoryItemTest {
                             "priority": "normal",
                             "timestamp": "2026-04-01T15:00:00Z"
                         },
-                        "Response": {
+                        "response": {
                             "request_id": "ntf_006",
                             "accepted": true,
                             "timestamp": "2026-04-01T15:00:30Z"
@@ -364,8 +364,8 @@ class HistoryItemTest {
             {
                 "records": [
                     {
-                        "Username": "testuser",
-                        "Request": {
+                        "username": "testuser",
+                        "request": {
                             "id": "ntf_007",
                             "flow_id": "fl_007",
                             "daemon_id": "dn_001",
@@ -375,7 +375,7 @@ class HistoryItemTest {
                             "priority": "normal",
                             "timestamp": "2026-04-01T16:00:00Z"
                         },
-                        "Response": {
+                        "response": {
                             "request_id": "ntf_007",
                             "accepted": false
                         }
@@ -452,8 +452,8 @@ class HistoryItemTest {
             {
                 "records": [
                     {
-                        "Username": "testuser",
-                        "Request": {
+                        "username": "testuser",
+                        "request": {
                             "id": "ntf_008",
                             "flow_id": "fl_008",
                             "daemon_id": "dn_001",
@@ -483,8 +483,8 @@ class HistoryItemTest {
             {
                 "records": [
                     {
-                        "Username": "testuser",
-                        "Request": {
+                        "username": "testuser",
+                        "request": {
                             "id": "ntf_009",
                             "flow_id": "fl_009",
                             "daemon_id": "dn_001",
@@ -511,8 +511,8 @@ class HistoryItemTest {
             {
                 "records": [
                     {
-                        "Username": "testuser",
-                        "Request": {
+                        "username": "testuser",
+                        "request": {
                             "id": "ntf_010",
                             "flow_id": "fl_010",
                             "daemon_id": "dn_001",
@@ -540,11 +540,11 @@ class HistoryItemTest {
             {
                 "records": [
                     {
-                        "Username": "testuser",
-                        "FlowLabel": "CI Pipeline",
-                        "WorkspaceName": "renotify",
-                        "WorkspacePath": "/home/user/renotify",
-                        "Request": {
+                        "username": "testuser",
+                        "flow_label": "CI Pipeline",
+                        "workspace_name": "renotify",
+                        "workspace_path": "/home/user/renotify",
+                        "request": {
                             "id": "ntf_011",
                             "flow_id": "fl_011",
                             "daemon_id": "dn_001",
@@ -571,8 +571,8 @@ class HistoryItemTest {
             {
                 "records": [
                     {
-                        "Username": "testuser",
-                        "Request": {
+                        "username": "testuser",
+                        "request": {
                             "id": "ntf_012",
                             "flow_id": "fl_012",
                             "daemon_id": "dn_001",

@@ -9,7 +9,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/ledger"
 	"go.resystems.io/renotify/internal/payload"
 	"go.resystems.io/renotify/internal/state"
 )
@@ -157,48 +156,39 @@ func (s *Server) handleRefreshFlow(
 ) (*mcp.CallToolResult, *refreshFlowResult, error) {
 	now := time.Now().UTC()
 
-	// Publish lifecycle event to NATS. The registry's lifecycle
-	// consumer handles the DB write (C-10).
-	// Read flow context from ledger for the event fields.
-	flows, _ := s.db().ListActiveFlows(ledger.ActiveFlowsQuery{
-		FlowID: args.FlowID,
-	})
-	var event payload.FlowLifecycleEvent
-	for _, f := range flows {
-		if f.FlowID == args.FlowID {
-			// Merge new metadata with existing. New keys
-			// overwrite, existing keys are preserved.
-			merged := make(map[string]string)
-			for k, v := range f.Metadata {
-				merged[k] = v
-			}
-			for k, v := range args.Metadata {
-				merged[k] = v
-			}
-
-			// Preserve existing label when not provided.
-			label := args.Label
-			if label == "" {
-				label = f.Label
-			}
-
-			event = payload.FlowLifecycleEvent{
-				FlowID:      args.FlowID,
-				DaemonID:    f.DaemonID,
-				WorkspaceID: f.WorkspaceID,
-				Status:      payload.FlowActive,
-				Label:       label,
-				Metadata:    merged,
-				Timestamp:   now,
-			}
-			break
-		}
-	}
-	if event.FlowID == "" {
+	// Look up flow context via state service.
+	flow, err := s.lookupFlow(args.FlowID)
+	if err != nil {
 		return nil, nil, fmt.Errorf(
 			"flow %q not found (may have been reaped after "+
 				"inactivity) — call register_flow to start a new flow",
 			args.FlowID)
+	}
+
+	// Merge new metadata with existing. New keys overwrite,
+	// existing keys are preserved.
+	merged := make(map[string]string)
+	for k, v := range flow.Metadata {
+		merged[k] = v
+	}
+	for k, v := range args.Metadata {
+		merged[k] = v
+	}
+
+	// Preserve existing label when not provided.
+	label := args.Label
+	if label == "" {
+		label = flow.Label
+	}
+
+	event := payload.FlowLifecycleEvent{
+		FlowID:      args.FlowID,
+		DaemonID:    flow.DaemonID,
+		WorkspaceID: flow.WorkspaceID,
+		Status:      payload.FlowActive,
+		Label:       label,
+		Metadata:    merged,
+		Timestamp:   now,
 	}
 
 	msgID := fmt.Sprintf("%s-refresh-%d",
@@ -228,13 +218,9 @@ func (s *Server) handleTerminateFlow(
 	now := time.Now().UTC()
 
 	// Look up flow context for the lifecycle event.
-	flows, _ := s.db().ListActiveFlows(ledger.ActiveFlowsQuery{})
 	var workspaceID string
-	for _, f := range flows {
-		if f.FlowID == args.FlowID {
-			workspaceID = f.WorkspaceID
-			break
-		}
+	if flow, err := s.lookupFlow(args.FlowID); err == nil {
+		workspaceID = flow.WorkspaceID
 	}
 
 	// Clean up interjection queue (C-11).

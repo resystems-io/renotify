@@ -22,15 +22,15 @@ use Renotify-specific codes 3-6 for domain error conditions. Each
 domain code maps 1:1 to an `ErrorResponse.code` value (see
 [Payload Schemas](analysis-payload-schemas.md) `ErrorResponse`).
 
-| Exit Code | Name | `ErrorResponse.code` | Meaning |
-| :--- | :--- | :--- | :--- |
-| 0 | Success | — | Command completed normally |
-| 1 | General error | `internal` | Unexpected failure (daemon unreachable, I/O error, config invalid) |
-| 2 | Usage error | — | Invalid flags, missing required arguments, malformed input. Cobra emits this automatically for argument validation failures. |
-| 3 | Timeout | `timeout` | Blocking `ask` request expired without a human response (R-CLI-06) |
-| 4 | Rate limited | `rate_limited` | Per-flow notification rate limit exceeded (R-CLI-16) |
-| 5 | Unroutable | `unroutable` | No mobile client connected to receive the notification |
-| 6 | Not found | `not_found` | Referenced flow, notification, or pairing token does not exist |
+| Exit Code | Name          | `ErrorResponse.code` | Meaning                                                                                                                      |
+|:----------|:--------------|:---------------------|:-----------------------------------------------------------------------------------------------------------------------------|
+| 0         | Success       | —                    | Command completed normally                                                                                                   |
+| 1         | General error | `internal`           | Unexpected failure (daemon unreachable, I/O error, config invalid)                                                           |
+| 2         | Usage error   | —                    | Invalid flags, missing required arguments, malformed input. Cobra emits this automatically for argument validation failures. |
+| 3         | Timeout       | `timeout`            | Blocking `ask` request expired without a human response (R-CLI-06)                                                           |
+| 4         | Rate limited  | `rate_limited`       | Per-flow notification rate limit exceeded (R-CLI-16)                                                                         |
+| 5         | Unroutable    | `unroutable`         | No mobile client connected to receive the notification                                                                       |
+| 6         | Not found     | `not_found`          | Referenced flow, notification, or pairing token does not exist                                                               |
 
 ### 1.1 Cobra Integration
 
@@ -62,10 +62,10 @@ const (
 All commands follow the Unix convention: **stdout is data, stderr
 is diagnostics**.
 
-| Stream | Content | Consumers |
-| :--- | :--- | :--- |
-| stdout | Command result (JSON or human-readable text) | Scripts, agents, pipes, terminal user |
-| stderr | Error messages, warnings, progress indicators | Terminal user, log files |
+| Stream | Content                                       | Consumers                             |
+|:-------|:----------------------------------------------|:--------------------------------------|
+| stdout | Command result (JSON or human-readable text)  | Scripts, agents, pipes, terminal user |
+| stderr | Error messages, warnings, progress indicators | Terminal user, log files              |
 
 Rules:
 
@@ -87,21 +87,21 @@ Rules:
 Commands that produce structured data support a `--format` flag
 with two modes:
 
-| Mode | Description | Consumers |
-| :--- | :--- | :--- |
+| Mode   | Description                                 | Consumers                        |
+|:-------|:--------------------------------------------|:---------------------------------|
 | `json` | Machine-parseable JSON, one object per line | Scripts, CI pipelines, AI agents |
-| `text` | Human-readable formatted output | Terminal users |
+| `text` | Human-readable formatted output             | Terminal users                   |
 
 Each command has a sensible default:
 
-| Command | Default `--format` | Rationale |
-| :--- | :--- | :--- |
-| `ask` | `json` | Primary consumer is scripts/agents parsing the response |
-| `history` | `json` | Primary consumer is scripts/agents processing records |
-| `post` | `text` | Fire-and-forget; no structured data to return |
-| `pair` | `text` | QR code is inherently visual |
-| `revoke` | `text` | Confirmation message for the user |
-| `daemon` | — | No stdout output (logs to stderr or file) |
+| Command   | Default `--format` | Rationale                                               |
+|:----------|:-------------------|:--------------------------------------------------------|
+| `ask`     | `json`             | Primary consumer is scripts/agents parsing the response |
+| `history` | `json`             | Primary consumer is scripts/agents processing records   |
+| `post`    | `text`             | Fire-and-forget; no structured data to return           |
+| `pair`    | `text`             | QR code is inherently visual                            |
+| `revoke`  | `text`             | Confirmation message for the user                       |
+| `daemon`  | —                  | No stdout output (logs to stderr or file)               |
 
 The `--format` flag is accepted by all commands but only
 meaningful for `ask` and `history`. For `post`, `pair`, and
@@ -118,27 +118,27 @@ Starts the daemon process. Does not produce stdout output.
 
 **Foreground mode:**
 
-| Stream | Content |
-| :--- | :--- |
-| stdout | (none) |
+| Stream | Content                                                   |
+|:-------|:----------------------------------------------------------|
+| stdout | (none)                                                    |
 | stderr | Structured log lines (startup, connection events, errors) |
 
 **Background mode:**
 
-| Stream | Content |
-| :--- | :--- |
-| stdout | (none) |
-| stderr | (none after daemonisation) |
-| `daemon.log` | Structured log lines |
+| Stream       | Content                    |
+|:-------------|:---------------------------|
+| stdout       | (none)                     |
+| stderr       | (none after daemonisation) |
+| `daemon.log` | Structured log lines       |
 
 **Exit codes:**
 
-| Condition | Exit Code |
-| :--- | :--- |
-| Normal shutdown (SIGINT/SIGTERM) | 0 |
-| Configuration validation failure | 1 |
-| Port already in use | 1 |
-| Missing required `username` | 1 |
+| Condition                        | Exit Code |
+|:---------------------------------|:----------|
+| Normal shutdown (SIGINT/SIGTERM) | 0         |
+| Configuration validation failure | 1         |
+| Port already in use              | 1         |
+| Missing required `username`      | 1         |
 
 ### 4.2 `renotify post`
 
@@ -164,12 +164,12 @@ error: rate limit exceeded (60 notifications/min for flow fl_0R3FABM7TP2XE89YWCG
 
 **Exit codes:**
 
-| Condition | Exit Code |
-| :--- | :--- |
-| Notification published | 0 |
-| Rate limited | 4 |
-| Unroutable (no mobile client) | 5 |
-| Daemon unreachable | 1 |
+| Condition                     | Exit Code |
+|:------------------------------|:----------|
+| Notification published        | 0         |
+| Rate limited                  | 4         |
+| Unroutable (no mobile client) | 5         |
+| Daemon unreachable            | 1         |
 
 ### 4.3 `renotify ask`
 
@@ -226,13 +226,13 @@ error: timeout after 5m0s waiting for response to "Deploy to production?"
 
 **Exit codes:**
 
-| Condition | Exit Code |
-| :--- | :--- |
-| Response received | 0 |
-| Timeout expired | 3 |
-| Rate limited | 4 |
-| Unroutable (no mobile client) | 5 |
-| Daemon unreachable | 1 |
+| Condition                     | Exit Code |
+|:------------------------------|:----------|
+| Response received             | 0         |
+| Timeout expired               | 3         |
+| Rate limited                  | 4         |
+| Unroutable (no mobile client) | 5         |
+| Daemon unreachable            | 1         |
 
 **Note on `accepted: false`:** A human responding "No" is a
 **successful** response (exit 0). The boolean value is data, not
@@ -263,10 +263,10 @@ Showing 1 of 1 records
 
 **Exit codes:**
 
-| Condition | Exit Code |
-| :--- | :--- |
-| Query returned results (including empty) | 0 |
-| Daemon unreachable | 1 |
+| Condition                                | Exit Code |
+|:-----------------------------------------|:----------|
+| Query returned results (including empty) | 0         |
+| Daemon unreachable                       | 1         |
 
 An empty result set (`"records":[],"total":0`) is success (exit
 0), not an error.
@@ -306,12 +306,12 @@ mechanisms.
 
 **Exit codes:**
 
-| Condition | Exit Code |
-| :--- | :--- |
-| QR code generated (new or existing cert) | 0 |
-| IP discovery failed | 1 |
-| Certificate generation failed | 1 |
-| Daemon state directory not writable | 1 |
+| Condition                                | Exit Code |
+|:-----------------------------------------|:----------|
+| QR code generated (new or existing cert) | 0         |
+| IP discovery failed                      | 1         |
+| Certificate generation failed            | 1         |
+| Daemon state directory not writable      | 1         |
 
 ### 4.6 `renotify revoke`
 
@@ -338,11 +338,11 @@ Note: shared broker token must be revoked by the operator.
 
 **Exit codes:**
 
-| Condition | Exit Code |
-| :--- | :--- |
-| Token revoked | 0 |
-| No active token to revoke | 6 |
-| Daemon unreachable | 1 |
+| Condition                 | Exit Code |
+|:--------------------------|:----------|
+| Token revoked             | 0         |
+| No active token to revoke | 6         |
+| Daemon unreachable        | 1         |
 
 ---
 

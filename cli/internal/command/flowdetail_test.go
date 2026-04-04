@@ -8,7 +8,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/registry"
+	"go.resystems.io/renotify/internal/statesvc"
 )
 
 func TestFlow_RequiresArg(t *testing.T) {
@@ -61,7 +61,7 @@ func TestFlow_TextOutput(t *testing.T) {
 	defer nc.Close()
 
 	now := time.Now().UTC()
-	entry := registry.ActiveFlowEntry{
+	entry := statesvc.FlowEntry{
 		FlowID:      "fl_DETAIL01",
 		DaemonID:    "dn_TEST1234ABCDE",
 		WorkspaceID: "ws_TESTWS01",
@@ -79,8 +79,8 @@ func TestFlow_TextOutput(t *testing.T) {
 	sub, err := nc.Subscribe(
 		"resystems.renotify.testuser.svc.flows",
 		func(msg *nats.Msg) {
-			result := registry.ActiveFlowsResult{
-				Flows: []registry.ActiveFlowEntry{entry},
+			result := statesvc.FlowsResult{
+				Flows: []statesvc.FlowEntry{entry},
 			}
 			data, _ := json.Marshal(result)
 			msg.Respond(data)
@@ -125,7 +125,7 @@ func TestFlow_JSONOutput(t *testing.T) {
 	defer nc.Close()
 
 	now := time.Now().UTC()
-	entry := registry.ActiveFlowEntry{
+	entry := statesvc.FlowEntry{
 		FlowID:      "fl_JSON01",
 		DaemonID:    "dn_TEST1234ABCDE",
 		WorkspaceID: "ws_TESTWS01",
@@ -142,8 +142,8 @@ func TestFlow_JSONOutput(t *testing.T) {
 	sub, err := nc.Subscribe(
 		"resystems.renotify.testuser.svc.flows",
 		func(msg *nats.Msg) {
-			result := registry.ActiveFlowsResult{
-				Flows: []registry.ActiveFlowEntry{entry},
+			result := statesvc.FlowsResult{
+				Flows: []statesvc.FlowEntry{entry},
 			}
 			data, _ := json.Marshal(result)
 			msg.Respond(data)
@@ -159,7 +159,7 @@ func TestFlow_JSONOutput(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var got registry.ActiveFlowEntry
+	var got statesvc.FlowEntry
 	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 		t.Fatalf("invalid JSON: %v\n%s", err, stdout)
 	}
@@ -189,7 +189,7 @@ func TestFlow_NoMetadata(t *testing.T) {
 	defer nc.Close()
 
 	now := time.Now().UTC()
-	entry := registry.ActiveFlowEntry{
+	entry := statesvc.FlowEntry{
 		FlowID:                "fl_NOMETA01",
 		DaemonID:              "dn_TEST1234ABCDE",
 		WorkspaceID:           "ws_TESTWS01",
@@ -200,8 +200,8 @@ func TestFlow_NoMetadata(t *testing.T) {
 	sub, err := nc.Subscribe(
 		"resystems.renotify.testuser.svc.flows",
 		func(msg *nats.Msg) {
-			result := registry.ActiveFlowsResult{
-				Flows: []registry.ActiveFlowEntry{entry},
+			result := statesvc.FlowsResult{
+				Flows: []statesvc.FlowEntry{entry},
 			}
 			data, _ := json.Marshal(result)
 			msg.Respond(data)
