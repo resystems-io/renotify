@@ -16,6 +16,7 @@ import (
 	"go.resystems.io/renotify/internal/ledger"
 	"go.resystems.io/renotify/internal/payload"
 	"go.resystems.io/renotify/internal/registry"
+	"go.resystems.io/renotify/internal/statesvc"
 	"go.resystems.io/renotify/internal/testutil"
 
 	"log/slog"
@@ -302,7 +303,7 @@ func TestFlowsEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var result registry.ActiveFlowsResult
+	var result statesvc.FlowsResult
 	if err := json.Unmarshal(resp.Data, &result); err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +426,7 @@ func TestHistoryEndpoint_Empty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var result registry.HistoryQueryResult
+	var result statesvc.HistoryQueryResult
 	if err := json.Unmarshal(resp.Data, &result); err != nil {
 		t.Fatal(err)
 	}
@@ -491,7 +492,7 @@ func TestHistoryEndpoint_WithRecords(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var result registry.HistoryQueryResult
+	var result statesvc.HistoryQueryResult
 	if err := json.Unmarshal(resp.Data, &result); err != nil {
 		t.Fatal(err)
 	}
@@ -558,7 +559,7 @@ func TestHistoryEndpoint_WorkspaceFilter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var result registry.HistoryQueryResult
+	var result statesvc.HistoryQueryResult
 	json.Unmarshal(resp.Data, &result)
 
 	if result.Total != 2 {
@@ -603,7 +604,7 @@ func TestHistoryEndpoint_Pagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var result registry.HistoryQueryResult
+	var result statesvc.HistoryQueryResult
 	json.Unmarshal(resp.Data, &result)
 
 	if result.Total != 5 {

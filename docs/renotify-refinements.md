@@ -1025,7 +1025,7 @@ workspace monitoring).*
 exclusively via NATS, enabling out-of-process deployment when a
 shared broker is in use.)*
 
-- [ ] **C-17: State Management Subsystem:** Extract a dedicated
+- [x] **C-17: State Management Subsystem:** Extract a dedicated
   state management subsystem that is the sole owner of the SQLite
   ledger. Expose ledger reads (active flow lookups, history queries)
   via NATS request-reply subjects and ledger writes (insert request,
@@ -1033,7 +1033,7 @@ shared broker is in use.)*
   JetStream consumption. Consolidate the existing `svc.flows` and
   `svc.history` endpoints (C-09, C-10) into this subsystem
   alongside new write-path subjects (R-CLI-20).
-- [ ] **C-18: MCP Server NATS Migration:** Remove the direct
+- [x] **C-18: MCP Server NATS Migration:** Remove the direct
   `func() *ledger.DB` accessor from the MCP server. Replace all
   in-process database calls (`s.db().ListActiveFlows`,
   `s.db().InsertRequest`, `s.db().InsertResponse`,
@@ -1135,6 +1135,7 @@ specifications.
 | D-67 | Daemon-side timeout: goroutine per ask, `select` on `time.After(timeoutSec)` vs `DecisionStore.Resolved` channel. On timeout: publishes `ErrorResponse(code:"timeout")` to `.response` subject. Response subscriber resolves DecisionResource with decided=true, no response fields. | [NATS Transport](analysis-nats-transport-design.md) | 2026-04-01 |
 | D-68 | Multi-device pairing: per-device `device_id` (`mb_` + 13 Crockford Base32), per-device auth token, per-device NATS account (`mobile-{device_id}`), per-device JetStream push consumer (`mobile-{username}-{device_id}`). Device registry stored in `devices.json`. Provisioning payload v2 adds `"d"` (device_id) and `"n"` (NATS username). Legacy v1 single-token migrated on daemon startup. Daemon creates consumers at startup from registry; SIGHUP reloads auth from registry. R-SEC-02 updated from single-device to multi-device model. | [NATS Transport](analysis-nats-transport-design.md) | 2026-04-02 |
 | D-69 | Heartbeat payload extended: `WorkspaceInfo.ActiveFlows` changed from `[]string` (flow IDs only) to `[]FlowInfo` carrying `flow_id`, `label`, and `metadata` per flow. Dashboard renders label prominently with metadata key-value pairs below. Live updates on `refresh_flow` — heartbeat already fires on flow lifecycle changes via `rebuildWorkspaceSnapshot()`. | [Payload Schemas](analysis-payload-schemas.md) | 2026-04-02 |
+| D-70 | State management subsystem (C-17, R-CLI-20/21): registry extended with four NATS write endpoints (`svc.insert-request`, `svc.insert-response`, `svc.insert-interjection`, `svc.update-activity`) alongside existing read endpoints (`svc.flows`, `svc.history`). New `statesvc` package defines shared wire types for all six service endpoints, breaking the MCP-to-ledger import dependency. MCP server accesses state exclusively via `stateClient` wrapping NATS request-reply. Production `mcpserver` package has zero import of `ledger`. Endpoint wire types (`ActiveFlowEntry`, `HistoryQueryResult`, etc.) migrated from `registry` to `statesvc` so CLI commands also import the shared package. | — | 2026-04-04 |
 
 ---
 
@@ -1204,6 +1205,8 @@ Record completed items here with the date.
 | 2026-04-03 | P-03 | APK management commands implemented as `renotify app apk extract` and `renotify app apk serve`. Extract writes the embedded APK to disk. Serve starts a temporary HTTP server with QR code download URL, uses `http.ServeContent` for Range request support (required by Firefox), and prints ufw firewall hints on Linux. IP discovery fixed: `FlagRunning` check filters virtual bridges (virbr0, docker0) that lack carrier. |
 | 2026-04-03 | V-01 | Test gap analysis and code quality pass. Removed dead `caCert` ReadFile in `broker/client.go`. Fixed duplicate `New()` comment in `mcpserver/server.go`. Extracted `sessionIDPayload` type in `stdio_relay.go`. Extracted shared `isErrorResponse()` helper from duplicated inline probes in `ask.go` and `dispatch.go` with 5 unit tests. Added 7 broker subject unit tests (service, device, MCP). Added MCP tool error-path tests (expired flow, terminated flow). Added APK extract write-path test (skipped when APK absent). |
 | 2026-04-03 | V-02 | README rewritten (~110 lines) with quick start, agent integration configs (Claude Code HTTP MCP, Antigravity/Cursor stdio, Claude Code hooks), CLI command table, and links to testing guides. New `docs/renotify-architecture.md` with system context prose, design principles, Mermaid system block diagram (concurrent HTTP MCP + stdio + terminal + multi-device), and sequence diagrams for post, ask, and interjection flows. Port architecture table and NATS subject namespace reference. Phase 7 complete. |
+| 2026-04-04 | — | Requirements gap analysis: R-CLI-20 (State Management Authority), R-CLI-21 (MCP Server as Broker Client), R-CLI-22 (In-Process Broker Transport) added. Phase 8 implementation plan (C-17 through C-19, V-04, V-05) defined. |
+| 2026-04-04 | C-17 | State management subsystem extracted. Registry extended with 4 write endpoints (`svc.insert-request`, `svc.insert-response`, `svc.insert-interjection`, `svc.update-activity`). New `statesvc` package with shared wire types. MCP server migrated to `stateClient` — all state access via NATS request-reply. Production `mcpserver` package has zero `ledger` import. Endpoint wire types migrated from `registry` to `statesvc`. All existing tests updated and passing (unit + integration). |
 
 ## 6. References
 

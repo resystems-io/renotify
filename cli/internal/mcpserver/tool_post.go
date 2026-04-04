@@ -8,9 +8,9 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/ledger"
 	"go.resystems.io/renotify/internal/payload"
 	"go.resystems.io/renotify/internal/state"
+	"go.resystems.io/renotify/internal/statesvc"
 )
 
 type postArgs struct {
@@ -52,7 +52,7 @@ func (s *Server) handlePost(
 	now := time.Now().UTC()
 	notificationID := state.GenerateNotificationID()
 
-	// Look up flow context.
+	// Look up flow context via state service.
 	flow, err := s.lookupFlow(args.FlowID)
 	if err != nil {
 		return nil, nil, err
@@ -87,20 +87,20 @@ func (s *Server) handlePost(
 		return nil, nil, fmt.Errorf("publish notification: %w", err)
 	}
 
-	// Insert into ledger.
-	if s.db != nil && s.db() != nil {
-		s.db().InsertRequest(
-			ledger.WriteContext{
-				Username:      s.username,
-				FlowLabel:     flow.Label,
-				WorkspaceName: flow.DisplayName,
-				WorkspacePath: flow.AbsPath,
-			}, req)
+	// Insert into ledger via state service.
+	if s.state != nil {
+		s.state.InsertRequest(statesvc.InsertRequestCmd{
+			Username:      s.username,
+			FlowLabel:     flow.Label,
+			WorkspaceName: flow.DisplayName,
+			WorkspacePath: flow.AbsPath,
+			Request:       *req,
+		})
 	}
 
-	// Update flow activity.
-	if s.db != nil && s.db() != nil {
-		s.db().UpdateFlowActivity(args.FlowID, now)
+	// Update flow activity via state service.
+	if s.state != nil {
+		s.state.UpdateActivity(args.FlowID, now)
 	}
 
 	result := &postResult{
@@ -110,19 +110,13 @@ func (s *Server) handlePost(
 	return nil, result, nil
 }
 
-// lookupFlow finds an active flow by ID. Returns an error if the
-// flow is not found.
-func (s *Server) lookupFlow(flowID string) (*ledger.ActiveFlow, error) {
-	flows, err := s.db().ListActiveFlows(ledger.ActiveFlowsQuery{
-		FlowID: flowID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("list flows: %w", err)
+// lookupFlow finds an active flow by ID via the state service.
+// Returns an error if the flow is not found.
+func (s *Server) lookupFlow(
+	flowID string,
+) (*statesvc.FlowEntry, error) {
+	if s.state == nil {
+		return nil, fmt.Errorf("state service not available")
 	}
-	for i := range flows {
-		if flows[i].FlowID == flowID {
-			return &flows[i], nil
-		}
-	}
-	return nil, fmt.Errorf("flow %q not found in active registry", flowID)
+	return s.state.LookupFlow(flowID)
 }

@@ -237,7 +237,7 @@ func TestController_MCPSubsystem(t *testing.T) {
 
 	logger := integrationLogger()
 	httpSrv := httpserver.New("127.0.0.1", 0, logger)
-	mcpSrv := mcpserver.New(httpSrv, logger, nil, "", "", nil)
+	mcpSrv := mcpserver.New(httpSrv, logger, "", "", nil)
 
 	c := NewController(cfg,
 		WithLogger(logger),
@@ -275,7 +275,7 @@ func TestController_MCPSSEEndpoint(t *testing.T) {
 
 	logger := integrationLogger()
 	httpSrv := httpserver.New("127.0.0.1", 0, logger)
-	mcpSrv := mcpserver.New(httpSrv, logger, nil, "", "", nil)
+	mcpSrv := mcpserver.New(httpSrv, logger, "", "", nil)
 
 	c := NewController(cfg,
 		WithLogger(logger),
@@ -346,7 +346,7 @@ func TestController_MCPToolEndToEnd(t *testing.T) {
 	ledgerSub := ledger.NewSubsystem(cfg.Daemon.DBPath, logger)
 	httpSrv := httpserver.New("127.0.0.1", 0, logger)
 	mcpSrv := mcpserver.New(httpSrv, logger,
-		ledgerSub.DB, cfg.Username, "dn_INTEGTEST01", cfg)
+		cfg.Username, "dn_INTEGTEST01", cfg)
 	hbPub := heartbeat.New("dn_INTEGTEST01", cfg.Username,
 		"test-host", 30*time.Second, logger)
 	regSvc := registry.New(ledgerSub.DB, hbPub,

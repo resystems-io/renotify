@@ -385,7 +385,7 @@ func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
 	if cfg.MCP.Enabled {
 		httpSrv := httpserver.New(cfg.MCP.Host, cfg.MCP.Port, logger)
 		mcpSrv := mcpserver.New(httpSrv, logger,
-			ledgerSub.DB, cfg.Username, daemonID, cfg)
+			cfg.Username, daemonID, cfg)
 		opts = append(opts,
 			daemon.WithSubsystem(httpSrv),
 			daemon.WithSubsystem(mcpSrv),
