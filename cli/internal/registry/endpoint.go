@@ -2,61 +2,16 @@ package registry
 
 import (
 	"encoding/json"
-	"time"
 
 	"github.com/nats-io/nats.go"
 
 	"go.resystems.io/renotify/internal/broker"
 	"go.resystems.io/renotify/internal/ledger"
+	"go.resystems.io/renotify/internal/statesvc"
 )
 
-// --- History endpoint wire types (C-09) ---
-
-// HistoryQueryRequest is the inbound query for the svc.history
-// Core NATS Request-Reply endpoint. All fields are optional
-// filters; when omitted, the daemon returns the most recent
-// records up to the default limit.
-type HistoryQueryRequest struct {
-	WorkspaceID string     `json:"workspace_id,omitempty"`
-	FlowID      string     `json:"flow_id,omitempty"`
-	Since       *time.Time `json:"since,omitempty"`
-	Until       *time.Time `json:"until,omitempty"`
-	Limit       int        `json:"limit,omitempty"`
-	Offset      int        `json:"offset,omitempty"`
-}
-
-// HistoryQueryResult is the response payload for the svc.history
-// Core NATS Request-Reply endpoint.
-type HistoryQueryResult struct {
-	Records []ledger.HistoryRecord `json:"records"`
-	Total   int                    `json:"total"`
-}
-
-// --- Active flows endpoint wire types ---
-
-// ActiveFlowEntry is a single entry in the ActiveFlowsResult.
-// Includes fields needed by the CLI flows command (display name,
-// last activity for TTL computation).
-type ActiveFlowEntry struct {
-	FlowID                string            `json:"flow_id"`
-	DaemonID              string            `json:"daemon_id"`
-	WorkspaceID           string            `json:"workspace_id"`
-	DisplayName           string            `json:"display_name,omitempty"`
-	AbsPath               string            `json:"abs_path,omitempty"`
-	Label                 string            `json:"label,omitempty"`
-	Metadata              map[string]string `json:"metadata,omitempty"`
-	RegisteredAt          time.Time         `json:"registered_at"`
-	LastActivityTimestamp time.Time         `json:"last_activity_timestamp"`
-}
-
-// ActiveFlowsResult is the response payload for the svc.flows
-// Core NATS Request-Reply endpoint.
-type ActiveFlowsResult struct {
-	Flows []ActiveFlowEntry `json:"flows"`
-}
-
 // subscribeFlowsEndpoint subscribes to the svc.flows subject
-// and handles incoming ActiveFlowsQuery requests.
+// and handles incoming FlowsQuery requests.
 func (s *Service) subscribeFlowsEndpoint() (*nats.Subscription, error) {
 	subject := broker.ServiceFlowsSubject(s.username)
 	sub, err := s.nc.Subscribe(subject, s.handleFlowsQuery)
@@ -69,7 +24,7 @@ func (s *Service) subscribeFlowsEndpoint() (*nats.Subscription, error) {
 
 // handleFlowsQuery processes a single svc.flows request.
 func (s *Service) handleFlowsQuery(msg *nats.Msg) {
-	var query ledger.ActiveFlowsQuery
+	var query statesvc.FlowsQuery
 	if len(msg.Data) > 0 {
 		if err := json.Unmarshal(msg.Data, &query); err != nil {
 			s.logger.Error("svc.flows unmarshal", "err", err)
@@ -78,16 +33,20 @@ func (s *Service) handleFlowsQuery(msg *nats.Msg) {
 		}
 	}
 
-	flows, err := s.dbFunc().ListActiveFlows(query)
+	flows, err := s.dbFunc().ListActiveFlows(ledger.ActiveFlowsQuery{
+		FlowID:      query.FlowID,
+		DaemonID:    query.DaemonID,
+		WorkspaceID: query.WorkspaceID,
+	})
 	if err != nil {
 		s.logger.Error("svc.flows query", "err", err)
 		msg.Respond([]byte(`{"flows":[]}`))
 		return
 	}
 
-	entries := make([]ActiveFlowEntry, len(flows))
+	entries := make([]statesvc.FlowEntry, len(flows))
 	for i, f := range flows {
-		entries[i] = ActiveFlowEntry{
+		entries[i] = statesvc.FlowEntry{
 			FlowID:                f.FlowID,
 			DaemonID:              f.DaemonID,
 			WorkspaceID:           f.WorkspaceID,
@@ -100,7 +59,7 @@ func (s *Service) handleFlowsQuery(msg *nats.Msg) {
 		}
 	}
 
-	result := ActiveFlowsResult{Flows: entries}
+	result := statesvc.FlowsResult{Flows: entries}
 	data, err := json.Marshal(result)
 	if err != nil {
 		s.logger.Error("svc.flows marshal", "err", err)
@@ -129,7 +88,7 @@ var emptyHistoryResult = []byte(`{"records":[],"total":0}`)
 
 // handleHistoryQuery processes a single svc.history request.
 func (s *Service) handleHistoryQuery(msg *nats.Msg) {
-	var req HistoryQueryRequest
+	var req statesvc.HistoryQueryRequest
 	if len(msg.Data) > 0 {
 		if err := json.Unmarshal(msg.Data, &req); err != nil {
 			s.logger.Error("svc.history unmarshal", "err", err)
@@ -154,8 +113,21 @@ func (s *Service) handleHistoryQuery(msg *nats.Msg) {
 		return
 	}
 
-	out := HistoryQueryResult{
-		Records: result.Records,
+	// Convert ledger records to statesvc wire types.
+	records := make([]statesvc.HistoryRecord, len(result.Records))
+	for i, r := range result.Records {
+		records[i] = statesvc.HistoryRecord{
+			Username:      r.Username,
+			FlowLabel:     r.FlowLabel,
+			WorkspaceName: r.WorkspaceName,
+			WorkspacePath: r.WorkspacePath,
+			Request:       r.Request,
+			Response:      r.Response,
+		}
+	}
+
+	out := statesvc.HistoryQueryResult{
+		Records: records,
 		Total:   result.Total,
 	}
 

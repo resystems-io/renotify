@@ -16,7 +16,6 @@ import (
 
 	"go.resystems.io/renotify/internal/config"
 	"go.resystems.io/renotify/internal/httpserver"
-	"go.resystems.io/renotify/internal/ledger"
 )
 
 // Server is the MCP server implementing daemon.Subsystem.
@@ -28,14 +27,14 @@ type Server struct {
 	sseHandler http.Handler
 
 	// Dependencies set via constructor — available after New().
-	db       func() *ledger.DB
 	username string
 	daemonID string
 	cfg      *config.Config
 
 	// Dependencies set in Start() — available after ready.
-	nc *nats.Conn
-	js nats.JetStreamContext
+	nc    *nats.Conn
+	js    nats.JetStreamContext
+	state *stateClient
 
 	// Decision tracking for async ask responses.
 	decisions   *DecisionStore
@@ -53,15 +52,13 @@ type Server struct {
 	stdioCloseSub *nats.Subscription
 }
 
-// New creates an MCP server. The dbFunc parameter is a lazy
-// accessor for the ledger DB — it must return non-nil after
-// the ledger subsystem has started. This allows construction
-// before the ledger's Start() is called. Dependencies that
-// require the NATS connection are bound in Start().
+// New creates an MCP server. Dependencies that require the NATS
+// connection (including the state client for ledger access) are
+// bound in Start(). The MCP server accesses persistent state
+// exclusively via NATS service endpoints (R-CLI-21).
 func New(
 	httpSrv *httpserver.Server,
 	logger *slog.Logger,
-	dbFunc func() *ledger.DB,
 	username, daemonID string,
 	cfg *config.Config,
 ) *Server {
@@ -97,7 +94,6 @@ func New(
 		mcpServer:     mcpSrv,
 		handler:       handler,
 		sseHandler:    sseHandler,
-		db:            dbFunc,
 		username:      username,
 		daemonID:      daemonID,
 		cfg:           cfg,
@@ -126,6 +122,11 @@ func (s *Server) Start(_ context.Context, nc *nats.Conn, ready chan<- error) err
 		}
 		s.js = js
 
+		// Create state client for ledger access via NATS (C-17).
+		if s.username != "" {
+			s.state = newStateClient(nc, s.username)
+		}
+
 		// Register tools and resources.
 		s.registerFlowTools()
 		s.registerPostTool()
@@ -135,9 +136,9 @@ func (s *Server) Start(_ context.Context, nc *nats.Conn, ready chan<- error) err
 		s.registerDecisionTemplate()
 		s.registerInterjectionTemplate()
 
-		// Start interjection consumer (C-11). Skipped when db is
-		// nil (lightweight test mode without ledger).
-		if s.db != nil {
+		// Start interjection consumer (C-11). Skipped when
+		// username is empty (lightweight test mode).
+		if s.username != "" {
 			if err := s.startInterjectConsumer(context.Background()); err != nil {
 				if ready != nil {
 					ready <- err

@@ -11,8 +11,7 @@ import (
 
 	"go.resystems.io/renotify/internal/broker"
 	"go.resystems.io/renotify/internal/exitcode"
-	"go.resystems.io/renotify/internal/ledger"
-	"go.resystems.io/renotify/internal/registry"
+	"go.resystems.io/renotify/internal/statesvc"
 )
 
 func newFlowsCmd(app *App) *cobra.Command {
@@ -41,7 +40,7 @@ Use flow IDs with other commands:
 			defer nc.Drain()
 
 			// Build query.
-			query := ledger.ActiveFlowsQuery{
+			query := statesvc.FlowsQuery{
 				WorkspaceID: workspace,
 			}
 			queryData, _ := json.Marshal(query)
@@ -59,7 +58,7 @@ Use flow IDs with other commands:
 					"query flows: %v", err)
 			}
 
-			var result registry.ActiveFlowsResult
+			var result statesvc.FlowsResult
 			if err := json.Unmarshal(resp.Data, &result); err != nil {
 				return exitcode.Errorf(exitcode.Error,
 					"parse response: %v", err)

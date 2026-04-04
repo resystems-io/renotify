@@ -11,8 +11,8 @@ import (
 	natsjs "github.com/nats-io/nats.go/jetstream"
 
 	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/ledger"
 	"go.resystems.io/renotify/internal/payload"
+	"go.resystems.io/renotify/internal/statesvc"
 )
 
 // debounceMap tracks the last-processed timestamp per
@@ -119,10 +119,12 @@ func (s *Server) processInterjection(
 		return
 	}
 
-	// Insert into ledger for audit.
-	if s.db != nil && s.db() != nil {
-		s.db().InsertInterjection(
-			ledger.WriteContext{Username: s.username}, &cmd)
+	// Insert into ledger for audit via state service.
+	if s.state != nil {
+		s.state.InsertInterjection(statesvc.InsertInterjectionCmd{
+			Username:     s.username,
+			Interjection: cmd,
+		})
 	}
 
 	switch cmd.Action {
@@ -160,14 +162,8 @@ func (s *Server) handleStop(cmd *payload.InterjectionCommand) {
 
 	// Publish failed lifecycle to NATS (registry handles DB).
 	var workspaceID string
-	if s.db != nil && s.db() != nil {
-		flows, _ := s.db().ListActiveFlows(ledger.ActiveFlowsQuery{})
-		for _, f := range flows {
-			if f.FlowID == cmd.FlowID {
-				workspaceID = f.WorkspaceID
-				break
-			}
-		}
+	if flow, err := s.lookupFlow(cmd.FlowID); err == nil {
+		workspaceID = flow.WorkspaceID
 	}
 
 	event := &payload.FlowLifecycleEvent{

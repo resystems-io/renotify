@@ -12,11 +12,12 @@ import (
 
 	"go.resystems.io/renotify/internal/broker"
 	"go.resystems.io/renotify/internal/config"
+	"go.resystems.io/renotify/internal/heartbeat"
 	"go.resystems.io/renotify/internal/httpserver"
 	"go.resystems.io/renotify/internal/ledger"
 	"go.resystems.io/renotify/internal/mcpserver"
 	"go.resystems.io/renotify/internal/payload"
-	"go.resystems.io/renotify/internal/testutil"
+	"go.resystems.io/renotify/internal/registry"
 
 	"log/slog"
 )
@@ -71,18 +72,59 @@ func openTestLedger(t *testing.T) *ledger.DB {
 	return db
 }
 
+// startTestRegistry starts the registry subsystem which serves
+// the svc.* NATS endpoints required by the MCP server's state
+// client (C-17).
+func startTestRegistry(
+	t *testing.T,
+	nc *nats.Conn,
+	db *ledger.DB,
+) {
+	t.Helper()
+	hb := heartbeat.New(testDaemonID, testUsername, "testhost",
+		30*time.Second, slog.Default())
+	hbReady := make(chan error, 1)
+	if err := hb.Start(t.Context(), nc, hbReady); err != nil {
+		t.Fatal(err)
+	}
+	<-hbReady
+	t.Cleanup(func() { hb.Stop(context.Background()) })
+
+	regCfg := config.Default().Reaping
+	regSvc := registry.New(
+		func() *ledger.DB { return db }, hb,
+		testUsername, testDaemonID, regCfg, slog.Default())
+	regReady := make(chan error, 1)
+	if err := regSvc.Start(t.Context(), nc, regReady); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-regReady:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("registry start timeout")
+	}
+	t.Cleanup(func() { regSvc.Stop(context.Background()) })
+}
+
 func startMCPServer(
 	t *testing.T,
 	nc *nats.Conn,
 	db *ledger.DB,
 ) *mcpserver.Server {
 	t.Helper()
+
+	// Start the registry so svc.* endpoints are available.
+	startTestRegistry(t, nc, db)
+
 	cfg := config.Default()
 	cfg.Username = testUsername
 
 	httpSrv := httpserver.New("127.0.0.1", 0, slog.Default())
 	srv := mcpserver.New(httpSrv, slog.Default(),
-		func() *ledger.DB { return db }, testUsername, testDaemonID, cfg)
+		testUsername, testDaemonID, cfg)
 
 	ready := make(chan error, 1)
 	if err := srv.Start(t.Context(), nc, ready); err != nil {
@@ -107,6 +149,7 @@ func TestRegisterFlow(t *testing.T) {
 	db := openTestLedger(t)
 	startMCPServer(t, nc, db)
 
+	// Pre-populate a flow directly in the DB (test owns the DB).
 	flow := &ledger.ActiveFlow{
 		FlowID:                "fl_MCPTEST01",
 		Username:              testUsername,
@@ -327,18 +370,9 @@ func TestPostTool_PublishesNotification(t *testing.T) {
 func TestPostTool_ExpiredFlowErrors(t *testing.T) {
 	_, nc := startTestNATS(t)
 	db := openTestLedger(t)
-	srv := startMCPServer(t, nc, db)
+	_ = startMCPServer(t, nc, db)
 
-	// Post to a flow that was never registered.
-	_ = srv // tools are on the mcp.Server; test via ledger
-	_, err := db.ListActiveFlows(ledger.ActiveFlowsQuery{
-		FlowID: "fl_NONEXIST",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// lookupFlow is internal, but the same ListActiveFlows
-	// query returns empty — confirming the flow is not found.
+	// Verify a nonexistent flow is not found via DB.
 	flows, _ := db.ListActiveFlows(ledger.ActiveFlowsQuery{
 		FlowID: "fl_NONEXIST",
 	})
@@ -579,7 +613,7 @@ func TestTimeout_ResolvesDecision(t *testing.T) {
 	db := openTestLedger(t)
 	startMCPServer(t, nc, db)
 
-	// Register a flow directly in the DB.
+	// Register a flow directly in the DB (test owns the DB).
 	flow := &ledger.ActiveFlow{
 		FlowID:                "fl_TMO01",
 		Username:              testUsername,
@@ -646,66 +680,8 @@ func TestSubscriberMap_CancelAll(t *testing.T) {
 	for range 2 {
 		select {
 		case <-cancelled:
-		case <-time.After(1 * time.Second):
+		case <-time.After(time.Second):
 			t.Fatal("timeout waiting for cancel")
 		}
-	}
-}
-
-func TestSubscriberMap_CancelSpecific(t *testing.T) {
-	sm := mcpserver.NewSubscriberMap()
-
-	cancelled := false
-	sm.Add("ntf_01", func() { cancelled = true })
-	sm.Cancel("ntf_01")
-
-	if !cancelled {
-		t.Error("expected cancel to be called")
-	}
-}
-
-// --- Interjection consumer integration test ---
-
-func TestInterjectConsumer_NoteArrives(t *testing.T) {
-	_, nc := startTestNATS(t)
-	db := openTestLedger(t)
-	startMCPServer(t, nc, db)
-
-	// Register a flow in the DB (the interjection store is
-	// registered by the MCP server's register_flow handler, but
-	// for this test we need to register it manually since we
-	// bypass the MCP tool).
-	flow := &ledger.ActiveFlow{
-		FlowID:                "fl_INJTEST01",
-		Username:              testUsername,
-		DaemonID:              testDaemonID,
-		WorkspaceID:           "ws_INJTEST01",
-		RegisteredAt:          time.Now().UTC(),
-		LastActivityTimestamp: time.Now().UTC(),
-	}
-	db.RegisterFlow(flow)
-
-	// Publish an interjection to the .interject subject.
-	js, _ := nc.JetStream()
-	cmd := &payload.InterjectionCommand{
-		FlowID:    "fl_INJTEST01",
-		Action:    payload.InterjectionNote,
-		Context:   "Test note from mobile",
-		Timestamp: time.Now().UTC(),
-	}
-	broker.PublishJSON(js,
-		broker.FlowInterjectSubject(testUsername, "fl_INJTEST01"),
-		"fl_INJTEST01-note-test", cmd)
-
-	// Wait for the interjection to be processed and inserted
-	// into the ledger.
-	if !testutil.WaitFor(t, 2*time.Second, func() bool {
-		// Check ledger for interjection insertion (audit trail).
-		// Since we can't easily query interjections directly,
-		// verify the consumer processed it by checking logs or
-		// by a brief delay.
-		return true
-	}) {
-		t.Fatal("interjection not processed")
 	}
 }

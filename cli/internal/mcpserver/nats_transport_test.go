@@ -47,6 +47,17 @@ func startPlainNATS(t *testing.T) (*natsserver.Server, *nats.Conn) {
 		t.Fatal(err)
 	}
 	t.Cleanup(nc.Close)
+
+	// Create stream and consumers so the MCP server's
+	// interjection consumer can bind.
+	logger := discardLogger()
+	if err := broker.EnsureJetStream(
+		t.Context(), nc, testUsername, nil,
+		config.Default().JetStream, logger,
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	return srv, nc
 }
 
@@ -63,7 +74,7 @@ func startMCPWithNATS(t *testing.T) (*mcpserver.Server, *nats.Conn) {
 	cfg.Username = testUsername
 
 	httpSrv := httpserver.New("127.0.0.1", 0, discardLogger())
-	srv := mcpserver.New(httpSrv, discardLogger(), nil,
+	srv := mcpserver.New(httpSrv, discardLogger(),
 		testUsername, testDaemonID, cfg)
 
 	ready := make(chan error, 1)

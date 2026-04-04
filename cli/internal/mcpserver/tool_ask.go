@@ -8,9 +8,9 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/ledger"
 	"go.resystems.io/renotify/internal/payload"
 	"go.resystems.io/renotify/internal/state"
+	"go.resystems.io/renotify/internal/statesvc"
 )
 
 type askArgs struct {
@@ -64,7 +64,7 @@ func (s *Server) handleAsk(
 	now := time.Now().UTC()
 	notificationID := state.GenerateNotificationID()
 
-	// Look up flow context.
+	// Look up flow context via state service.
 	flow, err := s.lookupFlow(args.FlowID)
 	if err != nil {
 		return nil, nil, err
@@ -110,15 +110,15 @@ func (s *Server) handleAsk(
 		return nil, nil, fmt.Errorf("publish notification: %w", err)
 	}
 
-	// Insert into ledger.
-	if s.db != nil && s.db() != nil {
-		s.db().InsertRequest(
-			ledger.WriteContext{
-				Username:      s.username,
-				FlowLabel:     flow.Label,
-				WorkspaceName: flow.DisplayName,
-				WorkspacePath: flow.AbsPath,
-			}, req)
+	// Insert into ledger via state service.
+	if s.state != nil {
+		s.state.InsertRequest(statesvc.InsertRequestCmd{
+			Username:      s.username,
+			FlowLabel:     flow.Label,
+			WorkspaceName: flow.DisplayName,
+			WorkspacePath: flow.AbsPath,
+			Request:       *req,
+		})
 	}
 
 	// Create pending DecisionResource.
@@ -130,9 +130,9 @@ func (s *Server) handleAsk(
 	// Start daemon-side timeout timer (D-27, C-11).
 	s.startTimeoutTimer(args.FlowID, notificationID, timeoutSec)
 
-	// Update flow activity.
-	if s.db != nil && s.db() != nil {
-		s.db().UpdateFlowActivity(args.FlowID, now)
+	// Update flow activity via state service.
+	if s.state != nil {
+		s.state.UpdateActivity(args.FlowID, now)
 	}
 
 	resourceURI := DecisionResourceURI(notificationID)

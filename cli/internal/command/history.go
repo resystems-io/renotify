@@ -12,7 +12,7 @@ import (
 	"go.resystems.io/renotify/internal/broker"
 	"go.resystems.io/renotify/internal/exitcode"
 	"go.resystems.io/renotify/internal/payload"
-	"go.resystems.io/renotify/internal/registry"
+	"go.resystems.io/renotify/internal/statesvc"
 )
 
 func newHistoryCmd(app *App) *cobra.Command {
@@ -43,7 +43,7 @@ by workspace, flow, time range, and pagination via limit/offset.`,
 			defer nc.Drain()
 
 			// Build query request.
-			req := registry.HistoryQueryRequest{
+			req := statesvc.HistoryQueryRequest{
 				WorkspaceID: workspaceID,
 				FlowID:      flowID,
 				Limit:       limit,
@@ -82,7 +82,7 @@ by workspace, flow, time range, and pagination via limit/offset.`,
 					"query history: %v", err)
 			}
 
-			var result registry.HistoryQueryResult
+			var result statesvc.HistoryQueryResult
 			if err := json.Unmarshal(resp.Data, &result); err != nil {
 				return exitcode.Errorf(exitcode.Error,
 					"parse response: %v", err)
@@ -121,7 +121,7 @@ by workspace, flow, time range, and pagination via limit/offset.`,
 // tabular format.
 func formatHistoryText(
 	cmd *cobra.Command,
-	result *registry.HistoryQueryResult,
+	result *statesvc.HistoryQueryResult,
 ) error {
 	out := cmd.OutOrStdout()
 
