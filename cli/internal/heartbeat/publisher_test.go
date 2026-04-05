@@ -130,8 +130,8 @@ func TestPayload_EmptyWorkspaces(t *testing.T) {
 }
 
 func TestPublisher_Name(t *testing.T) {
-	p := New("dn_TEST", "testuser", "host", time.Second,
-		discardLogger())
+	p := New("dn_TEST", "testuser", "host",
+		5*time.Minute, time.Second, discardLogger())
 	if p.Name() != "heartbeat" {
 		t.Errorf("Name = %q, want heartbeat", p.Name())
 	}
@@ -147,8 +147,8 @@ func TestPublisher_ImmediatePublish(t *testing.T) {
 	}
 	nc.Flush()
 
-	p := New("dn_TEST", "testuser", "testhost", 10*time.Second,
-		discardLogger())
+	p := New("dn_TEST", "testuser", "testhost",
+		5*time.Minute, 10*time.Second, discardLogger())
 
 	ready := make(chan error, 1)
 	if err := p.Start(context.Background(), nc, ready); err != nil {
@@ -178,6 +178,10 @@ func TestPublisher_ImmediatePublish(t *testing.T) {
 	if hb.Workspaces == nil {
 		t.Error("workspaces should not be nil")
 	}
+	if hb.GracePeriod != "5m0s" {
+		t.Errorf("grace_period = %q, want %q",
+			hb.GracePeriod, "5m0s")
+	}
 }
 
 func TestPublisher_PeriodicPublish(t *testing.T) {
@@ -191,8 +195,8 @@ func TestPublisher_PeriodicPublish(t *testing.T) {
 	nc.Flush()
 
 	// Use a short interval to keep the test fast.
-	p := New("dn_TEST", "testuser", "testhost", 50*time.Millisecond,
-		discardLogger())
+	p := New("dn_TEST", "testuser", "testhost",
+		5*time.Minute, 50*time.Millisecond, discardLogger())
 
 	ready := make(chan error, 1)
 	if err := p.Start(context.Background(), nc, ready); err != nil {
@@ -220,8 +224,8 @@ func TestPublisher_Stop(t *testing.T) {
 	}
 	nc.Flush()
 
-	p := New("dn_TEST", "testuser", "testhost", 50*time.Millisecond,
-		discardLogger())
+	p := New("dn_TEST", "testuser", "testhost",
+		5*time.Minute, 50*time.Millisecond, discardLogger())
 
 	ready := make(chan error, 1)
 	if err := p.Start(context.Background(), nc, ready); err != nil {
@@ -253,8 +257,8 @@ func TestPublisher_SetWorkspaces(t *testing.T) {
 	}
 	nc.Flush()
 
-	p := New("dn_TEST", "testuser", "testhost", 10*time.Second,
-		discardLogger())
+	p := New("dn_TEST", "testuser", "testhost",
+		5*time.Minute, 10*time.Second, discardLogger())
 
 	ready := make(chan error, 1)
 	if err := p.Start(context.Background(), nc, ready); err != nil {

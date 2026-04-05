@@ -23,6 +23,7 @@ class DashboardItemTest {
             daemonId = "dn_TEST",
             username = "test",
             hostname = "host",
+            gracePeriodMs = 900_000,
             workspaces = emptyList(),
             timestamp = "2026-04-01T10:00:00Z"
         )
@@ -42,6 +43,7 @@ class DashboardItemTest {
             daemonId = "dn_TEST",
             username = "test",
             hostname = "host",
+            gracePeriodMs = 900_000,
             workspaces = listOf(
                 WorkspaceInfo(
                     workspaceId = "ws_01",
@@ -81,6 +83,7 @@ class DashboardItemTest {
             daemonId = "dn_TEST",
             username = "test",
             hostname = "host",
+            gracePeriodMs = 900_000,
             workspaces = listOf(
                 WorkspaceInfo(
                     workspaceId = "ws_01",
@@ -119,6 +122,7 @@ class DashboardItemTest {
             daemonId = "dn_TEST",
             username = "test",
             hostname = "host",
+            gracePeriodMs = 900_000,
             workspaces = listOf(
                 WorkspaceInfo(
                     workspaceId = "ws_01",
