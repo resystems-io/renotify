@@ -54,11 +54,20 @@ via NATS, not via shared memory or direct function calls.
 This ensures every subsystem can operate as a NATS client
 regardless of whether the broker is embedded or shared.
 
-**MCP as the agent integration standard.** AI agents
-connect via the Model Context Protocol. The daemon serves
-Streamable HTTP (`/mcp`), Standard SSE (`/sse`), and stdio
-(`renotify mcp`) transports simultaneously from a single
-`mcp.Server` instance.
+**MCP as the agent integration standard.** AI agents connect
+via the Model Context Protocol for tool-initiated
+interactions (`register_flow`, `post`, `ask`). The daemon
+serves Streamable HTTP (`/mcp`), Standard SSE (`/sse`), and
+stdio (`renotify mcp`) transports simultaneously from a
+single `mcp.Server` instance.
+
+**Hook dispatcher for framework events.** Framework-initiated
+events that occur outside the MCP tool loop — permission
+requests, idle prompts — are bridged via the hook dispatcher
+(`renotify dispatch`). Claude Code invokes it as a subprocess,
+piping hook event JSON to stdin and reading the decision from
+stdout. MCP handles agent-driven flow; hooks handle
+framework-driven events.
 
 **Flows as the unit of work.** A "flow" represents one
 logical task — not a connection, not a session. Flows are
@@ -83,14 +92,16 @@ with its embedded NATS broker. The daemon process contains
 all subsystems. Internal subsystem communication uses the
 NATS in-process transport (a `net.Pipe()` between the
 client and the embedded server). External clients (CLI
-commands, mobile app) connect via TCP or WSS.
+commands, hook dispatcher, mobile app) connect via TCP or
+WSS.
 
 ```mermaid
 graph TB
     subgraph Workstation
-        CC["Claude Code<br/>(HTTP MCP)"]
+        AI["AI Agents<br/>(HTTP MCP)"]
         AG["Antigravity<br/>(stdio via renotify mcp)"]
         Term["Terminal<br/>(renotify post, ask, ...)"]
+        Hook["Hook Dispatcher<br/>(renotify dispatch)<br/>Claude Code hooks"]
     end
 
     subgraph Daemon["Renotify Daemon"]
@@ -108,11 +119,12 @@ graph TB
         Phone2["Phone B"]
     end
 
-    CC -->|"JSON-RPC over HTTP"| HTTP
+    AI -->|"JSON-RPC over HTTP"| HTTP
     HTTP --> MCP
     AG -->|"stdin/stdout (NDJSON)"| Stdio
     Stdio -->|"NATS Core"| Broker
     Term -->|"NATS TCP"| Broker
+    Hook -->|"NATS TCP"| Broker
     MCP -->|"NATS in-process"| Broker
     State -->|"NATS in-process"| Broker
     HB -->|"NATS in-process"| Broker
@@ -120,6 +132,15 @@ graph TB
     Broker -->|"NATS WSS + TLS"| Phone1
     Broker -->|"NATS WSS + TLS"| Phone2
 ```
+
+AI agents connect to the daemon's MCP server over HTTP for
+tool-initiated interactions (`register_flow`, `post`, `ask`).
+Claude Code additionally uses the hook dispatcher for
+framework events (`PermissionRequest`, `Notification`) that
+occur outside the MCP tool loop. The hook dispatcher is a
+short-lived CLI process — Claude Code spawns it as a
+subprocess, pipes hook event JSON to stdin, and reads the
+decision from stdout.
 
 ## Shared Broker Deployment
 
@@ -146,9 +167,10 @@ This enables two additional topologies:
 ```mermaid
 graph TB
     subgraph Workstation
-        CC["Claude Code<br/>(HTTP MCP)"]
+        AI["AI Agents<br/>(HTTP MCP)"]
         AG["Antigravity<br/>(stdio via renotify mcp)"]
         Term["Terminal<br/>(renotify post, ask, ...)"]
+        Hook["Hook Dispatcher<br/>(renotify dispatch)<br/>Claude Code hooks"]
     end
 
     subgraph DaemonProcess["Renotify Daemon"]
@@ -166,11 +188,12 @@ graph TB
         Phone["Phone"]
     end
 
-    CC -->|"JSON-RPC over HTTP"| HTTP
+    AI -->|"JSON-RPC over HTTP"| HTTP
     HTTP --> MCP
     AG -->|"stdin/stdout (NDJSON)"| Stdio
     Stdio -->|"NATS TCP or WSS"| SharedBroker
     Term -->|"NATS TCP or WSS"| SharedBroker
+    Hook -->|"NATS TCP or WSS"| SharedBroker
     MCP -->|"NATS TCP or WSS"| SharedBroker
     State -->|"NATS TCP or WSS"| SharedBroker
     HB -->|"NATS TCP or WSS"| SharedBroker
@@ -236,6 +259,38 @@ sequenceDiagram
     MCP-->>Agent: {accepted: true/false, text: "..."}
 ```
 
+## Hook Dispatch Flow (PermissionRequest)
+
+Claude Code spawns `renotify dispatch` as a hook subprocess
+when a tool requires permission. The dispatcher bridges the
+framework event to a mobile notification and blocks until the
+developer responds.
+
+```mermaid
+sequenceDiagram
+    participant CC as Claude Code
+    participant Disp as Hook Dispatcher
+    participant JS as JetStream
+    participant Phone as Android
+
+    CC->>Disp: stdin: hook event JSON
+    Disp->>JS: Publish FlowLifecycleEvent (active)
+    Disp->>JS: Publish NotificationRequest
+    JS->>Phone: Deliver via mobile consumer
+
+    Phone->>Phone: User taps Allow/Deny
+    Phone->>JS: Publish NotificationResponse
+    JS->>Disp: Deliver to ephemeral consumer
+
+    Disp->>JS: Publish FlowLifecycleEvent (completed)
+    Disp-->>CC: stdout: decision JSON
+    Note over CC: Resumes with allow/deny
+```
+
+For `Notification` hook events (fire-and-forget), the
+dispatcher publishes the request and exits immediately
+without waiting for a response.
+
 ## Interjection Flow
 
 The developer proactively sends a signal (stop, note) to
@@ -262,20 +317,22 @@ sequenceDiagram
 
 ## Port Architecture
 
-| Port | Protocol | Bind Address | Purpose                           | TLS                             |
-|:-----|:---------|:-------------|:----------------------------------|:--------------------------------|
-| 4222 | NATS TCP | `127.0.0.1`  | CLI commands and external clients | No (loopback)                   |
-| 4223 | NATS WSS | `0.0.0.0`    | Mobile device connections         | Yes (self-signed, TOFU pinning) |
-| 4224 | HTTP     | `127.0.0.1`  | MCP server (`/mcp`, `/sse`)       | No (loopback)                   |
+| Port | Protocol | Bind Address | Purpose                          | TLS                             |
+|:-----|:---------|:-------------|:---------------------------------|:--------------------------------|
+| 4222 | NATS TCP | `127.0.0.1`  | CLI commands and hook dispatcher | No (loopback)                   |
+| 4223 | NATS WSS | `0.0.0.0`    | Mobile device connections        | Yes (self-signed, TOFU pinning) |
+| 4224 | HTTP     | `127.0.0.1`  | MCP server (`/mcp`, `/sse`)      | No (loopback)                   |
 
 Separate trust boundaries justify separate listeners. Mobile
-connections cross untrusted networks and require TLS. CLI and
-MCP connections stay on loopback and need no encryption.
+connections cross untrusted networks and require TLS. CLI,
+hook dispatcher, and MCP connections stay on loopback and need
+no encryption.
 
 The daemon's own subsystems connect to the embedded broker via
 in-process transport (`nats.InProcessServer`), bypassing TCP
-entirely. The TCP listener on port 4222 serves only external
-CLI processes (`renotify post`, `renotify ask`, etc.).
+entirely. The TCP listener on port 4222 serves external CLI
+processes (`renotify post`, `renotify ask`, etc.) and the hook
+dispatcher (`renotify dispatch`).
 
 ## NATS Subject Namespace
 
@@ -287,12 +344,12 @@ resystems.renotify.{username}.{scope}.{id}.{event}
 
 ### Flow-scoped subjects (JetStream)
 
-| Subject                  | Direction                    | Purpose               |
-|:-------------------------|:-----------------------------|:----------------------|
-| `...flow.{id}.request`   | MCP Server → Mobile          | Notification delivery |
-| `...flow.{id}.response`  | Mobile → MCP Server          | User's decision       |
-| `...flow.{id}.lifecycle` | MCP Server → State Subsystem | Flow state changes    |
-| `...flow.{id}.interject` | Mobile → MCP Server          | Stop/note signals     |
+| Subject                  | Direction                                     | Purpose               |
+|:-------------------------|:----------------------------------------------|:----------------------|
+| `...flow.{id}.request`   | MCP Server, Hook Dispatcher → Mobile          | Notification delivery |
+| `...flow.{id}.response`  | Mobile → MCP Server, Hook Dispatcher          | User's decision       |
+| `...flow.{id}.lifecycle` | MCP Server, Hook Dispatcher → State Subsystem | Flow state changes    |
+| `...flow.{id}.interject` | Mobile → MCP Server                           | Stop/note signals     |
 
 ### State service subjects (Core NATS Request-Reply)
 
