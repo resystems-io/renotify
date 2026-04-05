@@ -373,8 +373,16 @@ class DashboardAdapter :
             parts.add(item.flowId)
         }
         if (item.lastActivity.isNotEmpty()) {
-            parts.add(
-                "updated: ${formatTimestamp(item.lastActivity)}")
+            val ttlStr = formatTTL(
+                item.lastActivity, item.gracePeriodMs)
+            if (ttlStr != null) {
+                parts.add(
+                    "updated: ${formatTimestamp(item.lastActivity)}" +
+                    "  TTL: $ttlStr")
+            } else {
+                parts.add(
+                    "updated: ${formatTimestamp(item.lastActivity)}")
+            }
         }
         for ((k, v) in item.metadata.toSortedMap()) {
             parts.add("$k: $v")
@@ -829,6 +837,38 @@ class DashboardAdapter :
                 .ofPattern("yyyy-MM-dd HH:mm:ss"))
         } catch (_: Exception) {
             ts
+        }
+    }
+
+    /**
+     * Compute the remaining TTL for a flow given its last
+     * activity timestamp and the grace period. Returns a
+     * human-readable string (e.g. "12m30s") or null if the
+     * grace period is unknown.
+     */
+    private fun formatTTL(
+        lastActivity: String,
+        gracePeriodMs: Long
+    ): String? {
+        if (gracePeriodMs <= 0) return null
+        return try {
+            val instant = java.time.Instant.parse(lastActivity)
+            val expiresAt = instant.plusMillis(gracePeriodMs)
+            val remainingMs = expiresAt.toEpochMilli() -
+                System.currentTimeMillis()
+            if (remainingMs <= 0) return "expired"
+            val totalSec = remainingMs / 1000
+            val min = totalSec / 60
+            val sec = totalSec % 60
+            val base = if (min > 0) "${min}m${sec}s" else "${sec}s"
+            // Visual warning when TTL is running low.
+            when {
+                remainingMs < 60_000  -> "$base \u26a0"
+                remainingMs < 180_000 -> "$base \u23f2"
+                else                  -> base
+            }
+        } catch (_: Exception) {
+            null
         }
     }
 

@@ -394,6 +394,7 @@ func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
 
 	// Heartbeat publisher (Section 8.1 step 12).
 	hbPub := heartbeat.New(daemonID, cfg.Username, hostname,
+		cfg.Reaping.GracePeriod.Duration,
 		cfg.Heartbeat.Interval.Duration, logger)
 	opts = append(opts, daemon.WithSubsystem(hbPub))
 

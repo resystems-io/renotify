@@ -19,11 +19,12 @@ import (
 // Publish triggers an immediate out-of-cycle heartbeat for
 // on-change events (flow started/ended, workspace added/removed).
 type Publisher struct {
-	daemonID string
-	username string
-	hostname string
-	interval time.Duration
-	logger   *slog.Logger
+	daemonID    string
+	username    string
+	hostname    string
+	gracePeriod time.Duration
+	interval    time.Duration
+	logger      *slog.Logger
 
 	nc     *nats.Conn
 	cancel context.CancelFunc
@@ -33,16 +34,19 @@ type Publisher struct {
 }
 
 // New creates a heartbeat Publisher. Call Start to begin
-// publishing.
+// publishing. The gracePeriod is included in each heartbeat
+// so the mobile app can compute flow TTL locally.
 func New(daemonID, username, hostname string,
-	interval time.Duration, logger *slog.Logger) *Publisher {
+	gracePeriod, interval time.Duration,
+	logger *slog.Logger) *Publisher {
 	return &Publisher{
-		daemonID:   daemonID,
-		username:   username,
-		hostname:   hostname,
-		interval:   interval,
-		logger:     logger,
-		workspaces: []WorkspaceInfo{},
+		daemonID:    daemonID,
+		username:    username,
+		hostname:    hostname,
+		gracePeriod: gracePeriod,
+		interval:    interval,
+		logger:      logger,
+		workspaces:  []WorkspaceInfo{},
 	}
 }
 
@@ -115,11 +119,12 @@ func (p *Publisher) publish() {
 	p.mu.RUnlock()
 
 	hb := DaemonHeartbeat{
-		DaemonID:   p.daemonID,
-		Username:   p.username,
-		Hostname:   p.hostname,
-		Workspaces: ws,
-		Timestamp:  time.Now().UTC(),
+		DaemonID:    p.daemonID,
+		Username:    p.username,
+		Hostname:    p.hostname,
+		GracePeriod: p.gracePeriod.String(),
+		Workspaces:  ws,
+		Timestamp:   time.Now().UTC(),
 	}
 
 	data, err := json.Marshal(hb)

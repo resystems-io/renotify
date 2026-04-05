@@ -81,7 +81,7 @@ func openTestLedger(t *testing.T) *ledger.DB {
 func newTestHeartbeat(t *testing.T, nc *nats.Conn) *heartbeat.Publisher {
 	t.Helper()
 	hb := heartbeat.New(testDaemonID, testUsername, "test-host",
-		30*time.Second, slog.Default())
+		5*time.Minute, 30*time.Second, slog.Default())
 	ready := make(chan error, 1)
 	if err := hb.Start(t.Context(), nc, ready); err != nil {
 		t.Fatal(err)

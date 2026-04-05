@@ -58,6 +58,7 @@ data class ActiveFlowsResult(
             daemonId = firstFlow?.daemonId ?: "",
             username = "",
             hostname = "",
+            gracePeriodMs = 0,
             workspaces = workspaces,
             timestamp = firstFlow?.registeredAt ?: ""
         )
