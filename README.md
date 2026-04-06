@@ -89,22 +89,27 @@ Add to `~/.claude/settings.json`:
 
 ## CLI Commands
 
-| Command | Description |
-|:--------|:------------|
-| `daemon start` | Start the Renotify daemon |
-| `post` | Send a fire-and-forget notification |
-| `ask` | Send an interactive notification and wait |
-| `history` | Query notification history |
-| `pair` | Pair a mobile device via QR code |
-| `pairings` | List paired devices |
-| `revoke` | Revoke a device pairing |
-| `silent` | Toggle silent mode on a device |
-| `app apk extract` | Extract the embedded APK to disk |
-| `app apk serve` | Serve the APK over HTTP with QR code |
-| `mcp` | Run a stdio MCP gateway to the daemon |
-| `dispatch` | Claude Code hook handler (stdin/stdout) |
-| `config init` | Generate a default settings.json |
-| `config list` | Show all configuration parameters |
+| Command          | Description                                |
+|:-----------------|:-------------------------------------------|
+| `answer`         | Publish a response to a waiting ask        |
+| `app apk extract`| Extract the embedded APK to disk           |
+| `app apk serve`  | Serve the APK over HTTP with QR code       |
+| `ask`            | Send an interactive notification and wait  |
+| `config init`    | Generate a default settings.json           |
+| `config list`    | Show all configuration parameters          |
+| `daemon start`   | Start the Renotify daemon                  |
+| `dispatch`       | Claude Code hook handler (stdin/stdout)    |
+| `flow`           | Show details of a single active flow       |
+| `flows`          | List active flows                          |
+| `history`        | Query notification history                 |
+| `interject`      | Send a control signal to a running flow    |
+| `mcp`            | Run a stdio MCP gateway to the daemon      |
+| `pair`           | Pair a mobile device via QR code           |
+| `pairings`       | List paired devices                        |
+| `post`           | Send a fire-and-forget notification        |
+| `revoke`         | Revoke a device pairing                    |
+| `silent`         | Toggle silent mode on a device             |
+| `version`        | Print the build version                    |
 
 ## Architecture
 
