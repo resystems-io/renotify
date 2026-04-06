@@ -832,7 +832,7 @@ and how to generate one.
   APKs as same-origin updates, enabling impersonation attacks that bypass
   signature verification. This risk is acute if the project is
   open-sourced.
-* **Trace to Parent (A4):** [N-01][n-01], [R-SEC-03][r-sec-03]
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** Android Build System
 * **V&V Method (A2):** Inspection (verify keystore absent from repository
   and gitignored; verify unsigned APK produced when keystore missing)
