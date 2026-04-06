@@ -19,6 +19,9 @@ decisions back.
 
 ## Quick Start
 
+Build from source, start the daemon, pair your phone, and send
+your first notification in under five minutes.
+
 ```bash
 # Build everything (Android APK + CLI with embedded APK)
 make
@@ -41,6 +44,9 @@ renotify ask -t "Deploy to production?" -r boolean
 ```
 
 ## AI Agent Integration
+
+Renotify exposes an MCP server so AI agents can send notifications
+and request human decisions as part of their tool-use workflow.
 
 ### Claude Code (HTTP MCP)
 
@@ -89,6 +95,13 @@ Add to `~/.claude/settings.json`:
 
 ## CLI Commands
 
+The CLI provides tools and utilities for interacting with the notification flows
+directly from the CLI. This includes sending notifications, managing device
+pairings, and inspecting flow and history state. Additionally, this includes
+launching the daemon or MCP stdio bindings.
+
+Run `renotify <command> --help` for flags and usage details.
+
 | Command          | Description                                |
 |:-----------------|:-------------------------------------------|
 | `answer`         | Publish a response to a waiting ask        |
@@ -113,7 +126,7 @@ Add to `~/.claude/settings.json`:
 
 ## Architecture
 
-See [docs/renotify-architecture.md](docs/renotify-architecture.md)
+See [renotify architecture](docs/renotify-architecture.md)
 for system context, design principles, block diagrams, and
 sequence diagrams.
 
