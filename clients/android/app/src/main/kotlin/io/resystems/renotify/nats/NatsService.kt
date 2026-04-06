@@ -3,6 +3,7 @@ package io.resystems.renotify.nats
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -11,6 +12,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import io.resystems.renotify.MainActivity
 import io.resystems.renotify.dashboard.ActiveFlowsResult
 import io.resystems.renotify.dashboard.DaemonHeartbeat
 import io.resystems.renotify.dashboard.HistoryQueryResult
@@ -519,10 +521,21 @@ class NatsService : Service() {
                 "Error: ${state.message}"
         }
 
+        val launchIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val contentIntent = PendingIntent.getActivity(
+            this, 0, launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or
+                PendingIntent.FLAG_IMMUTABLE
+        )
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Renotify")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
+            .setContentIntent(contentIntent)
             .setOngoing(true)
             .setSilent(true)
             .build()

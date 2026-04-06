@@ -96,6 +96,31 @@ class DashboardAdapter :
     }
 
     /**
+     * Programmatically expand a specific flow (accordion).
+     * Triggers [onFlowExpanded] to fetch notifications.
+     * No-op if the flow is not in the current item list.
+     */
+    fun expandFlow(flowId: String) {
+        val pos = items.indexOfFirst {
+            it is DashboardItem.FlowItem && it.flowId == flowId
+        }
+        if (pos < 0) return
+
+        val prev = expandedFlowId
+        expandedFlowId = flowId
+        expandedNotificationId = null
+        onFlowExpanded?.invoke(flowId)
+
+        if (prev != null && prev != flowId) {
+            val prevPos = items.indexOfFirst {
+                it is DashboardItem.FlowItem && it.flowId == prev
+            }
+            if (prevPos >= 0) notifyItemChanged(prevPos)
+        }
+        notifyItemChanged(pos)
+    }
+
+    /**
      * Receive flow-scoped notification results from a
      * svc.history query. Updates badges and, if the flow is
      * currently expanded, renders the notification sub-list.
