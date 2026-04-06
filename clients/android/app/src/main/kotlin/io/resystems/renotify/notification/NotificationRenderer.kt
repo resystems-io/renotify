@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import io.resystems.renotify.MainActivity
 import androidx.core.app.RemoteInput
 
 /**
@@ -36,6 +37,7 @@ object NotificationRenderer {
     // Extras for carrying notification data to the app.
     const val EXTRA_ACTIONS_ARRAY = "actions_array"
     const val EXTRA_RESPONSE_TYPES = "response_types"
+    const val EXTRA_NAVIGATE_FLOW_ID = "navigate_flow_id"
 
     // Action types for PendingIntent discrimination.
     const val ACTION_TYPE_ACCEPTED = "accepted"
@@ -96,6 +98,18 @@ object NotificationRenderer {
                 builder.priority = NotificationCompat.PRIORITY_DEFAULT
             }
         }
+
+        // Tap body → open dashboard with originating flow expanded.
+        val navIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_NAVIGATE_FLOW_ID, payload.flowId)
+        }
+        builder.setContentIntent(PendingIntent.getActivity(
+            context, androidId, navIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or
+                PendingIntent.FLAG_IMMUTABLE
+        ))
 
         // Add action buttons based on response types.
         addActions(context, builder, payload, androidId)
