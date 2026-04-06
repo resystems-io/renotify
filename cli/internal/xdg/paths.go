@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package xdg resolves XDG Base Directory paths for Renotify.
 // See docs/analysis-configuration-schema.md Section 1.
 package xdg

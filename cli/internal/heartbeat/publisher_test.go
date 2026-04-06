@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 package heartbeat
 
 import (
@@ -47,8 +50,8 @@ func startTestServer(t *testing.T) *nats.Conn {
 }
 
 func TestSubject(t *testing.T) {
-	got := Subject("stewart", "dn_3G2K7V9WNFQ4J")
-	want := "resystems.renotify.stewart.daemon.dn_3G2K7V9WNFQ4J.heartbeat"
+	got := Subject("alice", "dn_3G2K7V9WNFQ4J")
+	want := "resystems.renotify.alice.daemon.dn_3G2K7V9WNFQ4J.heartbeat"
 	if got != want {
 		t.Errorf("Subject = %q, want %q", got, want)
 	}

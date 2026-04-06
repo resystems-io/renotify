@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package httpserver provides a shared loopback HTTP server for
 // the daemon. Subsystems register handlers on named paths (e.g.,
 // /mcp for MCP SSE, /dashboard for future UI). The server binds

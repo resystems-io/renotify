@@ -278,7 +278,7 @@ Generates a pairing QR code for the mobile app.
 **Success (`--format text`, default):**
 
 ```
-Pairing QR code for stewart@dev-laptop (wss://192.168.1.42:4223)
+Pairing QR code for alice@dev-laptop (wss://192.168.1.42:4223)
 
 █████████████████████████████████
 █████████████████████████████████

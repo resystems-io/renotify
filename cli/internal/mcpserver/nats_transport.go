@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // nats_transport.go implements mcp.Transport and mcp.Connection
 // backed by NATS Pub/Sub. This enables the daemon's mcp.Server
 // to serve stdio MCP sessions relayed via the `renotify mcp` CLI.

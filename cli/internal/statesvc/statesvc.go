@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package statesvc defines the wire types for the daemon's state
 // management NATS service endpoints (R-CLI-20). These types are
 // shared between the state subsystem (which serves the endpoints)

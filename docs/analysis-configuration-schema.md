@@ -299,7 +299,7 @@ username. All other values use compiled defaults.
 
 ```json
 {
-  "username": "stewart"
+  "username": "alice"
 }
 ```
 
@@ -307,7 +307,7 @@ With optional tuning:
 
 ```json
 {
-  "username": "stewart",
+  "username": "alice",
   "broker": {
     "wss_port": 9443
   },
@@ -328,7 +328,7 @@ connection details.
 
 ```json
 {
-  "username": "stewart",
+  "username": "alice",
   "broker": {
     "enabled": false
   },
@@ -347,7 +347,7 @@ use a `wss://` URL instead:
 
 ```json
 {
-  "username": "stewart",
+  "username": "alice",
   "broker": {
     "enabled": false
   },

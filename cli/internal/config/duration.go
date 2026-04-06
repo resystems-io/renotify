@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package config defines the unified daemon configuration schema.
 // See docs/analysis-configuration-schema.md.
 package config

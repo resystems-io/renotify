@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package mcpserver implements the MCP server that exposes
 // Renotify's capabilities to AI agents (C-06, C-11). Tools:
 // register_flow, refresh_flow, terminate_flow, post, ask,

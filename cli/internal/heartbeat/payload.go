@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package heartbeat publishes periodic DaemonHeartbeat messages
 // over Core NATS Pub/Sub. See
 // docs/analysis-payload-schemas.md (DaemonHeartbeat) and

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 package crockford
 
 import (
@@ -45,7 +48,10 @@ func TestEncodeBits_65Bits(t *testing.T) {
 	for i := range src {
 		src[i] = 0xFF
 	}
-	got := EncodeBits(src, 65)
+	got, err := EncodeBits(src, 65)
+	if err != nil {
+		t.Fatalf("EncodeBits(9 bytes, 65) error: %v", err)
+	}
 	if len(got) != 13 {
 		t.Errorf("EncodeBits(9 bytes, 65) length = %d, want 13", len(got))
 	}
@@ -60,7 +66,10 @@ func TestEncodeBits_65Bits(t *testing.T) {
 
 func TestEncodeBits_256Bits(t *testing.T) {
 	src := make([]byte, 32)
-	got := EncodeBits(src, 256)
+	got, err := EncodeBits(src, 256)
+	if err != nil {
+		t.Fatalf("EncodeBits(32 bytes, 256) error: %v", err)
+	}
 	if len(got) != 52 {
 		t.Errorf("EncodeBits(32 bytes, 256) length = %d, want 52", len(got))
 	}
@@ -70,19 +79,20 @@ func TestEncodeBits_TrailingZeroPad(t *testing.T) {
 	// 1 byte (8 bits), encode 8 bits → 2 chars.
 	// 0xFF = 11111111 → first 5 bits = 11111 = 31 = 'Z',
 	// next 3 bits = 111 + 00 pad = 11100 = 28 = 'W'.
-	got := EncodeBits([]byte{0xFF}, 8)
+	got, err := EncodeBits([]byte{0xFF}, 8)
+	if err != nil {
+		t.Fatalf("EncodeBits([0xFF], 8) error: %v", err)
+	}
 	if got != "ZW" {
 		t.Errorf("EncodeBits([0xFF], 8) = %q, want %q", got, "ZW")
 	}
 }
 
-func TestEncodeBits_PanicOnOverflow(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic for nBits > src*8")
-		}
-	}()
-	EncodeBits([]byte{0x00}, 9) // 1 byte = 8 bits, requesting 9
+func TestEncodeBits_ErrorOnOverflow(t *testing.T) {
+	_, err := EncodeBits([]byte{0x00}, 9) // 1 byte = 8 bits, requesting 9
+	if err == nil {
+		t.Error("expected error for nBits > src*8")
+	}
 }
 
 func TestDecode_KnownVectors(t *testing.T) {

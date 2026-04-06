@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package pairing orchestrates the `renotify pair` flow:
 // certificate generation, IP discovery, token creation, and
 // provisioning payload assembly. See

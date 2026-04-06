@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package ledger implements the daemon's persistent SQLite
 // database for notification history, active flows, lifecycle
 // events, and interjections. See docs/analysis-sqlite-ledger.md.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 package io.resystems.renotify.dashboard
 
 import org.junit.Assert.assertEquals
@@ -11,13 +14,13 @@ class DaemonHeartbeatTest {
         val json = """
             {
                 "daemon_id": "dn_3G2K7V9WNFQ4J",
-                "username": "stewart",
+                "username": "alice",
                 "hostname": "dev-laptop",
                 "workspaces": [
                     {
                         "workspace_id": "ws_5MBJR1HXNP3KQ8DW",
                         "display_name": "renotify",
-                        "abs_path": "/home/stewart/projects/renotify",
+                        "abs_path": "/home/alice/projects/renotify",
                         "active_flows": [
                             {"flow_id": "fl_FLOW01", "label": "Build"},
                             {"flow_id": "fl_FLOW02", "label": "Test", "metadata": {"branch": "main"}}
@@ -25,8 +28,8 @@ class DaemonHeartbeatTest {
                     },
                     {
                         "workspace_id": "ws_R7CV4WFQE2NM1KGX",
-                        "display_name": "gethos-api",
-                        "abs_path": "/home/stewart/projects/gethos-api",
+                        "display_name": "example-api",
+                        "abs_path": "/home/alice/projects/example-api",
                         "active_flows": []
                     }
                 ],
@@ -37,7 +40,7 @@ class DaemonHeartbeatTest {
         val hb = DaemonHeartbeat.fromJson(json)
 
         assertEquals("dn_3G2K7V9WNFQ4J", hb.daemonId)
-        assertEquals("stewart", hb.username)
+        assertEquals("alice", hb.username)
         assertEquals("dev-laptop", hb.hostname)
         assertEquals(2, hb.workspaces.size)
 
@@ -52,7 +55,7 @@ class DaemonHeartbeatTest {
             ws0.activeFlows[1].metadata["branch"])
 
         val ws1 = hb.workspaces[1]
-        assertEquals("gethos-api", ws1.displayName)
+        assertEquals("example-api", ws1.displayName)
         assertTrue(ws1.activeFlows.isEmpty())
     }
 

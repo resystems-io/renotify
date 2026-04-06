@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 package state
 
 import (
@@ -6,15 +9,15 @@ import (
 )
 
 func TestWorkspaceID_Deterministic(t *testing.T) {
-	id1 := WorkspaceID("dn_3G2K7V9WNFQ4J", "/home/stewart/projects/renotify")
-	id2 := WorkspaceID("dn_3G2K7V9WNFQ4J", "/home/stewart/projects/renotify")
+	id1 := WorkspaceID("dn_3G2K7V9WNFQ4J", "/home/alice/projects/renotify")
+	id2 := WorkspaceID("dn_3G2K7V9WNFQ4J", "/home/alice/projects/renotify")
 	if id1 != id2 {
 		t.Errorf("same inputs produced different IDs: %q vs %q", id1, id2)
 	}
 }
 
 func TestWorkspaceID_Format(t *testing.T) {
-	id := WorkspaceID("dn_3G2K7V9WNFQ4J", "/home/stewart/projects/renotify")
+	id := WorkspaceID("dn_3G2K7V9WNFQ4J", "/home/alice/projects/renotify")
 	if !strings.HasPrefix(id, "ws_") {
 		t.Errorf("workspace ID should start with ws_, got %q", id)
 	}
@@ -30,13 +33,13 @@ func TestWorkspaceID_Format(t *testing.T) {
 }
 
 func TestWorkspaceID_DifferentInputs(t *testing.T) {
-	id1 := WorkspaceID("dn_3G2K7V9WNFQ4J", "/home/stewart/projects/renotify")
-	id2 := WorkspaceID("dn_3G2K7V9WNFQ4J", "/home/stewart/projects/other")
+	id1 := WorkspaceID("dn_3G2K7V9WNFQ4J", "/home/alice/projects/renotify")
+	id2 := WorkspaceID("dn_3G2K7V9WNFQ4J", "/home/alice/projects/other")
 	if id1 == id2 {
 		t.Error("different paths should produce different IDs")
 	}
 
-	id3 := WorkspaceID("dn_DIFFERENT0001", "/home/stewart/projects/renotify")
+	id3 := WorkspaceID("dn_DIFFERENT0001", "/home/alice/projects/renotify")
 	if id1 == id3 {
 		t.Error("different daemon IDs should produce different IDs")
 	}
@@ -47,7 +50,7 @@ func TestDisplayName(t *testing.T) {
 		path string
 		want string
 	}{
-		{"/home/stewart/projects/renotify", "renotify"},
+		{"/home/alice/projects/renotify", "renotify"},
 		{"/opt/builds/my-project", "my-project"},
 		{"/", "/"},
 	}

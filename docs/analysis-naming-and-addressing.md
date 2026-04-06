@@ -42,9 +42,9 @@ NATS Broker
 ```
 
 **Concrete example:** A shared enterprise NATS broker serves two developers.
-Developer `stewart` runs a daemon on both a workstation (`dn_ws01`) and a CI
+Developer `alice` runs a daemon on both a workstation (`dn_ws01`) and a CI
 server (`dn_ci01`). The workstation daemon manages two workspaces (`renotify`
-and `gethos-api`), each with multiple concurrent flows (a build pipeline, an AI
+and `example-api`), each with multiple concurrent flows (a build pipeline, an AI
 agent conversation, etc.). Developer `alice` runs a single daemon with her own
 set of workspaces and flows.
 
@@ -71,7 +71,7 @@ single-machine) or shared across an organisation.
 
 A human developer authenticated to the NATS broker.
 
-* **Identifier:** `username` — a short alphanumeric string (e.g., `stewart`).
+* **Identifier:** `username` — a short alphanumeric string (e.g., `alice`).
 * **Uniqueness scope:** Per NATS broker. Enforced by NATS auth configuration.
   Two users on the same broker cannot share a username.
 * **Generation:** Configured during daemon setup. Corresponds to the NATS auth
@@ -114,9 +114,9 @@ collide across users, machines, and even across daemons on the same machine
 * **Uniqueness scope:** Global. Because `daemon_id` is globally unique and the
   absolute path is unique per filesystem, the composite hash is globally unique.
 * **Examples:**
-  * `stewart`'s laptop daemon `dn_3G2K7V9WNFQ4J` with path
-    `/home/stewart/projects/renotify` → `ws_5MBJR1HXNP3KQ8DW`
-  * `stewart`'s CI daemon `dn_9F4HN2TCRWK6Y` with path `/opt/builds/renotify` →
+  * `alice`'s laptop daemon `dn_3G2K7V9WNFQ4J` with path
+    `/home/alice/projects/renotify` → `ws_5MBJR1HXNP3KQ8DW`
+  * `alice`'s CI daemon `dn_9F4HN2TCRWK6Y` with path `/opt/builds/renotify` →
     `ws_R7CV4WFQE2NM1KGX` (different ID, same display name)
 * **Generation:** Deterministic — the same daemon + path always
   produces the same ID. See "Workspace Discovery" below for how
@@ -279,8 +279,8 @@ resystems.renotify.{username}.svc.history                  HistoryQueryRequest /
 ### 4.4 Benefits Over Current Design
 
 1. **Shorter, flatter subjects.**
-   `resystems.renotify.stewart.flow.fl_0R3FABM6NQKJ71XWCD4PG9V2HE.request` vs
-   `resystems.renotify.user.stewart.workspace.renotify.session.ses_deploy_9c2b.request`.
+   `resystems.renotify.alice.flow.fl_0R3FABM6NQKJ71XWCD4PG9V2HE.request` vs
+   `resystems.renotify.user.alice.workspace.renotify.session.ses_deploy_9c2b.request`.
    The flow ID is longer (29 chars with prefix) but the subject has fewer
    segments and no collision-prone workspace name.
 2. **No workspace name collisions.** Workspace identity is in the payload, not
@@ -323,19 +323,19 @@ type DaemonHeartbeat struct {
 ```json
 {
   "daemon_id": "dn_3G2K7V9WNFQ4J",
-  "username": "stewart",
+  "username": "alice",
   "hostname": "dev-laptop",
   "workspaces": [
     {
       "workspace_id": "ws_5MBJR1HXNP3KQ8DW",
       "display_name": "renotify",
-      "abs_path": "/home/stewart/projects/renotify",
+      "abs_path": "/home/alice/projects/renotify",
       "active_flows": ["fl_0R3FABM6NQKJ71XWCD4PG9V2HE", "fl_0R3FABM7TP2XE89YWCGKN4QJ5V"]
     },
     {
       "workspace_id": "ws_R7CV4WFQE2NM1KGX",
-      "display_name": "gethos-api",
-      "abs_path": "/home/stewart/projects/gethos-api",
+      "display_name": "example-api",
+      "abs_path": "/home/alice/projects/example-api",
       "active_flows": []
     }
   ],

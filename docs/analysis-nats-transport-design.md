@@ -435,7 +435,7 @@ auth):
   `resystems.renotify.{username}.>` (see Section 7).
 
 The `{username}` in the ACL subject patterns is the daemon
-operator's identity (e.g., `stewart` from `config.Username`), not
+operator's identity (e.g., `alice` from `config.Username`), not
 the NATS authentication username. On the embedded broker, the ACL
 is baked at server startup from the daemon's configured username.
 On a shared broker, the operator is responsible for creating

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package daemon implements the daemon controller that
 // orchestrates the NATS broker, HTTP server, MCP server, and
 // future subsystems.

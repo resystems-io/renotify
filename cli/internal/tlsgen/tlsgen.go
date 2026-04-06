@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package tlsgen generates self-signed TLS certificates for the
 // Renotify daemon's WSS listener. See
 // docs/analysis-nats-transport-design.md Section 5.

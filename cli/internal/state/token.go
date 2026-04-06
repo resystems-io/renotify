@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 package state
 
 import (
@@ -19,7 +22,11 @@ func LoadOrGenerateToken(path string) (string, error) {
 		if _, err := rand.Read(b); err != nil {
 			return "", fmt.Errorf("generate token: %w", err)
 		}
-		return "rn_tk_" + crockford.EncodeBits(b, 256), nil
+		enc, err := crockford.EncodeBits(b, 256)
+		if err != nil {
+			return "", fmt.Errorf("generate token: %w", err)
+		}
+		return "rn_tk_" + enc, nil
 	})
 }
 
@@ -31,7 +38,11 @@ func GenerateToken(path string) (string, error) {
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("generate token: %w", err)
 	}
-	tok := "rn_tk_" + crockford.EncodeBits(b, 256)
+	enc, err := crockford.EncodeBits(b, 256)
+	if err != nil {
+		return "", fmt.Errorf("generate token: %w", err)
+	}
+	tok := "rn_tk_" + enc
 	if err := writeAtomic(path, tok); err != nil {
 		return "", err
 	}

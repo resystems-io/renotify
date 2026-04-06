@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package broker manages NATS connectivity for the daemon: the
 // embedded server, auth configuration, and client connections.
 package broker

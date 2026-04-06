@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package netutil provides network discovery utilities for the
 // Renotify daemon. See docs/analysis-nats-transport-design.md
 // Section 5.1 (SANs) and Section 8.3 (IP discovery).

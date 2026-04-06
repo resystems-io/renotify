@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 package state
 
 import (
@@ -13,7 +16,8 @@ import (
 // See docs/analysis-naming-and-addressing.md Section 2.5.
 func GenerateFlowID() string {
 	id := uuid.Must(uuid.NewV7())
-	return "fl_" + crockford.EncodeBits(id[:], 128)
+	enc, _ := crockford.EncodeBits(id[:], 128) // cannot fail: 128 == 16*8
+	return "fl_" + enc
 }
 
 // GenerateNotificationID creates a globally unique notification
@@ -23,5 +27,6 @@ func GenerateFlowID() string {
 // See docs/analysis-naming-and-addressing.md Section 3.
 func GenerateNotificationID() string {
 	id := uuid.Must(uuid.NewV7())
-	return "ntf_" + crockford.EncodeBits(id[:], 80)
+	enc, _ := crockford.EncodeBits(id[:], 80) // cannot fail: 80 < 128
+	return "ntf_" + enc
 }

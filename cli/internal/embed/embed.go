@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package apkembed provides the embedded Android APK artefact.
 // The dist/ directory is embedded at build time via go:embed.
 //

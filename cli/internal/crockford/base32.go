@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package crockford implements Crockford Base32 encoding and
 // decoding. The alphabet excludes I, L, O, U to avoid visual
 // ambiguity. See https://www.crockford.com/base32.html.
@@ -13,18 +16,19 @@ const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 // Encode encodes all bytes in src as a Crockford Base32 string.
 // The output length is ceil(len(src)*8/5).
 func Encode(src []byte) string {
-	return EncodeBits(src, len(src)*8)
+	s, _ := EncodeBits(src, len(src)*8) // cannot fail: nBits == len*8
+	return s
 }
 
 // EncodeBits encodes exactly nBits from src into Crockford
-// Base32. Panics if nBits > len(src)*8. Bits beyond nBits in
-// the final group are zero-padded.
-func EncodeBits(src []byte, nBits int) string {
+// Base32. Returns an error if nBits > len(src)*8. Bits beyond
+// nBits in the final group are zero-padded.
+func EncodeBits(src []byte, nBits int) (string, error) {
 	if nBits > len(src)*8 {
-		panic(fmt.Sprintf("crockford: nBits %d exceeds source length %d bytes", nBits, len(src)))
+		return "", fmt.Errorf("crockford: nBits %d exceeds source length %d bytes", nBits, len(src))
 	}
 	if nBits == 0 {
-		return ""
+		return "", nil
 	}
 
 	nChars := (nBits + 4) / 5 // ceil(nBits / 5)
@@ -34,7 +38,7 @@ func EncodeBits(src []byte, nBits int) string {
 		val := extractBits(src, i*5, nBits)
 		buf[i] = alphabet[val]
 	}
-	return string(buf)
+	return string(buf), nil
 }
 
 // extractBits reads up to 5 bits from src starting at the given

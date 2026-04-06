@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 package command
 
 import (
@@ -58,7 +61,8 @@ documentation for future session state persistence notes.`,
 // Format: ms_ + 26 Crockford Base32 chars (128-bit UUIDv7).
 func generateSessionID() string {
 	id := uuid.Must(uuid.NewV7())
-	return "ms_" + crockford.EncodeBits(id[:], 128)
+	enc, _ := crockford.EncodeBits(id[:], 128) // cannot fail: 128 == 16*8
+	return "ms_" + enc
 }
 
 func runMCP(app *App) error {

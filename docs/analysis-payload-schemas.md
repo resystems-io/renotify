@@ -372,7 +372,7 @@ type RegisterFlowRequest struct {
 ```
 
 - `workspace_path` (required) — the absolute filesystem path of
-  the workspace directory (e.g., `/home/stewart/projects/renotify`).
+  the workspace directory (e.g., `/home/alice/projects/renotify`).
   The daemon computes `workspace_id` from
   `SHA-256(daemon_id + "|" + workspace_path)` and derives
   `display_name` from the directory basename. New workspaces are
@@ -405,7 +405,7 @@ correlation) but is not required for subsequent tool calls.
 
 ```json
 {
-  "workspace_path": "/home/stewart/projects/renotify",
+  "workspace_path": "/home/alice/projects/renotify",
   "label": "Production Deploy",
   "metadata": {
     "branch": "main",
@@ -949,19 +949,19 @@ type DaemonHeartbeat struct {
 ```json
 {
   "daemon_id": "dn_3G2K7V9WNFQ4J",
-  "username": "stewart",
+  "username": "alice",
   "hostname": "dev-laptop",
   "workspaces": [
     {
       "workspace_id": "ws_5MBJR1HXNP3KQ8DW",
       "display_name": "renotify",
-      "abs_path": "/home/stewart/projects/renotify",
+      "abs_path": "/home/alice/projects/renotify",
       "active_flows": ["fl_0R3FABM6NQKJ71XWCD4PG9V2HE", "fl_0R3FABM7TP2XE89YWCGKN4QJ5V"]
     },
     {
       "workspace_id": "ws_R7CV4WFQE2NM1KGX",
-      "display_name": "gethos-api",
-      "abs_path": "/home/stewart/projects/gethos-api",
+      "display_name": "example-api",
+      "abs_path": "/home/alice/projects/example-api",
       "active_flows": []
     }
   ],

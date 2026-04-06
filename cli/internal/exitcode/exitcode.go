@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package exitcode defines the CLI exit code constants and an error
 // type that maps domain errors to exit codes. See
 // docs/analysis-cli-contract.md Section 1.

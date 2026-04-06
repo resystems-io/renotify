@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 package state
 
 import (
@@ -15,7 +18,11 @@ func GenerateDeviceID() (string, error) {
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("generate device_id: %w", err)
 	}
-	return "mb_" + crockford.EncodeBits(b, 65), nil
+	enc, err := crockford.EncodeBits(b, 65)
+	if err != nil {
+		return "", fmt.Errorf("generate device_id: %w", err)
+	}
+	return "mb_" + enc, nil
 }
 
 // GenerateDeviceToken generates a new per-device auth token
@@ -25,5 +32,9 @@ func GenerateDeviceToken() (string, error) {
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("generate device token: %w", err)
 	}
-	return "rn_tk_" + crockford.EncodeBits(b, 256), nil
+	enc, err := crockford.EncodeBits(b, 256)
+	if err != nil {
+		return "", fmt.Errorf("generate device token: %w", err)
+	}
+	return "rn_tk_" + enc, nil
 }

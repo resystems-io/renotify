@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package payload defines the shared domain types serialised
 // to/from NATS messages. These are the wire-format types used
 // across CLI commands, the daemon, MCP server, and the Android

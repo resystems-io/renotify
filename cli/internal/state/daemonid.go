@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package state manages persistent daemon state files under
 // $XDG_STATE_HOME/renotify/. See docs/analysis-configuration-schema.md
 // Section 1.
@@ -23,7 +26,11 @@ func LoadOrGenerateDaemonID(path string) (string, error) {
 		if _, err := rand.Read(b); err != nil {
 			return "", fmt.Errorf("generate daemon_id: %w", err)
 		}
-		return "dn_" + crockford.EncodeBits(b, 65), nil
+		enc, err := crockford.EncodeBits(b, 65)
+		if err != nil {
+			return "", fmt.Errorf("generate daemon_id: %w", err)
+		}
+		return "dn_" + enc, nil
 	})
 }
 

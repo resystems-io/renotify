@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 package state
 
 import (
@@ -134,7 +137,7 @@ func TestDevices_MigrateFromSingleToken(t *testing.T) {
 	devicesPath := filepath.Join(dir, "devices.json")
 
 	os.WriteFile(tokenPath, []byte("rn_tk_LEGACY\n"), 0600)
-	os.WriteFile(usernamePath, []byte("stewart\n"), 0600)
+	os.WriteFile(usernamePath, []byte("alice\n"), 0600)
 
 	if err := MigrateFromSingleToken(
 		tokenPath, usernamePath, devicesPath,

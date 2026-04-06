@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 // Package command defines the Cobra command tree for the Renotify
 // CLI. Each subcommand is a separate file; this file creates the
 // root command and wires them together.

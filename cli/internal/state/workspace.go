@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Stewart Gebbie and Resystems IO
+
 package state
 
 import (
@@ -18,7 +21,8 @@ import (
 // See docs/analysis-naming-and-addressing.md Section 2.4.
 func WorkspaceID(daemonID, absPath string) string {
 	h := sha256.Sum256([]byte(daemonID + "|" + absPath))
-	return "ws_" + crockford.EncodeBits(h[:], 80)
+	enc, _ := crockford.EncodeBits(h[:], 80) // cannot fail: 80 < 256
+	return "ws_" + enc
 }
 
 // DisplayName returns a human-readable workspace name derived
