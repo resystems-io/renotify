@@ -7,7 +7,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/broker"
+	"go.resystems.io/renotify/cli/internal/broker"
 )
 
 // sessionIDPayload is the JSON envelope for stdio MCP session

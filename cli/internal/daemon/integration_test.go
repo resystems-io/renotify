@@ -19,14 +19,14 @@ import (
 	"github.com/nats-io/nats.go"
 	natsjs "github.com/nats-io/nats.go/jetstream"
 
-	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/config"
-	"go.resystems.io/renotify/internal/heartbeat"
-	"go.resystems.io/renotify/internal/httpserver"
-	"go.resystems.io/renotify/internal/ledger"
-	"go.resystems.io/renotify/internal/mcpserver"
-	"go.resystems.io/renotify/internal/registry"
-	"go.resystems.io/renotify/internal/testutil"
+	"go.resystems.io/renotify/cli/internal/broker"
+	"go.resystems.io/renotify/cli/internal/config"
+	"go.resystems.io/renotify/cli/internal/heartbeat"
+	"go.resystems.io/renotify/cli/internal/httpserver"
+	"go.resystems.io/renotify/cli/internal/ledger"
+	"go.resystems.io/renotify/cli/internal/mcpserver"
+	"go.resystems.io/renotify/cli/internal/registry"
+	"go.resystems.io/renotify/cli/internal/testutil"
 )
 
 func integrationLogger() *slog.Logger {

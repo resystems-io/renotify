@@ -5,9 +5,9 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/ledger"
-	"go.resystems.io/renotify/internal/statesvc"
+	"go.resystems.io/renotify/cli/internal/broker"
+	"go.resystems.io/renotify/cli/internal/ledger"
+	"go.resystems.io/renotify/cli/internal/statesvc"
 )
 
 // subscribeFlowsEndpoint subscribes to the svc.flows subject

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"go.resystems.io/renotify/internal/httpserver"
+	"go.resystems.io/renotify/cli/internal/httpserver"
 )
 
 func testLogger() *slog.Logger {

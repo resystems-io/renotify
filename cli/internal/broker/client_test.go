@@ -3,7 +3,7 @@ package broker
 import (
 	"testing"
 
-	"go.resystems.io/renotify/internal/config"
+	"go.resystems.io/renotify/cli/internal/config"
 )
 
 // These tests verify that ConnectShared constructs correct options

@@ -10,7 +10,7 @@ import (
 
 	"github.com/nats-io/nats-server/v2/server"
 
-	"go.resystems.io/renotify/internal/state"
+	"go.resystems.io/renotify/cli/internal/state"
 )
 
 // readyTimeout is how long Start waits for the embedded NATS

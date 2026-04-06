@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.resystems.io/renotify/internal/state"
+	"go.resystems.io/renotify/cli/internal/state"
 )
 
 func testConfig(t *testing.T) Config {

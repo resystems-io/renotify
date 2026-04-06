@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/exitcode"
-	"go.resystems.io/renotify/internal/state"
-	"go.resystems.io/renotify/internal/xdg"
+	"go.resystems.io/renotify/cli/internal/broker"
+	"go.resystems.io/renotify/cli/internal/exitcode"
+	"go.resystems.io/renotify/cli/internal/state"
+	"go.resystems.io/renotify/cli/internal/xdg"
 )
 
 // deviceControl is the control message published to a device's

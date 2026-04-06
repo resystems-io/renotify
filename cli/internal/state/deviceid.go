@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 
-	"go.resystems.io/renotify/internal/crockford"
+	"go.resystems.io/renotify/cli/internal/crockford"
 )
 
 // GenerateDeviceID generates a new device_id: mb_ + 13

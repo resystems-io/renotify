@@ -5,7 +5,7 @@ import (
 	"os/user"
 	"time"
 
-	"go.resystems.io/renotify/internal/xdg"
+	"go.resystems.io/renotify/cli/internal/xdg"
 )
 
 // Config is the top-level daemon configuration. All fields have

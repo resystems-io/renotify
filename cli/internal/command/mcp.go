@@ -11,8 +11,8 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 
-	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/crockford"
+	"go.resystems.io/renotify/cli/internal/broker"
+	"go.resystems.io/renotify/cli/internal/crockford"
 
 	"github.com/google/uuid"
 )

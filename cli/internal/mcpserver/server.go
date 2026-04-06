@@ -14,8 +14,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/config"
-	"go.resystems.io/renotify/internal/httpserver"
+	"go.resystems.io/renotify/cli/internal/config"
+	"go.resystems.io/renotify/cli/internal/httpserver"
 )
 
 // Server is the MCP server implementing daemon.Subsystem.

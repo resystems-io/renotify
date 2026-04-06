@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"go.resystems.io/renotify/internal/payload"
+	"go.resystems.io/renotify/cli/internal/payload"
 )
 
 // RegisterFlow inserts a new active flow and its initial lifecycle

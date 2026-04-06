@@ -13,9 +13,9 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/config"
-	"go.resystems.io/renotify/internal/heartbeat"
-	"go.resystems.io/renotify/internal/ledger"
+	"go.resystems.io/renotify/cli/internal/config"
+	"go.resystems.io/renotify/cli/internal/heartbeat"
+	"go.resystems.io/renotify/cli/internal/ledger"
 )
 
 // Service is a daemon.Subsystem that manages the active flow

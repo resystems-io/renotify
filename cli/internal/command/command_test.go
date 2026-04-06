@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	apkembed "go.resystems.io/renotify/internal/embed"
-	"go.resystems.io/renotify/internal/xdg"
+	apkembed "go.resystems.io/renotify/cli/internal/embed"
+	"go.resystems.io/renotify/cli/internal/xdg"
 )
 
 // executeCommand runs the root command with the given args and

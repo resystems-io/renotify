@@ -10,7 +10,7 @@ package statesvc
 import (
 	"time"
 
-	"go.resystems.io/renotify/internal/payload"
+	"go.resystems.io/renotify/cli/internal/payload"
 )
 
 // --- Flow query (existing svc.flows) ---

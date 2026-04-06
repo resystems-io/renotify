@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go.resystems.io/renotify/internal/crockford"
+	"go.resystems.io/renotify/cli/internal/crockford"
 )
 
 // LoadOrGenerateDaemonID reads the daemon_id from path. If the

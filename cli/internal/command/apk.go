@@ -14,8 +14,8 @@ import (
 	"github.com/mdp/qrterminal/v3"
 	"github.com/spf13/cobra"
 
-	apkembed "go.resystems.io/renotify/internal/embed"
-	"go.resystems.io/renotify/internal/netutil"
+	apkembed "go.resystems.io/renotify/cli/internal/embed"
+	"go.resystems.io/renotify/cli/internal/netutil"
 )
 
 func newAPKCmd(app *App) *cobra.Command {

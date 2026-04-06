@@ -10,8 +10,8 @@ import (
 	"github.com/nats-io/nats.go"
 	natsjs "github.com/nats-io/nats.go/jetstream"
 
-	"go.resystems.io/renotify/internal/config"
-	"go.resystems.io/renotify/internal/state"
+	"go.resystems.io/renotify/cli/internal/config"
+	"go.resystems.io/renotify/cli/internal/state"
 )
 
 // StreamName is the single JetStream stream used by Renotify.

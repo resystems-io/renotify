@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"path"
 
-	"go.resystems.io/renotify/internal/crockford"
+	"go.resystems.io/renotify/cli/internal/crockford"
 )
 
 // WorkspaceID computes a deterministic workspace identifier from

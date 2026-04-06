@@ -10,7 +10,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/config"
+	"go.resystems.io/renotify/cli/internal/config"
 )
 
 func testLogger() *slog.Logger {

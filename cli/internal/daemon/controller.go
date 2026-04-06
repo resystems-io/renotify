@@ -9,10 +9,10 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/config"
-	"go.resystems.io/renotify/internal/state"
-	"go.resystems.io/renotify/internal/xdg"
+	"go.resystems.io/renotify/cli/internal/broker"
+	"go.resystems.io/renotify/cli/internal/config"
+	"go.resystems.io/renotify/cli/internal/state"
+	"go.resystems.io/renotify/cli/internal/xdg"
 )
 
 const defaultStartupTimeout = 10 * time.Second

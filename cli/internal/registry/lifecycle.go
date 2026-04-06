@@ -9,9 +9,9 @@ import (
 	"github.com/nats-io/nats.go"
 	natsjs "github.com/nats-io/nats.go/jetstream"
 
-	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/ledger"
-	"go.resystems.io/renotify/internal/payload"
+	"go.resystems.io/renotify/cli/internal/broker"
+	"go.resystems.io/renotify/cli/internal/ledger"
+	"go.resystems.io/renotify/cli/internal/payload"
 )
 
 // startLifecycleConsumer binds to the daemon-lifecycle JetStream

@@ -7,7 +7,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"go.resystems.io/renotify/internal/payload"
+	"go.resystems.io/renotify/cli/internal/payload"
 )
 
 // flowInterjections holds the accumulated interjections and

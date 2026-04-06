@@ -11,10 +11,10 @@ import (
 	natsserver "github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/config"
-	"go.resystems.io/renotify/internal/httpserver"
-	"go.resystems.io/renotify/internal/mcpserver"
+	"go.resystems.io/renotify/cli/internal/broker"
+	"go.resystems.io/renotify/cli/internal/config"
+	"go.resystems.io/renotify/cli/internal/httpserver"
+	"go.resystems.io/renotify/cli/internal/mcpserver"
 )
 
 func discardLogger() *slog.Logger {

@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"go.resystems.io/renotify/internal/config"
-	"go.resystems.io/renotify/internal/exitcode"
-	"go.resystems.io/renotify/internal/xdg"
+	"go.resystems.io/renotify/cli/internal/config"
+	"go.resystems.io/renotify/cli/internal/exitcode"
+	"go.resystems.io/renotify/cli/internal/xdg"
 )
 
 func newConfigCmd(app *App) *cobra.Command {

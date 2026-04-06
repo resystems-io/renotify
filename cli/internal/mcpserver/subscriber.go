@@ -9,8 +9,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/payload"
+	"go.resystems.io/renotify/cli/internal/broker"
+	"go.resystems.io/renotify/cli/internal/payload"
 )
 
 // SubscriberMap tracks active response subscriber goroutines,

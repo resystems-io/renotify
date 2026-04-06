@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/exitcode"
-	"go.resystems.io/renotify/internal/payload"
+	"go.resystems.io/renotify/cli/internal/broker"
+	"go.resystems.io/renotify/cli/internal/exitcode"
+	"go.resystems.io/renotify/cli/internal/payload"
 )
 
 func newInterjectCmd(app *App) *cobra.Command {

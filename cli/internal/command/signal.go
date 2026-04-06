@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"go.resystems.io/renotify/internal/xdg"
+	"go.resystems.io/renotify/cli/internal/xdg"
 )
 
 // signalDaemonResult describes the outcome of signalling the

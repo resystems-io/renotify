@@ -1,4 +1,4 @@
-module go.resystems.io/renotify
+module go.resystems.io/renotify/cli
 
 go 1.25.0
 

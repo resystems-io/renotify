@@ -8,8 +8,8 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/payload"
-	"go.resystems.io/renotify/internal/testutil"
+	"go.resystems.io/renotify/cli/internal/payload"
+	"go.resystems.io/renotify/cli/internal/testutil"
 )
 
 func TestInterject_Stop(t *testing.T) {

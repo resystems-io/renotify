@@ -10,8 +10,8 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/config"
-	"go.resystems.io/renotify/internal/xdg"
+	"go.resystems.io/renotify/cli/internal/config"
+	"go.resystems.io/renotify/cli/internal/xdg"
 )
 
 // ConnectEmbedded connects a NATS client to the embedded server

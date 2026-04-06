@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"go.resystems.io/renotify/internal/crockford"
+	"go.resystems.io/renotify/cli/internal/crockford"
 )
 
 // LoadOrGenerateToken reads an auth token from path. If the file

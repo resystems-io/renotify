@@ -3,8 +3,8 @@ package registry
 import (
 	"sort"
 
-	"go.resystems.io/renotify/internal/heartbeat"
-	"go.resystems.io/renotify/internal/ledger"
+	"go.resystems.io/renotify/cli/internal/heartbeat"
+	"go.resystems.io/renotify/cli/internal/ledger"
 )
 
 // rebuildWorkspaceSnapshot queries all active flows, groups them

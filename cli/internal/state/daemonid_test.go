@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.resystems.io/renotify/internal/crockford"
+	"go.resystems.io/renotify/cli/internal/crockford"
 )
 
 func TestLoadOrGenerateDaemonID_GeneratesOnMissing(t *testing.T) {

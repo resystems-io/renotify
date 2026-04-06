@@ -10,7 +10,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/state"
+	"go.resystems.io/renotify/cli/internal/state"
 )
 
 func TestSilent_RequiresArg(t *testing.T) {

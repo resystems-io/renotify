@@ -9,9 +9,9 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 
-	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/exitcode"
-	"go.resystems.io/renotify/internal/statesvc"
+	"go.resystems.io/renotify/cli/internal/broker"
+	"go.resystems.io/renotify/cli/internal/exitcode"
+	"go.resystems.io/renotify/cli/internal/statesvc"
 )
 
 func newFlowsCmd(app *App) *cobra.Command {

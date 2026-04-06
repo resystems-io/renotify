@@ -8,8 +8,8 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/exitcode"
-	"go.resystems.io/renotify/internal/payload"
+	"go.resystems.io/renotify/cli/internal/exitcode"
+	"go.resystems.io/renotify/cli/internal/payload"
 )
 
 func TestAsk_ResponseBoolean(t *testing.T) {

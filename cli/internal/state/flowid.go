@@ -3,7 +3,7 @@ package state
 import (
 	"github.com/google/uuid"
 
-	"go.resystems.io/renotify/internal/crockford"
+	"go.resystems.io/renotify/cli/internal/crockford"
 )
 
 // GenerateFlowID creates a globally unique flow identifier.

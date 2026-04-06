@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.resystems.io/renotify/internal/netutil"
+	"go.resystems.io/renotify/cli/internal/netutil"
 )
 
 func integrationConfig(t *testing.T) Config {

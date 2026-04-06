@@ -8,7 +8,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/statesvc"
+	"go.resystems.io/renotify/cli/internal/statesvc"
 )
 
 func TestFlow_RequiresArg(t *testing.T) {

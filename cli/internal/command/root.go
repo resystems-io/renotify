@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"go.resystems.io/renotify/internal/config"
-	"go.resystems.io/renotify/internal/exitcode"
+	"go.resystems.io/renotify/cli/internal/config"
+	"go.resystems.io/renotify/cli/internal/exitcode"
 )
 
 // App holds shared state that is initialised by the root command's

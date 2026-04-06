@@ -14,7 +14,7 @@ import (
 	nats_test "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/testutil"
+	"go.resystems.io/renotify/cli/internal/testutil"
 )
 
 func TestPost_Integration(t *testing.T) {

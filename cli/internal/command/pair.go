@@ -9,10 +9,10 @@ import (
 
 	qrterminal "github.com/mdp/qrterminal/v3"
 
-	"go.resystems.io/renotify/internal/exitcode"
-	"go.resystems.io/renotify/internal/netutil"
-	"go.resystems.io/renotify/internal/pairing"
-	"go.resystems.io/renotify/internal/xdg"
+	"go.resystems.io/renotify/cli/internal/exitcode"
+	"go.resystems.io/renotify/cli/internal/netutil"
+	"go.resystems.io/renotify/cli/internal/pairing"
+	"go.resystems.io/renotify/cli/internal/xdg"
 )
 
 func newPairCmd(app *App) *cobra.Command {

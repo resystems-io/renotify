@@ -8,9 +8,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/payload"
-	"go.resystems.io/renotify/internal/state"
+	"go.resystems.io/renotify/cli/internal/broker"
+	"go.resystems.io/renotify/cli/internal/payload"
+	"go.resystems.io/renotify/cli/internal/state"
 )
 
 // --- register_flow ---

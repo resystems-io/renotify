@@ -9,7 +9,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
 
-	"go.resystems.io/renotify/internal/xdg"
+	"go.resystems.io/renotify/cli/internal/xdg"
 )
 
 // Load reads configuration from the settings.json file (if it

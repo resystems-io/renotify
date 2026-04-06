@@ -10,9 +10,9 @@ import (
 	"net"
 	"time"
 
-	"go.resystems.io/renotify/internal/netutil"
-	"go.resystems.io/renotify/internal/state"
-	"go.resystems.io/renotify/internal/tlsgen"
+	"go.resystems.io/renotify/cli/internal/netutil"
+	"go.resystems.io/renotify/cli/internal/state"
+	"go.resystems.io/renotify/cli/internal/tlsgen"
 )
 
 // Config holds all inputs for the pairing flow.

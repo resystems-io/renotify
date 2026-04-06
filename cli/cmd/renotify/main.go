@@ -1,6 +1,6 @@
 package main
 
-import "go.resystems.io/renotify/internal/command"
+import "go.resystems.io/renotify/cli/internal/command"
 
 func main() {
 	command.Execute()

@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.resystems.io/renotify/internal/state"
-	"go.resystems.io/renotify/internal/tlsgen"
+	"go.resystems.io/renotify/cli/internal/state"
+	"go.resystems.io/renotify/cli/internal/tlsgen"
 )
 
 func TestNewEmbeddedServer_TCPOnlyOptions(t *testing.T) {

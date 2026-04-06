@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"go.resystems.io/renotify/internal/payload"
+	"go.resystems.io/renotify/cli/internal/payload"
 )
 
 // InsertRequest inserts a notification request into the ledger.

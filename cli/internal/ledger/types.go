@@ -3,7 +3,7 @@ package ledger
 import (
 	"time"
 
-	"go.resystems.io/renotify/internal/payload"
+	"go.resystems.io/renotify/cli/internal/payload"
 )
 
 // WriteContext carries daemon-side enrichment data that is stored

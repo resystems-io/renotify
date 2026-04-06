@@ -7,9 +7,9 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/payload"
-	"go.resystems.io/renotify/internal/statesvc"
+	"go.resystems.io/renotify/cli/internal/broker"
+	"go.resystems.io/renotify/cli/internal/payload"
+	"go.resystems.io/renotify/cli/internal/statesvc"
 )
 
 // stateClient wraps NATS request-reply calls to the daemon's

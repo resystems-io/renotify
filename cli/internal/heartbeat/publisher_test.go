@@ -10,7 +10,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"go.resystems.io/renotify/internal/broker"
+	"go.resystems.io/renotify/cli/internal/broker"
 )
 
 func discardLogger() *slog.Logger {

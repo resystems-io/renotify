@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"go.resystems.io/renotify/internal/payload"
+	"go.resystems.io/renotify/cli/internal/payload"
 )
 
 var testWC = WriteContext{Username: "testuser"}

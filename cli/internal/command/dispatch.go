@@ -14,10 +14,10 @@ import (
 	natsjs "github.com/nats-io/nats.go/jetstream"
 	"github.com/spf13/cobra"
 
-	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/config"
-	"go.resystems.io/renotify/internal/exitcode"
-	"go.resystems.io/renotify/internal/payload"
+	"go.resystems.io/renotify/cli/internal/broker"
+	"go.resystems.io/renotify/cli/internal/config"
+	"go.resystems.io/renotify/cli/internal/exitcode"
+	"go.resystems.io/renotify/cli/internal/payload"
 )
 
 // hookInput is the common envelope for all Claude Code hook

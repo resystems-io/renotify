@@ -15,9 +15,9 @@ import (
 
 	natsjs "github.com/nats-io/nats.go/jetstream"
 
-	"go.resystems.io/renotify/internal/broker"
-	"go.resystems.io/renotify/internal/exitcode"
-	"go.resystems.io/renotify/internal/payload"
+	"go.resystems.io/renotify/cli/internal/broker"
+	"go.resystems.io/renotify/cli/internal/exitcode"
+	"go.resystems.io/renotify/cli/internal/payload"
 )
 
 func newAskCmd(app *App) *cobra.Command {

@@ -15,16 +15,16 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"go.resystems.io/renotify/internal/config"
-	"go.resystems.io/renotify/internal/daemon"
-	"go.resystems.io/renotify/internal/exitcode"
-	"go.resystems.io/renotify/internal/heartbeat"
-	"go.resystems.io/renotify/internal/httpserver"
-	"go.resystems.io/renotify/internal/ledger"
-	"go.resystems.io/renotify/internal/mcpserver"
-	"go.resystems.io/renotify/internal/registry"
-	"go.resystems.io/renotify/internal/state"
-	"go.resystems.io/renotify/internal/xdg"
+	"go.resystems.io/renotify/cli/internal/config"
+	"go.resystems.io/renotify/cli/internal/daemon"
+	"go.resystems.io/renotify/cli/internal/exitcode"
+	"go.resystems.io/renotify/cli/internal/heartbeat"
+	"go.resystems.io/renotify/cli/internal/httpserver"
+	"go.resystems.io/renotify/cli/internal/ledger"
+	"go.resystems.io/renotify/cli/internal/mcpserver"
+	"go.resystems.io/renotify/cli/internal/registry"
+	"go.resystems.io/renotify/cli/internal/state"
+	"go.resystems.io/renotify/cli/internal/xdg"
 )
 
 func newDaemonCmd(app *App) *cobra.Command {
