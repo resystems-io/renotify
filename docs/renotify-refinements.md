@@ -819,6 +819,23 @@ rotation on a scheduled cadence, and multi-device pairing support.
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Inspection
 
+#### R-SEC-04: Release Keystore Exclusion
+**Statement:** Android release signing keystores and their associated
+passwords must not be stored in the Git repository. Keystores must be
+generated locally by each developer or injected by CI/CD infrastructure.
+The build system must produce a functional (unsigned) APK when no keystore
+is present and must emit a visible warning identifying the missing keystore
+and how to generate one.
+* **Rationale (A1):** A committed keystore allows any party with repository
+  access to build APKs signed with the same key. Android treats same-key
+  APKs as same-origin updates, enabling impersonation attacks that bypass
+  signature verification. This risk is acute if the project is
+  open-sourced.
+* **Trace to Parent (A4):** N-01, R-SEC-03
+* **Allocation (A8):** Android Build System
+* **V&V Method (A2):** Inspection (verify keystore absent from repository
+  and gitignored; verify unsigned APK produced when keystore missing)
+
 ### 2.6 MVP Performance Envelope
 
 #### R-SYS-01: MVP Scale Bounds
@@ -1171,6 +1188,7 @@ specifications.
 | D-69 | Heartbeat payload extended: `WorkspaceInfo.ActiveFlows` changed from `[]string` (flow IDs only) to `[]FlowInfo` carrying `flow_id`, `label`, and `metadata` per flow. Dashboard renders label prominently with metadata key-value pairs below. Live updates on `refresh_flow` — heartbeat already fires on flow lifecycle changes via `rebuildWorkspaceSnapshot()`.                                                                                                                                                                                                                                                                                                                                        | [Payload Schemas](analysis-payload-schemas.md)                                                           | 2026-04-02 |
 | D-70 | State management subsystem (C-17, R-CLI-20/21): registry extended with four NATS write endpoints (`svc.insert-request`, `svc.insert-response`, `svc.insert-interjection`, `svc.update-activity`) alongside existing read endpoints (`svc.flows`, `svc.history`). New `statesvc` package defines shared wire types for all six service endpoints, breaking the MCP-to-ledger import dependency. MCP server accesses state exclusively via `stateClient` wrapping NATS request-reply. Production `mcpserver` package has zero import of `ledger`. Endpoint wire types (`ActiveFlowEntry`, `HistoryQueryResult`, etc.) migrated from `registry` to `statesvc` so CLI commands also import the shared package. | —                                                                                                        | 2026-04-04 |
 | D-71 | In-process NATS transport (C-19, R-CLI-22): `ConnectEmbedded()` now accepts `*server.Server` and uses `nats.InProcessServer()` to connect via `net.Pipe()` instead of TCP loopback. The TCP listener on port 4222 remains active for external CLI connections. When the embedded broker is disabled, `ConnectShared()` connects via TCP/WSS to the shared broker as before. Auth (UserInfo) works over in-process connections — the NATS CONNECT handshake still occurs over the pipe.                                                                                                                                                                                                                     | —                                                                                                        | 2026-04-04 |
+| D-72 | Release keystore removed from repository (R-SEC-04). Committed keystore (d299d57c) allowed any clone/fork to build APKs with the same signing key — an impersonation risk if the project is open-sourced (Android treats same-key APKs as same-origin updates). Keystore scrubbed from history (aad54e4). Signing config in `build.gradle.kts` now conditional on local keystore presence; warns and produces unsigned APK when absent. Passwords overridable via Gradle properties (`-PstorePassword`, `-PkeyPassword`) or Makefile variables (`STORE_PASSWORD`, `KEY_PASSWORD`), defaulting to `renotify`. New `make generate-keystore` target in `clients/android/Makefile` auto-generates a developer-local ECDSA P-256 keystore (30-year validity), wired as a prerequisite of `build`. `*.keystore` gitignored. Old key considered burned. Full history purge deferred to open-source preparation. | —                                                                                                        | 2026-04-06 |
 
 ---
 
@@ -1247,6 +1265,7 @@ Record completed items here with the date.
 | 2026-04-04 | V-05 | Architecture document rewritten. System block diagram now shows state subsystem (registry + ledger endpoints), heartbeat publisher, and in-process NATS transport for daemon internals. Direct `MCP → Ledger` edge removed — all state access routes through the broker. New shared broker deployment section with second Mermaid diagram showing collocated + shared and separated + shared topologies. Sequence diagrams updated: post, ask, and interjection flows show state subsystem as explicit participant for ledger writes via `svc.*` NATS endpoints. Port architecture table corrected (4222 serves CLI, not daemon internal). NATS subject namespace table split into three categories (JetStream, state service, ephemeral) with 4 new `svc.insert-*` write subjects and caller attribution. Transport labels standardised throughout. Phase 8 complete. |
 | 2026-04-05 | M-10 | Notification tap-to-open implemented. R-MOB-12 requirement added. `PendingIntent.getActivity()` content intent added to `NatsService.buildNotification()` targeting `MainActivity` with `FLAG_ACTIVITY_SINGLE_TOP \| FLAG_ACTIVITY_CLEAR_TOP` and `FLAG_IMMUTABLE`. `android:launchMode="singleTop"` added to `MainActivity` in `AndroidManifest.xml` to prevent duplicate instances. R-MOB-12 satisfied. |
 | 2026-04-05 | M-11 | Content notification flow navigation implemented. R-MOB-13 requirement added. `NotificationRenderer.render()` now sets a `contentIntent` carrying `EXTRA_NAVIGATE_FLOW_ID` on all content notifications (informational and interactive). `MainActivity.handleFlowNavigationIntent()` switches to the dashboard tab and calls `DashboardAdapter.expandFlow()` to expand the originating flow. Gracefully ignored if the flow has ended. Per-notification `PendingIntent` keyed by `androidId` prevents intent reuse across notifications. R-MOB-13 satisfied. |
+| 2026-04-06 | — | Release keystore removed from repository (D-72, R-SEC-04). Signing config in `build.gradle.kts` conditional on local keystore presence; warns when absent. Passwords overridable via Gradle properties or Makefile variables (default `renotify`). New `make generate-keystore` target auto-generates developer-local ECDSA P-256 keystore, wired as prerequisite of `build`. `*.keystore` gitignored. Old key burned; history scrubbed in aad54e4. |
 
 ## 6. References
 

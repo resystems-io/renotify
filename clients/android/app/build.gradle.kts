@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -18,18 +20,27 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            storeFile = file("../release.keystore")
-            storePassword = "renotify"
-            keyAlias = "renotify"
-            keyPassword = "renotify"
+        val ksFile = file("../release.keystore")
+        val signingProps = file("../release.properties")
+        if (ksFile.exists() && signingProps.exists()) {
+            val props = Properties().apply { signingProps.inputStream().use(::load) }
+            create("release") {
+                storeFile = ksFile
+                storePassword = props.getProperty("storePassword")
+                keyAlias = "renotify"
+                keyPassword = props.getProperty("keyPassword")
+            }
+        } else if (ksFile.exists()) {
+            logger.warn("WARNING: release.properties not found — APK will be unsigned. Run 'make generate-keystore' to regenerate.")
+        } else {
+            logger.warn("WARNING: release.keystore not found — APK will be unsigned. Run 'make generate-keystore' to create one.")
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
