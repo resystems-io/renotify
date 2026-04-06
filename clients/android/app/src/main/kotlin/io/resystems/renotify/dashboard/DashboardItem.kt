@@ -26,7 +26,8 @@ sealed class DashboardItem {
         val flowId: String,
         val label: String,
         val metadata: Map<String, String>,
-        val lastActivity: String
+        val lastActivity: String,
+        val gracePeriodMs: Long
     ) : DashboardItem()
 
     /**
@@ -69,7 +70,8 @@ sealed class DashboardItem {
                         flowId = flow.flowId,
                         label = flow.label,
                         metadata = flow.metadata,
-                        lastActivity = flow.lastActivity
+                        lastActivity = flow.lastActivity,
+                        gracePeriodMs = heartbeat.gracePeriodMs
                     ))
                 }
             }

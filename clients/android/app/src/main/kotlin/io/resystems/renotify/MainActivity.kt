@@ -381,13 +381,38 @@ class MainActivity : ComponentActivity() {
             startNatsService()
         }
 
-        // Handle "More..." overflow intent from notification.
+        // Handle notification tap intents.
+        handleFlowNavigationIntent(intent)
         handleChoiceIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        handleFlowNavigationIntent(intent)
         handleChoiceIntent(intent)
+    }
+
+    // --- Notification tap → flow navigation (R-MOB-13) ---
+
+    /**
+     * If the intent carries a [NotificationRenderer.EXTRA_NAVIGATE_FLOW_ID],
+     * switch to the dashboard tab and expand the originating flow.
+     * Gracefully ignored if the flow has already ended.
+     */
+    private fun handleFlowNavigationIntent(intent: Intent?) {
+        val flowId = intent?.getStringExtra(
+            NotificationRenderer.EXTRA_NAVIGATE_FLOW_ID) ?: return
+
+        // Clear the extra so activity recreation doesn't re-trigger.
+        intent.removeExtra(NotificationRenderer.EXTRA_NAVIGATE_FLOW_ID)
+
+        // Ensure we're on the dashboard tab.
+        if (activeTab != TAB_DASHBOARD) {
+            switchTab(TAB_DASHBOARD)
+        }
+
+        // Expand the flow — no-op if the flow is not present.
+        dashboardAdapter.expandFlow(flowId)
     }
 
     // --- In-app choice dialog for "More..." overflow ---

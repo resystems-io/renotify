@@ -758,6 +758,31 @@ carried in the provisioning payload.
 * **Allocation (A8):** Go CLI Application, Android Application
 * **V&V Method (A2):** Test
 
+#### R-MOB-12: Notification Tap Navigation
+**Statement:** Tapping the persistent connection status notification must open the
+Renotify dashboard. If the app is already open, the existing view must be brought
+to the foreground without creating a duplicate window.
+* **Rationale (A1):** The connection status notification is the most visible
+  persistent entry point for the app. Users expect tapping a service notification
+  to navigate to the associated application, consistent with standard Android
+  platform conventions.
+* **Trace to Parent (A4):** R-MOB-10
+* **Allocation (A8):** Android Application
+* **V&V Method (A2):** Demonstration
+
+#### R-MOB-13: Content Notification Tap Navigation
+**Statement:** Tapping a notification (informational or interactive) must navigate
+the user to the originating flow in the dashboard, showing the flow's notification
+history and any pending response controls. If the flow has already ended, the
+dashboard must still open without error.
+* **Rationale (A1):** Users receiving a notification naturally expect tapping it to
+  reveal more context about the source activity. Without contextual navigation the
+  user must manually locate the flow in the dashboard, which is especially awkward
+  for interactive notifications where the action buttons are small.
+* **Trace to Parent (A4):** R-MOB-03, R-MOB-09
+* **Allocation (A8):** Android Application
+* **V&V Method (A2):** Demonstration
+
 ### 2.5 Security Lifecycle
 
 #### R-SEC-01: Token Revocation
@@ -991,6 +1016,14 @@ workspace monitoring).*
   via Core NATS. The Android app subscribes to its device control subject and
   updates silent mode state on receipt. No ACL changes needed (daemon publishes,
   mobile subscribes — both already permitted by existing wildcards).
+- [x] **M-10: Notification Tap Navigation:** Add a `contentIntent` to the
+  foreground service notification so that tapping the persistent connection status
+  notification opens the Renotify dashboard without creating a duplicate activity
+  instance (R-MOB-12).
+- [x] **M-11: Content Notification Flow Navigation:** Add a `contentIntent` to
+  content notifications (both informational and interactive) so that tapping the
+  notification body navigates to the dashboard with the originating flow expanded,
+  showing its notification history and response controls (R-MOB-13).
 
 ### Phase 7: Final Assembly & Verification
 *(Goal: The cohesive single-binary cross-platform distribution).*
@@ -1212,6 +1245,8 @@ Record completed items here with the date.
 | 2026-04-04 | C-19 | In-process NATS transport for embedded broker. `ConnectEmbedded()` now takes `*server.Server` and uses `nats.InProcessServer()` to connect via `net.Pipe()`. TCP listener remains for CLI. `HistoryRecord` wire format standardised to snake_case (was PascalCase from missing JSON tags); Android parser and tests updated to match. |
 | 2026-04-04 | V-04 | Decoupling verification. 4 write endpoint isolation tests (`TestInsertRequestEndpoint`, `TestInsertResponseEndpoint`, `TestInsertInterjectionEndpoint`, `TestUpdateActivityEndpoint`) verify NATS request-reply contract for each `svc.insert-*` endpoint. `TestController_SharedBrokerMCPRoundTrip` exercises the full MCP→stateClient→NATS TCP→registry→ledger path with the daemon connected to a shared broker (not embedded). All existing unit and integration tests continue to pass. |
 | 2026-04-04 | V-05 | Architecture document rewritten. System block diagram now shows state subsystem (registry + ledger endpoints), heartbeat publisher, and in-process NATS transport for daemon internals. Direct `MCP → Ledger` edge removed — all state access routes through the broker. New shared broker deployment section with second Mermaid diagram showing collocated + shared and separated + shared topologies. Sequence diagrams updated: post, ask, and interjection flows show state subsystem as explicit participant for ledger writes via `svc.*` NATS endpoints. Port architecture table corrected (4222 serves CLI, not daemon internal). NATS subject namespace table split into three categories (JetStream, state service, ephemeral) with 4 new `svc.insert-*` write subjects and caller attribution. Transport labels standardised throughout. Phase 8 complete. |
+| 2026-04-05 | M-10 | Notification tap-to-open implemented. R-MOB-12 requirement added. `PendingIntent.getActivity()` content intent added to `NatsService.buildNotification()` targeting `MainActivity` with `FLAG_ACTIVITY_SINGLE_TOP \| FLAG_ACTIVITY_CLEAR_TOP` and `FLAG_IMMUTABLE`. `android:launchMode="singleTop"` added to `MainActivity` in `AndroidManifest.xml` to prevent duplicate instances. R-MOB-12 satisfied. |
+| 2026-04-05 | M-11 | Content notification flow navigation implemented. R-MOB-13 requirement added. `NotificationRenderer.render()` now sets a `contentIntent` carrying `EXTRA_NAVIGATE_FLOW_ID` on all content notifications (informational and interactive). `MainActivity.handleFlowNavigationIntent()` switches to the dashboard tab and calls `DashboardAdapter.expandFlow()` to expand the originating flow. Gracefully ignored if the flow has ended. Per-notification `PendingIntent` keyed by `androidId` prevents intent reuse across notifications. R-MOB-13 satisfied. |
 
 ## 6. References
 

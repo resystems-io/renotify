@@ -82,7 +82,7 @@ func startTestRegistry(
 ) {
 	t.Helper()
 	hb := heartbeat.New(testDaemonID, testUsername, "testhost",
-		30*time.Second, slog.Default())
+		5*time.Minute, 30*time.Second, slog.Default())
 	hbReady := make(chan error, 1)
 	if err := hb.Start(t.Context(), nc, hbReady); err != nil {
 		t.Fatal(err)

@@ -37,6 +37,7 @@ data class DaemonHeartbeat(
     val daemonId: String,
     val username: String,
     val hostname: String,
+    val gracePeriodMs: Long,
     val workspaces: List<WorkspaceInfo>,
     val timestamp: String
 ) {
@@ -100,13 +101,40 @@ data class DaemonHeartbeat(
                 }
             }
 
+            val gracePeriodStr = obj.optString(
+                "grace_period", "")
+
             return DaemonHeartbeat(
                 daemonId = obj.getString("daemon_id"),
                 username = obj.optString("username", ""),
                 hostname = obj.optString("hostname", ""),
+                gracePeriodMs = parseGoDuration(gracePeriodStr),
                 workspaces = workspaces,
                 timestamp = obj.optString("timestamp", "")
             )
+        }
+
+        /**
+         * Parse a Go duration string (e.g. "15m0s", "5m",
+         * "1h30m") into milliseconds. Returns 0 on parse
+         * failure.
+         */
+        fun parseGoDuration(s: String): Long {
+            if (s.isEmpty()) return 0
+            var remaining = s
+            var totalMs = 0L
+            val pattern = Regex("(\\d+)(h|m|s|ms)")
+            for (match in pattern.findAll(remaining)) {
+                val value = match.groupValues[1].toLongOrNull()
+                    ?: continue
+                when (match.groupValues[2]) {
+                    "ms" -> totalMs += value
+                    "s"  -> totalMs += value * 1000
+                    "m"  -> totalMs += value * 60_000
+                    "h"  -> totalMs += value * 3_600_000
+                }
+            }
+            return totalMs
         }
     }
 }

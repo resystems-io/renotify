@@ -142,4 +142,72 @@ class DaemonHeartbeatTest {
         assertEquals("", flow.label)
         assertTrue(flow.metadata.isEmpty())
     }
+
+    // --- parseGoDuration ---
+
+    @Test
+    fun parseGoDuration_minutesAndSeconds() {
+        assertEquals(900_000,
+            DaemonHeartbeat.parseGoDuration("15m0s"))
+    }
+
+    @Test
+    fun parseGoDuration_minutesOnly() {
+        assertEquals(300_000,
+            DaemonHeartbeat.parseGoDuration("5m"))
+    }
+
+    @Test
+    fun parseGoDuration_hoursMinutes() {
+        assertEquals(5_400_000,
+            DaemonHeartbeat.parseGoDuration("1h30m"))
+    }
+
+    @Test
+    fun parseGoDuration_secondsOnly() {
+        assertEquals(45_000,
+            DaemonHeartbeat.parseGoDuration("45s"))
+    }
+
+    @Test
+    fun parseGoDuration_empty() {
+        assertEquals(0, DaemonHeartbeat.parseGoDuration(""))
+    }
+
+    @Test
+    fun parseGoDuration_hoursMinutesSeconds() {
+        assertEquals(3_661_000,
+            DaemonHeartbeat.parseGoDuration("1h1m1s"))
+    }
+
+    // --- gracePeriodMs in heartbeat ---
+
+    @Test
+    fun parsesGracePeriod() {
+        val json = """
+            {
+                "daemon_id": "dn_GP01",
+                "grace_period": "15m0s",
+                "workspaces": [],
+                "timestamp": "2026-04-05T10:00:00Z"
+            }
+        """.trimIndent()
+
+        val hb = DaemonHeartbeat.fromJson(json)
+        assertEquals(900_000, hb.gracePeriodMs)
+    }
+
+    @Test
+    fun missingGracePeriod_defaultsToZero() {
+        val json = """
+            {
+                "daemon_id": "dn_GP02",
+                "workspaces": [],
+                "timestamp": "2026-04-05T10:00:00Z"
+            }
+        """.trimIndent()
+
+        val hb = DaemonHeartbeat.fromJson(json)
+        assertEquals(0, hb.gracePeriodMs)
+    }
 }
