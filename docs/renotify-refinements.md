@@ -116,18 +116,19 @@ alter its ongoing execution based on the delayed human context.
 
 ### 1.3 High-Level Functional Needs
 Derived from CONOPS-01:
-* **N-01 [Context Transmission]:** The system must ingest, route, and deliver
-  structured data.
-* **N-02 [Human Interruption]:** The system must present information natively
-  and prioritise disruptions.
-* **N-03 [Decision Feedback]:** The system must capture rich responses (boolean
-  decision, constrained choice, free-form text, or a combination thereof) and
-  route them back to the source.
-* **N-04 [Lifecycle State]:** The system must handle non-responses (timeouts)
-  and log interactions locally for auditability.
-* **N-05 [Proactive Interjection]:** The system must allow the human receiver to
-  emit asynchronous, unprompted control signals or feedback upstream to
-  terminate, pause, or alter the trajectory of active pipelines.
+* <a id="n-01"></a>**N-01 [Context Transmission]:** The system must ingest,
+  route, and deliver structured data.
+* <a id="n-02"></a>**N-02 [Human Interruption]:** The system must present
+  information natively and prioritise disruptions.
+* <a id="n-03"></a>**N-03 [Decision Feedback]:** The system must capture rich
+  responses (boolean decision, constrained choice, free-form text, or a
+  combination thereof) and route them back to the source.
+* <a id="n-04"></a>**N-04 [Lifecycle State]:** The system must handle
+  non-responses (timeouts) and log interactions locally for auditability.
+* <a id="n-05"></a>**N-05 [Proactive Interjection]:** The system must allow
+  the human receiver to emit asynchronous, unprompted control signals or
+  feedback upstream to terminate, pause, or alter the trajectory of active
+  pipelines.
 
 ### 1.4 Architectural Considerations
 To connect the CLI and the Android app, a reliable transport layer is necessary.
@@ -195,8 +196,8 @@ flowchart TB
     cli -. "QR Code (offline pairing)" .-> app
 ```
 
-The embedded NATS broker and MCP server are independently toggleable (R-CLI-02,
-R-CLI-03). The embedded broker is a first-class deployment model suited to solo
+The embedded NATS broker and MCP server are independently toggleable ([R-CLI-02][r-cli-02],
+[R-CLI-03][r-cli-03]). The embedded broker is a first-class deployment model suited to solo
 developers working independently or disconnected from enterprise infrastructure.
 When the embedded broker is disabled, the daemon connects to an external shared
 NATS broker instead. Both models use the same protocol, subject namespace, and
@@ -230,7 +231,7 @@ Crockford Base32 encoding.
   sessions.
 
 The NATS subject hierarchy uses `{username}` and `{flow_id}` for routing (see
-R-API-07). Structural context (daemon, workspace) is carried within payloads and
+[R-API-07][r-api-07]). Structural context (daemon, workspace) is carried within payloads and
 daemon heartbeats, not encoded in the subject. The Android UI groups
 notifications by workspace using data from heartbeat messages.
 
@@ -251,7 +252,7 @@ The root `Makefile` will delegate to subsystem-specific build tools (e.g., `go
 build` for the CLI, Gradle for Android APK creation).
 * **Rationale (A1):** Makefiles are universally supported, keep CI/CD pipelines
   simple, and cleanly delegate domain-specific tasks.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** System-wide Repository
 * **V&V Method (A2):** Demonstration
 
@@ -264,7 +265,7 @@ or download the APK for manual installation.
   Note: this creates a build-order dependency (Android APK must be compiled
   before the Go binary can embed it). The Makefile should provide a
   `build-cli-dev` target that skips APK embedding for development iteration.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Demonstration
 
@@ -277,7 +278,7 @@ multiple response types simultaneously (e.g., boolean with optional text) to
 support multi-modal human feedback.
 * **Rationale (A1):** Necessary to standardise how agents describe their intent
   to the broker.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Inspection
 
@@ -289,7 +290,7 @@ fields are orthogonal: a boolean `Accepted` for yes/no decisions,
 input. Multiple fields may be populated simultaneously for multi-modal requests.
 * **Rationale (A1):** Allows the agent to receive rich feedback (boolean,
   categorical, or text).
-* **Trace to Parent (A4):** N-03
+* **Trace to Parent (A4):** [N-03][n-03]
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Inspection
 
@@ -298,7 +299,7 @@ input. Multiple fields may be populated simultaneously for multi-modal requests.
 excluding Protobuf).
 * **Rationale (A1):** Simplifies integration with various AI agents and
   scripting tools.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Demonstration
 
@@ -310,7 +311,7 @@ native NATS TCP.
 * **Rationale (A1):** WebSockets are required where raw TCP may be restricted
   (mobile networks, firewalled environments). Co-located CLI processes benefit
   from native TCP's lower overhead and simpler connection handling.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Demonstration
 
@@ -319,7 +320,7 @@ native NATS TCP.
 (`resystems.renotify.>`).
 * **Rationale (A1):** Prevents collisions with other organisational traffic on a
   shared broker.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Inspection
 
@@ -329,7 +330,7 @@ native NATS TCP.
 * **Rationale (A1):** Allows multiple developers to share a broker without
   receiving each other's notifications. NATS auth scopes each user to their own
   prefix.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Demonstration
 
@@ -346,7 +347,7 @@ encoded in the subject hierarchy.
   heartbeat data. See the [Naming & Addressing
   Analysis](analysis-naming-and-addressing.md) Section 4 for the full namespace
   design.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Demonstration
 
@@ -358,7 +359,7 @@ fingerprints).
   easier to expand with complex cryptographic parameters than a standard URI
   format. Standardises the secure handshake protocol required for mobile
   connection bootstrapping.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Inspection
 
@@ -368,7 +369,7 @@ originating from the Android client representing a dynamic human interjection
 (e.g., FlowID, Action: "Stop" | "Pause" | "Note", Context).
 * **Rationale (A1):** Required to structure proactive steering or termination
   directives.
-* **Trace to Parent (A4):** N-05
+* **Trace to Parent (A4):** [N-05][n-05]
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Inspection
 
@@ -378,7 +379,7 @@ and termination of a distinct pipeline flow (e.g., `FlowID`, `DaemonID`,
 `WorkspaceID`, `Status: active|completed|failed`, `Metadata`).
 * **Rationale (A1):** Establishes a formal boundary for a workflow, allowing the
   Android UI to easily group and filter notifications by active flows.
-* **Trace to Parent (A4):** N-04
+* **Trace to Parent (A4):** [N-04][n-04]
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Inspection
 
@@ -390,7 +391,7 @@ rejection).
 * **Rationale (A1):** Standardises failure signalling across CLI and mobile
   flows, allowing callers and the Android app to distinguish error categories
   and present meaningful feedback.
-* **Trace to Parent (A4):** N-04
+* **Trace to Parent (A4):** [N-04][n-04]
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Inspection
 
@@ -402,7 +403,7 @@ broker (with WebSocket support), the MCP server, or both. Must support
 foreground or background detached mode with file logging.
 * **Rationale (A1):** Reduces infrastructure overhead by bundling the broker and
   server within the CLI tool.
-* **Trace to Parent (A4):** N-01, N-03
+* **Trace to Parent (A4):** [N-01][n-01], [N-03][n-03]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Demonstration
 
@@ -411,7 +412,7 @@ foreground or background detached mode with file logging.
 config) to enable or disable the embedded NATS broker.
 * **Rationale (A1):** Allows the daemon to act exclusively as an MCP server
   connecting to an external centralised NATS broker if preferred.
-* **Trace to Parent (A4):** R-CLI-01
+* **Trace to Parent (A4):** [R-CLI-01][r-cli-01]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
@@ -420,7 +421,7 @@ config) to enable or disable the embedded NATS broker.
 config) to enable or disable the embedded MCP server.
 * **Rationale (A1):** Allows the daemon to operate strictly as a lightweight
   standalone message broker without unnecessarily exposing MCP capabilities.
-* **Trace to Parent (A4):** R-CLI-01
+* **Trace to Parent (A4):** [R-CLI-01][r-cli-01]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
@@ -429,7 +430,7 @@ config) to enable or disable the embedded MCP server.
 notifications.
 * **Rationale (A1):** Supports simple informational alerts that do not require
   human decision.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
@@ -437,7 +438,7 @@ notifications.
 **Statement:** Implement `renotify ask` to send a notification with actions and
 block until a rich response is received.
 * **Rationale (A1):** Enables human-in-the-loop workflows for AI agents.
-* **Trace to Parent (A4):** N-03
+* **Trace to Parent (A4):** [N-03][n-03]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
@@ -446,7 +447,7 @@ block until a rich response is received.
 returning a standardised error to the caller if no response is received.
 * **Rationale (A1):** Prevents pipelines from hanging indefinitely if the human
   is unavailable.
-* **Trace to Parent (A4):** N-04
+* **Trace to Parent (A4):** [N-04][n-04]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
@@ -455,7 +456,7 @@ returning a standardised error to the caller if no response is received.
 notifications, their resolution states, and rich text responses from a local
 SQLite or file-based log.
 * **Rationale (A1):** Provides an audit trail for actions reviewed by the human.
-* **Trace to Parent (A4):** N-04
+* **Trace to Parent (A4):** [N-04][n-04]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Demonstration
 
@@ -465,7 +466,7 @@ autonomous agents to invoke `post`, `ask`, `register_flow`,
 `refresh_flow`, and `terminate_flow` natively.
 * **Rationale (A1):** Standardises agent integration without relying solely on
   shell execution.
-* **Trace to Parent (A4):** N-01, N-03
+* **Trace to Parent (A4):** [N-01][n-01], [N-03][n-03]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Demonstration
 
@@ -473,7 +474,7 @@ autonomous agents to invoke `post`, `ask`, `register_flow`,
 **Statement:** Store defaults and settings using the XDG Base Directory
 specification (e.g., `~/.config/renotify/settings.json`).
 * **Rationale (A1):** Conforms to modern Linux desktop standards.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Inspection
 
@@ -484,18 +485,18 @@ when a user provides decision feedback. The decision must be exposed as a
 dynamic resource containing the result (e.g., boolean, message).
 * **Rationale (A1):** Enables agents to subscribe to decision outcomes and be
   proactively notified without active polling.
-* **Trace to Parent (A4):** R-CLI-08
+* **Trace to Parent (A4):** [R-CLI-08][r-cli-08]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Demonstration
 
 #### R-CLI-11: Provisioning Orchestrator
 **Statement:** The CLI must mandate a `renotify pair` command that generates
 self-signed TLS certificates (if none exist), discovers/overrides network IPs,
-and yields an ASCII QR code matching the Provisioning Schema (`R-API-08`) to the
+and yields an ASCII QR code matching the Provisioning Schema ([R-API-08][r-api-08]) to the
 terminal.
 * **Rationale (A1):** Establishes the bedrock of secure NATS connectivity
   without requiring manual secret distribution.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Demonstration
 
@@ -508,7 +509,7 @@ persistence entirely.
   dodging the operational hazard of bloated local filesystems. The 30-minute
   default balances resilience against brief connectivity interruptions with
   bounded memory consumption.
-* **Trace to Parent (A4):** N-04
+* **Trace to Parent (A4):** [N-04][n-04]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
@@ -518,7 +519,7 @@ Request-Reply queries from authenticated clients, serving payload results
 directly from the local SQLite historical ledger.
 * **Rationale (A1):** Offloads permanent history storage from the broker
   infrastructure while continuing to serve remote auditability constraints.
-* **Trace to Parent (A4):** N-04
+* **Trace to Parent (A4):** [N-04][n-04]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
@@ -533,7 +534,7 @@ workspaces, active flow IDs).
   providing a single remote source of truth for "what is currently running."
   Heartbeats enable the mobile dashboard to discover daemons and group flows by
   workspace without encoding the hierarchy in NATS subjects.
-* **Trace to Parent (A4):** N-04
+* **Trace to Parent (A4):** [N-04][n-04]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Demonstration
 
@@ -544,17 +545,17 @@ their interactions with the daemon as strictly ephemeral.
 * **Rationale (A1):** Prevents the architectural complexity of agent recovery
   tracking after unexpected crashes, maintaining a resilient, stateless boundary
   for clients.
-* **Trace to Parent (A4):** N-04
+* **Trace to Parent (A4):** [N-04][n-04]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Inspection
 
 #### R-CLI-16: Notification Rate Limiting
 **Statement:** The daemon must enforce a configurable per-flow notification rate
 limit (default: 60 notifications per minute). Notifications exceeding the limit
-must be rejected with an ErrorResponse (`R-API-11`).
+must be rejected with an ErrorResponse ([R-API-11][r-api-11]).
 * **Rationale (A1):** Prevents runaway scripts or misconfigured agents from
   overwhelming the mobile client and broker with unbounded notification volume.
-* **Trace to Parent (A4):** N-04
+* **Trace to Parent (A4):** [N-04][n-04]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
@@ -564,7 +565,7 @@ computed server-side from the moment the request is received. Mobile client
 disconnection and reconnection must not reset or extend the timeout.
 * **Rationale (A1):** Guarantees deterministic timeout behaviour for the calling
   pipeline regardless of transient mobile network conditions.
-* **Trace to Parent (A4):** N-04
+* **Trace to Parent (A4):** [N-04][n-04]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
@@ -574,7 +575,7 @@ terminated (e.g., via heartbeat absence) and automatically mark them as `failed`
 in the flow registry within a configurable grace period (default: 5 minutes).
 * **Rationale (A1):** Prevents the Android dashboard from displaying phantom
   flows after unexpected pipeline crashes.
-* **Trace to Parent (A4):** N-04
+* **Trace to Parent (A4):** [N-04][n-04]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
@@ -589,7 +590,7 @@ error ensures graceful fallback to the local terminal prompt.
 * **Rationale (A1):** Extends Renotify's reach to agent lifecycle events that
   occur outside the MCP tool loop, enabling remote permission approval and
   status monitoring for unattended agent sessions.
-* **Trace to Parent (A4):** N-02, N-03
+* **Trace to Parent (A4):** [N-02][n-02], [N-03][n-03]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
@@ -607,7 +608,7 @@ a direct reference to the database.
   when a shared broker is in use. Funnelling all state access
   through NATS ensures that every subsystem is a broker client
   regardless of deployment topology.
-* **Trace to Parent (A4):** N-04, R-CLI-13, R-CLI-14
+* **Trace to Parent (A4):** [N-04][n-04], [R-CLI-13][r-cli-13], [R-CLI-14][r-cli-14]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test — verify the MCP server subsystem
   functions correctly when the ledger subsystem is reachable only
@@ -618,14 +619,14 @@ a direct reference to the database.
 (active flows, notification history, interjection records) and
 submit all state mutations (insert request, insert response, insert
 interjection) exclusively via NATS subjects served by the state
-management subsystem (R-CLI-20). The MCP server must not receive or
+management subsystem ([R-CLI-20][r-cli-20]). The MCP server must not receive or
 hold a reference to the database or any database accessor.
 * **Rationale (A1):** The CLI and mobile app already interact with
   the daemon solely through NATS. Applying the same constraint to
   the MCP server ensures it can be deployed as a separate process
-  connected to a shared broker — a topology that R-CLI-02 enables
+  connected to a shared broker — a topology that [R-CLI-02][r-cli-02] enables
   but that direct database access prevents.
-* **Trace to Parent (A4):** R-CLI-08, R-CLI-20
+* **Trace to Parent (A4):** [R-CLI-08][r-cli-08], [R-CLI-20][r-cli-20]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test — confirm that the MCP server package
   has no import dependency on the ledger package.
@@ -643,7 +644,7 @@ WSS as determined by the URL scheme).
   for internal daemon traffic. It also makes the collocated topology
   indistinguishable from the shared-broker topology at the NATS API
   level, ensuring subsystem code is transport-agnostic.
-* **Trace to Parent (A4):** R-CLI-02, R-CLI-01
+* **Trace to Parent (A4):** [R-CLI-02][r-cli-02], [R-CLI-01][r-cli-01]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test — verify the daemon starts and operates
   correctly with the in-process transport when the embedded broker
@@ -654,7 +655,7 @@ WSS as determined by the URL scheme).
 #### R-MOB-01: Programming Language
 **Statement:** The application must be developed using Kotlin rather than Java.
 * **Rationale (A1):** Ensures modern, maintainable code utilising coroutines.
-* **Trace to Parent (A4):** N-02
+* **Trace to Parent (A4):** [N-02][n-02]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Inspection
 
@@ -663,7 +664,7 @@ WSS as determined by the URL scheme).
 WebSocket connection to receive messages.
 * **Rationale (A1):** Required to asynchronously receive pushed contexts from
   the broker.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Test
 
@@ -673,7 +674,7 @@ notifications, differentiating visually between informational and blocking
 requests.
 * **Rationale (A1):** Prevents alert fatigue and ensures blocking requests
   capture attention.
-* **Trace to Parent (A4):** N-02
+* **Trace to Parent (A4):** [N-02][n-02]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Demonstration
 
@@ -683,7 +684,7 @@ free-form text input, or combinations thereof for multi-modal requests) and
 reliably dispatch the specific response payload back via NATS.
 * **Rationale (A1):** Closes the loop on the human-in-the-loop workflow with
   contextual feedback.
-* **Trace to Parent (A4):** N-03
+* **Trace to Parent (A4):** [N-03][n-03]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Test
 
@@ -691,17 +692,17 @@ reliably dispatch the specific response payload back via NATS.
 **Statement:** Follow the resystems.io branding and incorporate the core SVG
 logo within the application UI.
 * **Rationale (A1):** Maintains professional consistency with the organisation.
-* **Trace to Parent (A4):** N-02
+* **Trace to Parent (A4):** [N-02][n-02]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Inspection
 
 #### R-MOB-06: Secure Pairing Scanner
 **Statement:** Implement a camera-based QR scanner pipeline to decode the
-pairing payload (`R-API-08`), persisting the target IP, port, token, and
+pairing payload ([R-API-08][r-api-08]), persisting the target IP, port, token, and
 explicitly pinning the designated TLS certificate.
 * **Rationale (A1):** Translates the complex terminal handshake into a seamless
   mobile configuration.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Demonstration
 
@@ -711,7 +712,7 @@ historical notification ledger from the daemon via a scheduled Core NATS
 Request-Reply.
 * **Rationale (A1):** Allows developers to conduct historical look-backs native
   to their device, beyond what is currently cached ephemerally in JetStream.
-* **Trace to Parent (A4):** N-04
+* **Trace to Parent (A4):** [N-04][n-04]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Demonstration
 
@@ -721,7 +722,7 @@ to actively emit proactive "Stop," "Pause," or free-form context signals
 targeting a specific flow.
 * **Rationale (A1):** Completes the unprompted loop required for asynchronous
   pipeline tracking and alteration.
-* **Trace to Parent (A4):** N-05
+* **Trace to Parent (A4):** [N-05][n-05]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Demonstration
 
@@ -731,7 +732,7 @@ workspaces and their constituent flows, querying the daemon's active flow
 registry natively over Core NATS Request-Reply and daemon heartbeats.
 * **Rationale (A1):** Provides the critical "birds-eye view" of ongoing work,
   grouped by workspace, across all connected daemons.
-* **Trace to Parent (A4):** N-02
+* **Trace to Parent (A4):** [N-02][n-02]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Demonstration
 
@@ -743,7 +744,7 @@ connectivity status indicator at all times.
 * **Rationale (A1):** Ensures the developer is aware of connection state and
   does not silently miss time-critical blocking prompts during transient network
   disruptions.
-* **Trace to Parent (A4):** N-02
+* **Trace to Parent (A4):** [N-02][n-02]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Demonstration
 
@@ -754,7 +755,7 @@ its own JetStream consumer. Device identity is established at pairing time and
 carried in the provisioning payload.
 * **Rationale (A1):** Developers may use multiple devices (phone + tablet) or
   share a daemon with a colleague for pair programming.
-* **Trace to Parent (A4):** N-01, N-02
+* **Trace to Parent (A4):** [N-01][n-01], [N-02][n-02]
 * **Allocation (A8):** Go CLI Application, Android Application
 * **V&V Method (A2):** Test
 
@@ -766,7 +767,7 @@ to the foreground without creating a duplicate window.
   persistent entry point for the app. Users expect tapping a service notification
   to navigate to the associated application, consistent with standard Android
   platform conventions.
-* **Trace to Parent (A4):** R-MOB-10
+* **Trace to Parent (A4):** [R-MOB-10][r-mob-10]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Demonstration
 
@@ -779,7 +780,7 @@ dashboard must still open without error.
   reveal more context about the source activity. Without contextual navigation the
   user must manually locate the flow in the dashboard, which is especially awkward
   for interactive notifications where the action buttons are small.
-* **Trace to Parent (A4):** R-MOB-03, R-MOB-09
+* **Trace to Parent (A4):** [R-MOB-03][r-mob-03], [R-MOB-09][r-mob-09]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Demonstration
 
@@ -792,19 +793,19 @@ implementation: a manual CLI command `renotify revoke`.
 * **Rationale (A1):** A lost or compromised mobile device with a valid token
   represents an open credential. Revocation provides the minimum viable response
   to this threat.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
 #### R-SEC-02: Per-Device Pairing
 **Statement:** Each `renotify pair` invocation generates a unique device identity
 and per-device auth token, stored in a device registry (`devices.json`). Multiple
-devices may be paired simultaneously (R-MOB-11). Individual devices can be
+devices may be paired simultaneously ([R-MOB-11][r-mob-11]). Individual devices can be
 revoked via `renotify revoke --device <id>` or all devices via `renotify revoke
 --all`.
 * **Rationale (A1):** Supports multi-device workflows while maintaining per-device
   credential isolation and revocability.
-* **Trace to Parent (A4):** R-SEC-01, R-MOB-11
+* **Trace to Parent (A4):** [R-SEC-01][r-sec-01], [R-MOB-11][r-mob-11]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
 
@@ -815,7 +816,7 @@ rotation on a scheduled cadence, and multi-device pairing support.
 * **Rationale (A1):** Acknowledged security enhancements that exceed the
   complexity budget of the initial release. Documenting them here prevents
   future ambiguity about scope.
-* **Trace to Parent (A4):** N-01
+* **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Inspection
 
@@ -831,7 +832,7 @@ and how to generate one.
   APKs as same-origin updates, enabling impersonation attacks that bypass
   signature verification. This risk is acute if the project is
   open-sourced.
-* **Trace to Parent (A4):** N-01, R-SEC-03
+* **Trace to Parent (A4):** [N-01][n-01], [R-SEC-03][r-sec-03]
 * **Allocation (A8):** Android Build System
 * **V&V Method (A2):** Inspection (verify keystore absent from repository
   and gitignored; verify unsigned APK produced when keystore missing)
@@ -845,7 +846,7 @@ and a maximum individual payload size of 64 KB.
 * **Rationale (A1):** Provides testable lower bounds for MVP validation without
   constraining future scaling. These figures reflect a single-developer
   workstation with moderate automation activity.
-* **Trace to Parent (A4):** N-01, N-04
+* **Trace to Parent (A4):** [N-01][n-01], [N-04][n-04]
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Test
 
@@ -1000,8 +1001,8 @@ workspace monitoring).*
   tracker, stale sweeper, and the Core NATS registry presentation endpoint.
 - [x] **C-06: MCP Server:** Implement the MCP protocol layer with
   `register_flow`, `refresh_flow`, `terminate_flow`, `post`, and `ask`
-  tools plus `DecisionResource` for async decision delivery (R-CLI-08,
-  R-CLI-10).
+  tools plus `DecisionResource` for async decision delivery ([R-CLI-08][r-cli-08],
+  [R-CLI-10][r-cli-10]).
 - [x] **C-11: MCP Interjections & Timeouts:** Wire up interjection delivery
   (`InterjectionResource`, daemon-interject consumer) and daemon-side
   timeout enforcement for MCP `ask` requests (D-26, D-27).
@@ -1036,11 +1037,11 @@ workspace monitoring).*
 - [x] **M-10: Notification Tap Navigation:** Add a `contentIntent` to the
   foreground service notification so that tapping the persistent connection status
   notification opens the Renotify dashboard without creating a duplicate activity
-  instance (R-MOB-12).
+  instance ([R-MOB-12][r-mob-12]).
 - [x] **M-11: Content Notification Flow Navigation:** Add a `contentIntent` to
   content notifications (both informational and interactive) so that tapping the
   notification body navigates to the dashboard with the originating flow expanded,
-  showing its notification history and response controls (R-MOB-13).
+  showing its notification history and response controls ([R-MOB-13][r-mob-13]).
 
 ### Phase 7: Final Assembly & Verification
 *(Goal: The cohesive single-binary cross-platform distribution).*
@@ -1083,20 +1084,20 @@ shared broker is in use.)*
   insert response, insert interjection) via NATS request-reply or
   JetStream consumption. Consolidate the existing `svc.flows` and
   `svc.history` endpoints (C-09, C-10) into this subsystem
-  alongside new write-path subjects (R-CLI-20).
+  alongside new write-path subjects ([R-CLI-20][r-cli-20]).
 - [x] **C-18: MCP Server NATS Migration:** Remove the direct
   `func() *ledger.DB` accessor from the MCP server. Replace all
   in-process database calls (`s.db().ListActiveFlows`,
   `s.db().InsertRequest`, `s.db().InsertResponse`,
   `s.db().InsertInterjection`) with NATS request-reply calls to the
   state management subsystem (C-17). Verify the MCP server package
-  has no import dependency on the ledger package (R-CLI-21).
+  has no import dependency on the ledger package ([R-CLI-21][r-cli-21]).
 - [x] **C-19: In-Process NATS Transport:** When the embedded broker
   is enabled, connect daemon subsystems via `nats.InProcessConn`
   instead of TCP loopback. When the embedded broker is disabled,
   connect via NATS TCP to the shared broker address. The TCP
   listener on port 4222 remains available for external CLI
-  connections (R-CLI-22).
+  connections ([R-CLI-22][r-cli-22]).
 - [x] **V-04: Decoupling Verification:** Verify that the MCP server
   operates correctly when the ledger subsystem is reachable only via
   NATS. Test both the collocated (in-process transport) and
@@ -1142,7 +1143,7 @@ implemented — implementation detail belongs in the Section 5 change log.
 | D-22 | Notification ID: `ntf_` + 16 Crockford Base32 chars (80 bits from UUIDv7 truncated); generated by CLI or daemon before NATS publish                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | [Naming & Addressing](analysis-naming-and-addressing.md), [Payload Schemas](analysis-payload-schemas.md) | 2026-03-27 |
 | D-23 | CLI exit codes: 0 success, 1 general, 2 usage, 3 timeout, 4 rate limited, 5 unroutable, 6 not found; `--format json\|text` flag; stdout=data, stderr=diagnostics                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | [CLI Contract](analysis-cli-contract.md)                                                                 | 2026-03-27 |
 | D-24 | Shared broker CLI path: CLI reads `broker.enabled` from config and branches — embedded uses loopback + internal token, shared uses `shared_broker.url` + configured credentials. Internal token persisted to XDG state (0600).                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | [NATS Transport](analysis-nats-transport-design.md)                                                      | 2026-03-27 |
-| D-25 | MCP `post`: fire-and-forget, returns `notification_id`. MCP `ask`: non-blocking, returns `notification_id` + `resource_uri`; agent reads `DecisionResource` asynchronously via `notifications/resources/updated` (R-CLI-10). Daemon fills system fields from flow context.                                                                                                                                                                                                                                                                                                                                                                                                                                 | [Payload Schemas](analysis-payload-schemas.md)                                                           | 2026-03-27 |
+| D-25 | MCP `post`: fire-and-forget, returns `notification_id`. MCP `ask`: non-blocking, returns `notification_id` + `resource_uri`; agent reads `DecisionResource` asynchronously via `notifications/resources/updated` ([R-CLI-10][r-cli-10]). Daemon fills system fields from flow context.                                                                                                                                                                                                                                                                                                                                                                                                                                 | [Payload Schemas](analysis-payload-schemas.md)                                                           | 2026-03-27 |
 | D-26 | Interjection delivery: CLI dual-subscribes to `.response` + `.interject`; MCP via `InterjectionResource` at `renotify://interjections/{flow_id}`. `stop` terminates flow (failed). `note` forwarded without state change. `pause` deferred to post-MVP. Debounce 5s per flow+action.                                                                                                                                                                                                                                                                                                                                                                                                                       | [NATS Transport](analysis-nats-transport-design.md), [Payload Schemas](analysis-payload-schemas.md)      | 2026-03-27 |
 | D-27 | Timeout: daemon-only enforcement (Model A). Daemon reads `timeout_sec` from `NotificationRequest`, publishes `ErrorResponse` (`code: "timeout"`) on `.response` subject on expiry. CLI has no local timer. MCP agents detect timeout via `DecisionResource` with `decided: true` and absent response fields.                                                                                                                                                                                                                                                                                                                                                                                               | [NATS Transport](analysis-nats-transport-design.md), [CLI Contract](analysis-cli-contract.md)            | 2026-03-28 |
 | D-28 | Workspace discovery: CLI computes `workspace_id` locally from `daemon_id` + cwd (B1). MCP agents provide `workspace_path` in `register_flow`; daemon computes `workspace_id` (Option B). Workspaces created implicitly on first use. No project-detection heuristic.                                                                                                                                                                                                                                                                                                                                                                                                                                       | [Naming & Addressing](analysis-naming-and-addressing.md), [Payload Schemas](analysis-payload-schemas.md) | 2026-03-28 |
@@ -1164,7 +1165,7 @@ implemented — implementation detail belongs in the Section 5 change log.
 | D-44 | TLS fingerprint pinning via custom `X509TrustManager` computing SHA-256 of server cert DER. More restrictive than platform default (trusts exactly one leaf cert vs ~150 CAs). `@SuppressLint("CustomX509TrustManager")` suppresses lint for the non-empty `checkServerTrusted`.                                                                                                                                                                                                                                                                                                                                                                                                                           | [NATS Transport](analysis-nats-transport-design.md)                                                      | 2026-03-29 |
 | D-45 | Credential storage via `EncryptedSharedPreferences` (AES-256-GCM via Android Keystore). Interface/implementation split enables mocking in unit tests.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | [NATS Transport](analysis-nats-transport-design.md)                                                      | 2026-03-29 |
 | D-46 | NATS client: jnats (official Java client) over nats.kt/Ktor. Supports WSS, custom SSLContext, username/password auth, JetStream. No Ktor dependency chain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | [NATS Transport](analysis-nats-transport-design.md)                                                      | 2026-03-30 |
-| D-47 | Android Foreground Service (`FOREGROUND_SERVICE_TYPE_DATA_SYNC`) for persistent NATS connection. Persistent notification satisfies R-MOB-10 (visible connectivity status).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | [NATS Transport](analysis-nats-transport-design.md)                                                      | 2026-03-30 |
+| D-47 | Android Foreground Service (`FOREGROUND_SERVICE_TYPE_DATA_SYNC`) for persistent NATS connection. Persistent notification satisfies [R-MOB-10][r-mob-10] (visible connectivity status).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | [NATS Transport](analysis-nats-transport-design.md)                                                      | 2026-03-30 |
 | D-48 | Manual reconnection with exponential backoff (1s, 2s, 4s, 8s, 16s, 30s capped) instead of jnats auto-reconnect. Full TLS + auth + consumer re-bind on each attempt per Section 8.5.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | [NATS Transport](analysis-nats-transport-design.md)                                                      | 2026-03-30 |
 | D-49 | Added `u` (daemon username) field to `ProvisioningPayload` so mobile app can bind to `mobile-{username}` JetStream consumer. Version stays at 1 (app not shipped).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | [NATS Transport](analysis-nats-transport-design.md)                                                      | 2026-03-30 |
 | D-50 | Mobile consumer changed from pull to push with `DeliverSubject: resystems.renotify.{username}.mobile.deliver`. Required because jnats `PushSubscribeOptions.bind()` needs a deliver subject. Subject placed within user namespace to reuse existing subscribe ACL.                                                                                                                                                                                                                                                                                                                                                                                                                                         | [NATS Transport](analysis-nats-transport-design.md)                                                      | 2026-03-30 |
@@ -1179,11 +1180,11 @@ implemented — implementation detail belongs in the Section 5 change log.
 | D-61 | In-memory decision store resolved asynchronously via MCP resource template `renotify://decisions/{notification_id}`. Created on `ask`, resolved on mobile response arrival.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | [Payload Schemas](analysis-payload-schemas.md)                                                           | 2026-04-01 |
 | D-65 | Interjection delivery: per-flow accumulating queue, not latest-only. Non-blocking drain (`check_interjections`) and blocking await with timeout (`await_interjection`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | [Payload Schemas](analysis-payload-schemas.md)                                                           | 2026-04-01 |
 | D-66 | Interjection consumer owned by MCP server, not registry. Debounce per flow+action (5s configurable). `pause` treated as `note` for MVP.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | [NATS Transport](analysis-nats-transport-design.md)                                                      | 2026-04-01 |
-| D-68 | Multi-device pairing: per-device identity (`mb_` prefix), per-device auth token and NATS account, per-device JetStream consumer. Device registry in `devices.json`. Provisioning payload bumped to v2 (`"d"`, `"n"` fields); legacy v1 auto-migrated. Supersedes the single-device model in R-SEC-02.                                                                                                                                                                                                                                                                                                                                                                                                      | [NATS Transport](analysis-nats-transport-design.md)                                                      | 2026-04-02 |
+| D-68 | Multi-device pairing: per-device identity (`mb_` prefix), per-device auth token and NATS account, per-device JetStream consumer. Device registry in `devices.json`. Provisioning payload bumped to v2 (`"d"`, `"n"` fields); legacy v1 auto-migrated. Supersedes the single-device model in [R-SEC-02][r-sec-02].                                                                                                                                                                                                                                                                                                                                                                                                      | [NATS Transport](analysis-nats-transport-design.md)                                                      | 2026-04-02 |
 | D-69 | Heartbeat carries per-flow detail (`flow_id`, `label`, `metadata`) instead of bare flow ID list. Enables live dashboard rendering of flow progress without additional queries.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | [Payload Schemas](analysis-payload-schemas.md)                                                           | 2026-04-02 |
 | D-70 | State access decoupled from MCP server: all ledger reads and writes route through NATS request-reply endpoints. MCP server has no direct ledger dependency. Shared wire types in `statesvc` package used by both MCP and CLI.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | —                                                                                                        | 2026-04-04 |
 | D-71 | Embedded broker uses in-process NATS transport (`net.Pipe`) instead of TCP loopback. Eliminates local TCP round-trip for daemon internals. External TCP listener retained for CLI connections.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | —                                                                                                        | 2026-04-04 |
-| D-72 | Release keystores excluded from repository (R-SEC-04). Signing conditional on local keystore presence; passwords overridable via Gradle properties or Makefile variables. Committed key considered burned.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | —                                                                                                        | 2026-04-06 |
+| D-72 | Release keystores excluded from repository ([R-SEC-04][r-sec-04]). Signing conditional on local keystore presence; passwords overridable via Gradle properties or Makefile variables. Committed key considered burned.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | —                                                                                                        | 2026-04-06 |
 
 *Note:* IDs D-53, D-55, D-62, D-63, D-64, and D-67 were removed
 during a register cleanup on 2026-04-06. They recorded refactoring
@@ -1201,8 +1202,8 @@ Record completed items here with the date.
 
 | Date | Item | Notes |
 |------|------|-------|
-| 2026-03-26 | A-01a | Enumerated payload schemas across all workflows and revised R-API-08 for minified JSON QR codes. |
-| 2026-03-26 | Review | Document-wide refinement: added Section 1.5 (Key Definitions), Section 2.5 (Security Lifecycle), Section 2.6 (MVP Performance Envelope); new requirements R-API-11, R-CLI-16/17/18, R-MOB-10, R-SEC-01/02/03, R-SYS-01; revised R-API-04, R-API-07, R-CLI-12; added V-00 integration checkpoint, C-12 token revocation; structural fixes. |
+| 2026-03-26 | A-01a | Enumerated payload schemas across all workflows and revised [R-API-08][r-api-08] for minified JSON QR codes. |
+| 2026-03-26 | Review | Document-wide refinement: added Section 1.5 (Key Definitions), Section 2.5 (Security Lifecycle), Section 2.6 (MVP Performance Envelope); new requirements [R-API-11][r-api-11], [R-CLI-16][r-cli-16]/17/18, [R-MOB-10][r-mob-10], [R-SEC-01][r-sec-01]/02/03, [R-SYS-01][r-sys-01]; revised [R-API-04][r-api-04], [R-API-07][r-api-07], [R-CLI-12][r-cli-12]; added V-00 integration checkpoint, C-12 token revocation; structural fixes. |
 | 2026-03-26 | A-01a | Split payload table "Direction / Transport" into separate Transport and Direction columns with a closed taxonomy of transport labels. |
 | 2026-03-27 | A-01b | Defined Go structs and JSON exemplars for all 11 payload schemas with shared enumeration types. |
 | 2026-03-27 | Harmonisation | Renamed "session" to "flow" throughout. Introduced daemon_id, workspace_id, and Crockford Base32 identifiers per naming analysis. Simplified NATS namespace to flat flow-based subjects. Added DaemonHeartbeat payload. Extracted payload schemas into standalone analysis document. Restructured Section 4 as Design Decision Register. |
@@ -1215,9 +1216,9 @@ Record completed items here with the date.
 | 2026-03-27 | A-07 | Notification ID format specified: `ntf_` + 16 Crockford Base32 chars (80 bits from UUIDv7 truncated). Added to identifier summary table in naming analysis. Updated all payload schema exemplars with correct-length IDs. |
 | 2026-03-27 | A-08 | CLI output contract in standalone analysis document. Exit codes 0-6 mapped to ErrorResponse codes. Output routing: stdout=data, stderr=diagnostics. Per-command output specs with JSON exemplars for ask, history, post, pair, revoke. `--format json|text` flag with per-command defaults. Shell script integration examples. |
 | 2026-03-27 | A-09 | Shared broker CLI path documented. CLI branches on `broker.enabled`: embedded mode uses loopback TCP + internal token from XDG state, shared mode uses `shared_broker.url` + configured credentials. Internal token persisted to `$XDG_STATE_HOME/renotify/internal_token` (0600), generated once on first daemon startup. Section 8.6 split into embedded/shared subsections. Deployment comparison table updated with CLI connection rows. |
-| 2026-03-27 | A-10 | MCP `post` and `ask` tool schemas defined. `post` is fire-and-forget, returns notification_id. `ask` is non-blocking, returns notification_id + resource_uri; agent reads DecisionResource asynchronously via notifications/resources/updated (R-CLI-10). Daemon fills system fields (id, daemon_id, workspace_id, timestamp) from flow context. Timeout detection via DecisionResource with decided:true but absent response fields. Operations comparison table updated. |
+| 2026-03-27 | A-10 | MCP `post` and `ask` tool schemas defined. `post` is fire-and-forget, returns notification_id. `ask` is non-blocking, returns notification_id + resource_uri; agent reads DecisionResource asynchronously via notifications/resources/updated ([R-CLI-10][r-cli-10]). Daemon fills system fields (id, daemon_id, workspace_id, timestamp) from flow context. Timeout detection via DecisionResource with decided:true but absent response fields. Operations comparison table updated. |
 | 2026-03-27 | A-11 | Interjection delivery path fully specified. CLI dual-subscribes to `.response` + `.interject` during `ask` wait. Daemon processes interjections: `stop` terminates flow (publishes FlowLifecycleEvent failed), `note` forwards context without state change, `pause` deferred to post-MVP (treated as note). MCP delivery via new `InterjectionResource` at `renotify://interjections/{flow_id}`. Debounce: 5s per flow+action, configurable via `interjection.debounce_window`. New `interjections` SQLite table added to V1 migration. |
-| 2026-03-28 | A-12 | Timeout enforcement resolved: daemon-only model (Model A). Daemon reads `timeout_sec` from `NotificationRequest` payload and is the sole timer enforcer (R-CLI-17). On expiry daemon publishes `ErrorResponse` (`code: "timeout"`) on `.response` subject — CLI receives it directly, no local timer needed. Resolved contradictions in Sections 3.3, 8.6, 8.8 of transport design. Updated CLI contract and payload schemas with enforcement clarification. |
+| 2026-03-28 | A-12 | Timeout enforcement resolved: daemon-only model (Model A). Daemon reads `timeout_sec` from `NotificationRequest` payload and is the sole timer enforcer ([R-CLI-17][r-cli-17]). On expiry daemon publishes `ErrorResponse` (`code: "timeout"`) on `.response` subject — CLI receives it directly, no local timer needed. Resolved contradictions in Sections 3.3, 8.6, 8.8 of transport design. Updated CLI contract and payload schemas with enforcement clarification. |
 | 2026-03-28 | A-13 | Workspace discovery documented. CLI computes workspace_id locally from daemon_id + cwd (B1 model). MCP agents provide workspace_path in register_flow; daemon computes workspace_id and returns it (Option B). RegisterFlowRequest changed from workspace_id to workspace_path; RegisterFlowResult now includes workspace_id. Workspaces created implicitly on first use. No project-detection heuristic. Updated naming analysis Section 2.4, transport design Section 8.6, and C-01 description. |
 | 2026-03-28 | A-14 | Added `offset` field to `HistoryQueryRequest` for offset-based pagination. Updated SQLite history query with `OFFSET :offset`. Added `--offset` CLI flag to `renotify history`. |
 | 2026-03-28 | A-15 | Added `"v": 1` version field to `ProvisioningPayload` only. Other payloads deferred — they are ephemeral and flow between co-deployed components. ProvisioningPayload is uniquely at risk because it persists in the mobile app's local storage across daemon upgrades. |
@@ -1229,8 +1230,8 @@ Record completed items here with the date.
 | 2026-03-29 | C-07 | Pairing generator implemented. ECDSA P-256 self-signed certificate generation (3-year validity, daemon_id in CN, all discovered IPs + localhost in SANs). Local IP discovery (non-loopback, non-link-local) with IPv4 private preference. Pairing token management (always-new `rn_tk_` token, overwrites prior). ProvisioningPayload assembly with single-char JSON keys (`v`, `h`, `p`, `t`, `c`). ASCII QR rendering via `mdp/qrterminal` half-block at EC level L. Text and JSON output formats. `--ip` override, `--regenerate-cert` flag. Certificate fingerprint: SHA-256 of DER, hex-encoded (64 chars). New packages: `tlsgen`, `netutil`, `pairing`. Extended `state/` with `WriteTLS` (0644/0600), `GenerateToken`, `WriteUsername`. Dependency: qrterminal/v3. 64 tests (unit + integration). |
 | 2026-03-29 | C-08 | JetStream configuration implemented. RENOTIFY stream created at daemon startup with memory storage, limits retention, discard old, 1 replica, and configurable age/bytes/msg-size/msgs-per-subj/dup-window from JetStreamConfig. Three durable consumers created: `mobile-{username}` (AckExplicit, MaxDeliver=3, MaxAckPending=256, InactiveThreshold=35m), `daemon-lifecycle-{username}` and `daemon-interject-{username}` (MaxAckPending=64, InactiveThreshold=5m). Uses new `jetstream.New(nc)` API with idempotent `CreateOrUpdateStream`/`CreateOrUpdateConsumer`. Shared broker permission fallback (verify-only on 403). Fixed WSS TLS to use direct `TLSConfig` instead of `TLSMap`. 13 new tests (config builders + publish/consume + isolation). |
 | 2026-03-29 | M-06 | Secure pairing scanner implemented. QR scanning via Google ML Kit Barcode Scanning (bundled) + CameraX preview with `ImageAnalysis` frame processing. `ProvisioningPayload` data class with `fromJson` parsing and strict validation (version, host, port, Crockford Base32 token format, lowercase hex fingerprint). Custom `FingerprintTrustManager` (`X509TrustManager`) computes SHA-256 of server cert DER for fingerprint pinning (Section 5.5 Approach A). `PinnedSSLContext` factory creates `SSLContext` for M-02's NATS WSS connection. `EncryptedProvisioningStore` using `EncryptedSharedPreferences` (AES-256-GCM via Android Keystore). `ScannerActivity` with CameraX + ML Kit + runtime permission handling. `MainActivity` updated with pair button and status display. Dependencies: CameraX 1.4.2, ML Kit barcode-scanning 17.3.0, security-crypto 1.1.0-alpha06. Test infrastructure: JUnit 4.13.2, org.json 20240303 (JVM), AndroidJUnit4 (instrumented). 46 JVM unit tests + 7 instrumented tests. |
-| 2026-03-30 | M-02 | NATS client service implemented. Added `u` (daemon username) field to `ProvisioningPayload` on both Go and Android sides for JetStream consumer binding. Android Foreground Service (`NatsService`) with persistent notification showing connection state (R-MOB-10). `NatsConnectionManager` with coroutine-driven connect/reconnect and exponential backoff (1s-30s capped, Section 8.5). `NatsOptionsBuilder` builds jnats `Options` from provisioning credentials (WSS URL, `PinnedSSLContext`, `userInfo("mobile", token)`, `noReconnect()`). `ConnectionState` sealed class with `StateFlow` for UI observation. Binds to pre-existing `mobile-{username}` durable JetStream consumer (created by C-08). Dependencies: jnats 2.21.1, kotlinx-coroutines-android 1.10.1, lifecycle-runtime-ktx/lifecycle-service 2.9.0. Clarified Section 6.4 of transport design doc with literal NATS usernames. Updated device-testing.md with firewall, emulator networking (10.0.2.2), and NATS troubleshooting. 16 JVM unit tests (options builder, backoff, state, username). |
-| 2026-03-30 | C-12 | Token revocation implemented. `renotify revoke` deletes the pairing token and username files from XDG state and sends SIGHUP to the running daemon. The daemon's `reloadAuthorization()` automatically disconnects clients whose credentials are no longer valid — no separate client-kick API needed. Shared broker mode deletes local token and warns operator must revoke on broker side. Idempotent: reports "no active pairing" when no token exists. Text and JSON output formats. Extracted `signalDaemonReload()` as shared helper in `command/signal.go` (used by both `pair` and `revoke`). Updated `pair` long description to reflect SIGHUP hot-reload (no longer says "daemon must be restarted"). R-SEC-02 already satisfied: `renotify pair` overwrites prior token + SIGHUP disconnects old client. 8 new tests (state deletion + command). |
+| 2026-03-30 | M-02 | NATS client service implemented. Added `u` (daemon username) field to `ProvisioningPayload` on both Go and Android sides for JetStream consumer binding. Android Foreground Service (`NatsService`) with persistent notification showing connection state ([R-MOB-10][r-mob-10]). `NatsConnectionManager` with coroutine-driven connect/reconnect and exponential backoff (1s-30s capped, Section 8.5). `NatsOptionsBuilder` builds jnats `Options` from provisioning credentials (WSS URL, `PinnedSSLContext`, `userInfo("mobile", token)`, `noReconnect()`). `ConnectionState` sealed class with `StateFlow` for UI observation. Binds to pre-existing `mobile-{username}` durable JetStream consumer (created by C-08). Dependencies: jnats 2.21.1, kotlinx-coroutines-android 1.10.1, lifecycle-runtime-ktx/lifecycle-service 2.9.0. Clarified Section 6.4 of transport design doc with literal NATS usernames. Updated device-testing.md with firewall, emulator networking (10.0.2.2), and NATS troubleshooting. 16 JVM unit tests (options builder, backoff, state, username). |
+| 2026-03-30 | C-12 | Token revocation implemented. `renotify revoke` deletes the pairing token and username files from XDG state and sends SIGHUP to the running daemon. The daemon's `reloadAuthorization()` automatically disconnects clients whose credentials are no longer valid — no separate client-kick API needed. Shared broker mode deletes local token and warns operator must revoke on broker side. Idempotent: reports "no active pairing" when no token exists. Text and JSON output formats. Extracted `signalDaemonReload()` as shared helper in `command/signal.go` (used by both `pair` and `revoke`). Updated `pair` long description to reflect SIGHUP hot-reload (no longer says "daemon must be restarted"). [R-SEC-02][r-sec-02] already satisfied: `renotify pair` overwrites prior token + SIGHUP disconnects old client. 8 new tests (state deletion + command). |
 | 2026-03-30 | C-13 | Daemon heartbeat publisher implemented. New `heartbeat/` package with `DaemonHeartbeat` and `WorkspaceInfo` payload types matching the analysis schema. `Publisher` implements `daemon.Subsystem`: publishes an immediate heartbeat on Start (Section 8.1 step 12), then periodic at configurable interval (default 30s). `Publish()` for on-change triggers, `SetWorkspaces()` for thread-safe snapshot updates. Workspaces array is empty until the flow registry is implemented (C-03/C-04/C-05). Subject: `resystems.renotify.{username}.daemon.{daemon_id}.heartbeat` via Core NATS Pub/Sub (ephemeral, not JetStream). `daemon_id` loaded in `runDaemon()` before controller startup for publisher construction. 8 new tests (subject, payload serialisation, empty workspaces, immediate/periodic publish, stop, workspace update). |
 | 2026-03-31 | C-14 | Config init and parameter help implemented. New `config.Registry` (`[]ParamInfo`) as single source of truth for key metadata — carries key path, type label, env var, description, and `Resolve func(*Config) any`. Refactored `setDefaults()` from 30 hand-written lines to a 6-line loop iterating the registry, eliminating duplication between Viper key registration and the parameter catalogue. `renotify config init` generates `settings.json` (minimal with username only, or `--full` with all defaults; `--force` to overwrite; `--output` for custom path). `renotify config list` prints tabwriter table of all 27 parameters (key, type, default, env var, description); `--format json` for machine-readable output. `config` parent command overrides `PersistentPreRunE` to skip config loading so commands work without existing settings.json. 12 new tests (5 registry, 7 command). |
 | 2026-03-31 | C-03 | Local daemon SQLite state implemented. New `payload/` package for shared wire-format types (`NotificationRequest`, `NotificationResponse`, `FlowLifecycleEvent`, `InterjectionCommand`, `ErrorResponse`) with typed enums (`ResponseType`, `Priority`, `FlowStatus`, `InterjectionAction`) matching analysis-payload-schemas.md. New `ledger/` package using `modernc.org/sqlite` (pure Go, CGo-free). Five tables with 9 indices; `username TEXT NOT NULL` on 4 record-originating tables for future history aggregation. Ledger accepts payload types for persistence; daemon-side enrichment (username) passed via `WriteContext` struct, keeping wire-format types clean. `ActiveFlow` is a ledger-only storage type (not a wire format). Schema V1 DDL in embedded `schema_v1.sql`. PRAGMA `user_version`-based migration, WAL mode, foreign keys, busy timeout. Full CRUD: INSERT OR IGNORE dedup, transactional flow registration/refresh/termination, stale reaping query, rate-limiting count, LEFT JOIN history query with filters and pagination. Ledger implements `daemon.Subsystem` (registered first). `renotify history` CLI wiring deferred to C-09 (Phase 6). 42 ledger tests. |
@@ -1238,19 +1239,19 @@ Record completed items here with the date.
 | 2026-03-31 | C-05 | Interactive ask implemented. `renotify ask` publishes a `NotificationRequest` with `timeout_sec` and user-specified `response_types`/`actions`, creates two ephemeral JetStream consumers (`.response` and `.interject`) using the new `natsjs` API, and blocks until a response arrives. Discriminates `NotificationResponse` from `ErrorResponse` on the `.response` subject via `code` field probe. Handles interjections: `stop` → exit 1 with failed lifecycle, `note` → print to stderr and continue waiting. CLI safety timeout (`timeout_sec + ask_grace_period`) protects against daemon failure. New `config.Timeout.AskGracePeriod` (default 30s) configurable via `settings.json`. Shared flow setup extracted to `command/flow.go` (`setupFlow`/`flowContext`), used by both `post` and `ask`. Short flags: `-t`/`-b`/`-r`/`-a`. Text format: `Response: Yes/No/Action`, `Comment: ...`. JSON format: raw `NotificationResponse`. Signal handling (Ctrl-C) publishes failed lifecycle before exit. 10 new ask tests + config registry updated to 28 entries. |
 | 2026-03-31 | — | `renotify answer` utility implemented. Publishes a `NotificationResponse` to unblock a waiting `renotify ask`. Takes `--flow-id` (`-f`) and `--request-id` (`-n`) from ask's stderr output. Response flags: `--accepted`/`--rejected` (mutually exclusive), `--action` (`-a`), `--text` (`-t`, reads stdin). Lightweight: connects, publishes one JetStream message with dedup header, exits. No flow lifecycle events (owned by ask). `ask` updated to print identifiers to stderr (`Waiting for response (flow=..., notification=...)`). Enables end-to-end ask/answer testing without mobile app. 8 new tests. |
 | 2026-03-31 | — | `renotify interject` utility implemented. Publishes an `InterjectionCommand` (`stop`, `pause`, `note`) to a running flow's `.interject` subject. Action is a positional argument; takes `--flow-id` (`-f`) and optional `--context` (`-c`, reads stdin). Dedup header uses flow_id + action + timestamp to distinguish successive interjections. Completes the CLI testing toolkit: post → ask → answer/interject. 7 new tests. |
-| 2026-03-31 | M-03 | Notification rendering implemented. New `notification/` package: `NotificationPayload` data class parses incoming `NotificationRequest` JSON, `NotificationRenderer` builds and posts native `NotificationCompat` notifications. Renders both fire-and-forget (post, dismissible, no buttons) and interactive (ask, ongoing, with action buttons). Priority differentiation: high → heads-up via `renotify_urgent` channel (IMPORTANCE_HIGH), normal/low → `renotify_notifications` channel (IMPORTANCE_DEFAULT). Action buttons per response type: boolean (Yes/No), choice (per-label), text (RemoteInput inline reply), multi-modal (combination). Android 3-button limit enforced: overflow shows first 2 + "More..." button. PendingIntents carry notification_id/flow_id/action_type extras for M-04 BroadcastReceiver. `NatsConnectionManager` updated: message callback via coroutine pump with `nextMessage()`, dedup set for reconnect redelivery. `NatsService` wires message handler with subject discrimination (`.request` → render, `.lifecycle` completed/failed → dismiss). 14 new JVM tests (payload parsing, channel selection, notification ID determinism). R-MOB-03 satisfied. |
-| 2026-03-31 | M-04 | Action response dispatcher implemented. `NotificationActionReceiver` BroadcastReceiver catches notification action button taps, extracts intent extras (notification_id, flow_id, action_type, action_value), and delegates publishing to `NatsService` via `startService` with `ACTION_PUBLISH_RESPONSE`. Service builds `NotificationResponse` JSON (`buildResponseJson` — static, testable), publishes to `.response` JetStream subject with dedup header, and dismisses the notification. Handles boolean (accepted/rejected), choice (action label), text (RemoteInput extraction), and "More..." (opens app). Registered in AndroidManifest.xml. R-MOB-04 satisfied. 6 new JVM tests. |
-| 2026-03-31 | V-00 | Integration smoke tests implemented. 7 scenarios in `smoke_test.go`: post round-trip (payload fields, lifecycle events), ask with mock response (full round-trip), ask + answer utility (CLI-to-CLI), ask + interject stop, JetStream buffering (publish before subscriber connects, delivered via durable consumer), safety timeout (exit code 3), and payload serialisation (snake_case keys, omitempty, RFC 3339 timestamps). Mock mobile subscriber uses `broker.EnsureJetStream` to create durable consumers. Verifies R-CLI-04, R-CLI-05, R-API-01, R-API-02, R-CLI-12. Phase 4 complete. |
-| 2026-03-31 | A-16 | Claude Code hook integration analysis. Mapped `PermissionRequest` hook event to `renotify ask` (boolean Allow/Deny) and `Notification` hook event to `renotify post` (fire-and-forget). Evaluated command (stdio) vs HTTP transport — command preferred for graceful fallback (exit 1 → terminal prompt), no daemon dependency, and negligible latency overhead vs human response time. Designed `renotify dispatch` as universal hook handler: reads JSON from stdin, discriminates on `hook_event_name`, composes notifications from tool-specific input summarisation. New requirement R-CLI-19, implementation item C-15. |
-| 2026-04-01 | C-10 | Active registry service implemented. New `registry/` package as daemon subsystem: lifecycle consumer binds to `daemon-lifecycle-{username}` JetStream consumer via `consumer.Messages()` iterator, processes `FlowLifecycleEvent` messages (active→register, completed/failed→terminate), updates SQLite active_flows table. Stale reaper goroutine (30s ticker) calls `ReapStaleFlows()` and publishes `failed` lifecycle events for expired flows. `svc.flows` Core NATS Request-Reply endpoint serves `ActiveFlowsQuery`/`ActiveFlowsResult`. Workspace snapshot builder groups active flows by workspace_id, feeds `heartbeat.Publisher.SetWorkspaces()` + immediate publish on every state change. Schema V2 migration adds `display_name` and `abs_path` columns to `active_flows`. CLI lifecycle events include workspace metadata (`workspace_display_name`, `workspace_abs_path`) in `FlowLifecycleEvent.Metadata`. Subsystem ordering: ledger → http → mcp → heartbeat → registry. R-CLI-14, R-CLI-18 satisfied. 6 new registry tests, all existing tests pass. |
-| 2026-04-01 | C-06 | MCP server implemented with all 5 tools and DecisionResource. `register_flow` generates flow_id + workspace_id, registers in ledger, publishes lifecycle event. `refresh_flow` updates label/metadata, resets reaping timer. `terminate_flow` removes flow, publishes terminal lifecycle event. `post` sends fire-and-forget notification to mobile. `ask` sends interactive notification, creates pending `DecisionResource`, starts response subscriber goroutine; on mobile response, resolves resource and emits `notifications/resources/updated` via MCP SDK. DecisionStore: in-memory thread-safe map served via resource template `renotify://decisions/{notification_id}`. Shared `broker.PublishJSON()` extracted from CLI commands. Workspace metadata constants moved to `payload` package. MCP SDK `SubscribeHandler`/`UnsubscribeHandler` configured for resource subscriptions. C-11 re-scoped to interjections + timeout enforcement. Tool descriptions written as agent instructions per project memory. Manual testing playbook in `cli/docs/mcp-testing.md`. R-CLI-08, R-CLI-10, R-CLI-15 satisfied. 17 new tests (5 server, 6 DecisionStore, 4 integration, 2 subscriber). |
-| 2026-04-01 | C-11 | MCP interjections and timeouts implemented. New `InterjectionStore` accumulates interjections per flow with queue + notification channel. Interjection consumer binds to `daemon-interject-{username}` JetStream consumer, debounces per flow+action (5s window), dispatches: `stop` → publish failed lifecycle + resolve pending decisions; `note` → update store + emit resource notification; `pause` → treat as note. Two new tools: `check_interjections` (non-blocking drain) and `await_interjection` (blocking with timeout). `InterjectionResource` template at `renotify://interjections/{flow_id}`. Daemon-side timeout timer per `ask`: goroutine selects on timeout vs DecisionStore.Resolved channel, publishes `ErrorResponse(code:"timeout")` on `.response` on expiry. `InterjectionResource` payload type added. R-CLI-08, R-CLI-17, R-API-09 satisfied. |
-| 2026-04-01 | C-15 | Hook dispatcher command implemented. `renotify dispatch` reads Claude Code hook JSON from stdin, discriminates on `hook_event_name`. `PermissionRequest` → interactive `ask` with boolean Allow/Deny response, blocks until mobile user responds, writes hook decision JSON to stdout. `Notification` → fire-and-forget `post`, exits immediately. Unsupported events → silent no-op (exit 0). Exit 1 on error for graceful fallback to terminal prompt. Tool input summarisation extracts human-readable body per tool (Bash→command, Edit/Write/Read→file_path, Glob→pattern in path, Grep→/pattern/ in path, Agent→type: description, WebFetch→url, WebSearch→query, MCP→tool name, fallback→compact JSON truncated to 200 chars). Source field: `claude-code/{session_id}`. Refactored `setupFlow` into `setupFlowFromDir` for hook's cwd. Testing playbook in `cli/docs/hooks-testing.md`. R-CLI-19 satisfied. 23 new tests (13 summarisation, 2 source, 3 command-level, 5 integration). |
-| 2026-04-01 | M-09 | Dashboard rendering implemented. Android app subscribes to daemon heartbeat via Core NATS Pub/Sub (`daemon.*.heartbeat` wildcard). `DaemonHeartbeat` and `WorkspaceInfo` Kotlin data classes parse heartbeat JSON. `DashboardAdapter` renders a flat `RecyclerView` with workspace headers and flow items showing label and metadata. `NatsService` exposes `dashboardState: StateFlow<DaemonHeartbeat?>` for `MainActivity` observation. Immediate dashboard load on connect via `svc.flows` Request-Reply query. `workspace_name` field added to `NotificationRequest` for mobile subtext rendering. Heartbeat enriched with `FlowInfo` type (D-69) carrying label and metadata per flow — dashboard updates live on `refresh_flow`. Silent mode toggle suppresses notifications. RecyclerView 1.4.0 dependency. R-MOB-09 satisfied. |
-| 2026-04-02 | — | Multi-device pairing implemented (R-MOB-11). Per-device `device_id` (`mb_` prefix), per-device auth token, per-device NATS account and JetStream consumer. Device registry in `devices.json` replaces single-token `pairing/token` file. Provisioning payload bumped to v2 with `"d"` (device_id) and `"n"` (NATS username). Legacy v1 migrated on daemon startup. New `renotify pairings` command. Updated `renotify revoke` with `--device` and `--all` flags. Android app parses v2 payload, authenticates with device-specific username, binds to device-specific consumer. R-SEC-02 updated from single-device to multi-device model. D-68 records design. |
-| 2026-04-02 | M-08 | Active Workspace UI implemented. Tap a flow row in the dashboard to expand inline with Stop and Note action buttons. Stop sends `InterjectionCommand(action="stop")` to the flow's `.interject` subject via JetStream. Note shows a text input dialog and sends `InterjectionCommand(action="note", context="...")`. Publishing follows the existing M-04 response pattern (`NatsService.handlePublishInterjection()` with dedup header). No Go changes — mobile ACL already permits `.flow.*.interject` publish. R-MOB-08 satisfied. Phase 5 complete. |
+| 2026-03-31 | M-03 | Notification rendering implemented. New `notification/` package: `NotificationPayload` data class parses incoming `NotificationRequest` JSON, `NotificationRenderer` builds and posts native `NotificationCompat` notifications. Renders both fire-and-forget (post, dismissible, no buttons) and interactive (ask, ongoing, with action buttons). Priority differentiation: high → heads-up via `renotify_urgent` channel (IMPORTANCE_HIGH), normal/low → `renotify_notifications` channel (IMPORTANCE_DEFAULT). Action buttons per response type: boolean (Yes/No), choice (per-label), text (RemoteInput inline reply), multi-modal (combination). Android 3-button limit enforced: overflow shows first 2 + "More..." button. PendingIntents carry notification_id/flow_id/action_type extras for M-04 BroadcastReceiver. `NatsConnectionManager` updated: message callback via coroutine pump with `nextMessage()`, dedup set for reconnect redelivery. `NatsService` wires message handler with subject discrimination (`.request` → render, `.lifecycle` completed/failed → dismiss). 14 new JVM tests (payload parsing, channel selection, notification ID determinism). [R-MOB-03][r-mob-03] satisfied. |
+| 2026-03-31 | M-04 | Action response dispatcher implemented. `NotificationActionReceiver` BroadcastReceiver catches notification action button taps, extracts intent extras (notification_id, flow_id, action_type, action_value), and delegates publishing to `NatsService` via `startService` with `ACTION_PUBLISH_RESPONSE`. Service builds `NotificationResponse` JSON (`buildResponseJson` — static, testable), publishes to `.response` JetStream subject with dedup header, and dismisses the notification. Handles boolean (accepted/rejected), choice (action label), text (RemoteInput extraction), and "More..." (opens app). Registered in AndroidManifest.xml. [R-MOB-04][r-mob-04] satisfied. 6 new JVM tests. |
+| 2026-03-31 | V-00 | Integration smoke tests implemented. 7 scenarios in `smoke_test.go`: post round-trip (payload fields, lifecycle events), ask with mock response (full round-trip), ask + answer utility (CLI-to-CLI), ask + interject stop, JetStream buffering (publish before subscriber connects, delivered via durable consumer), safety timeout (exit code 3), and payload serialisation (snake_case keys, omitempty, RFC 3339 timestamps). Mock mobile subscriber uses `broker.EnsureJetStream` to create durable consumers. Verifies [R-CLI-04][r-cli-04], [R-CLI-05][r-cli-05], [R-API-01][r-api-01], [R-API-02][r-api-02], [R-CLI-12][r-cli-12]. Phase 4 complete. |
+| 2026-03-31 | A-16 | Claude Code hook integration analysis. Mapped `PermissionRequest` hook event to `renotify ask` (boolean Allow/Deny) and `Notification` hook event to `renotify post` (fire-and-forget). Evaluated command (stdio) vs HTTP transport — command preferred for graceful fallback (exit 1 → terminal prompt), no daemon dependency, and negligible latency overhead vs human response time. Designed `renotify dispatch` as universal hook handler: reads JSON from stdin, discriminates on `hook_event_name`, composes notifications from tool-specific input summarisation. New requirement [R-CLI-19][r-cli-19], implementation item C-15. |
+| 2026-04-01 | C-10 | Active registry service implemented. New `registry/` package as daemon subsystem: lifecycle consumer binds to `daemon-lifecycle-{username}` JetStream consumer via `consumer.Messages()` iterator, processes `FlowLifecycleEvent` messages (active→register, completed/failed→terminate), updates SQLite active_flows table. Stale reaper goroutine (30s ticker) calls `ReapStaleFlows()` and publishes `failed` lifecycle events for expired flows. `svc.flows` Core NATS Request-Reply endpoint serves `ActiveFlowsQuery`/`ActiveFlowsResult`. Workspace snapshot builder groups active flows by workspace_id, feeds `heartbeat.Publisher.SetWorkspaces()` + immediate publish on every state change. Schema V2 migration adds `display_name` and `abs_path` columns to `active_flows`. CLI lifecycle events include workspace metadata (`workspace_display_name`, `workspace_abs_path`) in `FlowLifecycleEvent.Metadata`. Subsystem ordering: ledger → http → mcp → heartbeat → registry. [R-CLI-14][r-cli-14], [R-CLI-18][r-cli-18] satisfied. 6 new registry tests, all existing tests pass. |
+| 2026-04-01 | C-06 | MCP server implemented with all 5 tools and DecisionResource. `register_flow` generates flow_id + workspace_id, registers in ledger, publishes lifecycle event. `refresh_flow` updates label/metadata, resets reaping timer. `terminate_flow` removes flow, publishes terminal lifecycle event. `post` sends fire-and-forget notification to mobile. `ask` sends interactive notification, creates pending `DecisionResource`, starts response subscriber goroutine; on mobile response, resolves resource and emits `notifications/resources/updated` via MCP SDK. DecisionStore: in-memory thread-safe map served via resource template `renotify://decisions/{notification_id}`. Shared `broker.PublishJSON()` extracted from CLI commands. Workspace metadata constants moved to `payload` package. MCP SDK `SubscribeHandler`/`UnsubscribeHandler` configured for resource subscriptions. C-11 re-scoped to interjections + timeout enforcement. Tool descriptions written as agent instructions per project memory. Manual testing playbook in `cli/docs/mcp-testing.md`. [R-CLI-08][r-cli-08], [R-CLI-10][r-cli-10], [R-CLI-15][r-cli-15] satisfied. 17 new tests (5 server, 6 DecisionStore, 4 integration, 2 subscriber). |
+| 2026-04-01 | C-11 | MCP interjections and timeouts implemented. New `InterjectionStore` accumulates interjections per flow with queue + notification channel. Interjection consumer binds to `daemon-interject-{username}` JetStream consumer, debounces per flow+action (5s window), dispatches: `stop` → publish failed lifecycle + resolve pending decisions; `note` → update store + emit resource notification; `pause` → treat as note. Two new tools: `check_interjections` (non-blocking drain) and `await_interjection` (blocking with timeout). `InterjectionResource` template at `renotify://interjections/{flow_id}`. Daemon-side timeout timer per `ask`: goroutine selects on timeout vs DecisionStore.Resolved channel, publishes `ErrorResponse(code:"timeout")` on `.response` on expiry. `InterjectionResource` payload type added. [R-CLI-08][r-cli-08], [R-CLI-17][r-cli-17], [R-API-09][r-api-09] satisfied. |
+| 2026-04-01 | C-15 | Hook dispatcher command implemented. `renotify dispatch` reads Claude Code hook JSON from stdin, discriminates on `hook_event_name`. `PermissionRequest` → interactive `ask` with boolean Allow/Deny response, blocks until mobile user responds, writes hook decision JSON to stdout. `Notification` → fire-and-forget `post`, exits immediately. Unsupported events → silent no-op (exit 0). Exit 1 on error for graceful fallback to terminal prompt. Tool input summarisation extracts human-readable body per tool (Bash→command, Edit/Write/Read→file_path, Glob→pattern in path, Grep→/pattern/ in path, Agent→type: description, WebFetch→url, WebSearch→query, MCP→tool name, fallback→compact JSON truncated to 200 chars). Source field: `claude-code/{session_id}`. Refactored `setupFlow` into `setupFlowFromDir` for hook's cwd. Testing playbook in `cli/docs/hooks-testing.md`. [R-CLI-19][r-cli-19] satisfied. 23 new tests (13 summarisation, 2 source, 3 command-level, 5 integration). |
+| 2026-04-01 | M-09 | Dashboard rendering implemented. Android app subscribes to daemon heartbeat via Core NATS Pub/Sub (`daemon.*.heartbeat` wildcard). `DaemonHeartbeat` and `WorkspaceInfo` Kotlin data classes parse heartbeat JSON. `DashboardAdapter` renders a flat `RecyclerView` with workspace headers and flow items showing label and metadata. `NatsService` exposes `dashboardState: StateFlow<DaemonHeartbeat?>` for `MainActivity` observation. Immediate dashboard load on connect via `svc.flows` Request-Reply query. `workspace_name` field added to `NotificationRequest` for mobile subtext rendering. Heartbeat enriched with `FlowInfo` type (D-69) carrying label and metadata per flow — dashboard updates live on `refresh_flow`. Silent mode toggle suppresses notifications. RecyclerView 1.4.0 dependency. [R-MOB-09][r-mob-09] satisfied. |
+| 2026-04-02 | — | Multi-device pairing implemented ([R-MOB-11][r-mob-11]). Per-device `device_id` (`mb_` prefix), per-device auth token, per-device NATS account and JetStream consumer. Device registry in `devices.json` replaces single-token `pairing/token` file. Provisioning payload bumped to v2 with `"d"` (device_id) and `"n"` (NATS username). Legacy v1 migrated on daemon startup. New `renotify pairings` command. Updated `renotify revoke` with `--device` and `--all` flags. Android app parses v2 payload, authenticates with device-specific username, binds to device-specific consumer. [R-SEC-02][r-sec-02] updated from single-device to multi-device model. D-68 records design. |
+| 2026-04-02 | M-08 | Active Workspace UI implemented. Tap a flow row in the dashboard to expand inline with Stop and Note action buttons. Stop sends `InterjectionCommand(action="stop")` to the flow's `.interject` subject via JetStream. Note shows a text input dialog and sends `InterjectionCommand(action="note", context="...")`. Publishing follows the existing M-04 response pattern (`NatsService.handlePublishInterjection()` with dedup header). No Go changes — mobile ACL already permits `.flow.*.interject` publish. [R-MOB-08][r-mob-08] satisfied. Phase 5 complete. |
 | 2026-04-02 | C-09 | Daemon Core NATS History API implemented. New `svc.history` Core NATS Request-Reply endpoint in the registry service wraps `ledger.QueryHistory()` with `HistoryQueryRequest`/`HistoryQueryResult` wire types. Supports workspace/flow filtering, time range, and offset-based pagination. CLI `renotify history` command fully implemented with `--workspace-id`, `--flow-id`, `--since`, `--until`, `--limit`, `--offset`, `--format` flags (default text). 4 endpoint tests (empty, with records, workspace filter, pagination). |
-| 2026-04-02 | M-07 | Remote History Viewer UI implemented. Tab toggle ("Dashboard · History") below the status line swaps the RecyclerView between the live dashboard and paginated notification history. `HistoryAdapter` renders record rows (title, timestamp, priority, response summary) with "Load more" pagination footer. `HistoryQueryResult` and `HistoryRecord` Kotlin data classes parse the `svc.history` wire format. `NatsConnectionManager.queryHistory()` uses Core NATS Request-Reply. `NatsService` exposes `historyState: StateFlow<HistoryQueryResult?>` with `ACTION_QUERY_HISTORY` intent and append-mode pagination. 7 parsing tests. R-MOB-07 satisfied. |
+| 2026-04-02 | M-07 | Remote History Viewer UI implemented. Tab toggle ("Dashboard · History") below the status line swaps the RecyclerView between the live dashboard and paginated notification history. `HistoryAdapter` renders record rows (title, timestamp, priority, response summary) with "Load more" pagination footer. `HistoryQueryResult` and `HistoryRecord` Kotlin data classes parse the `svc.history` wire format. `NatsConnectionManager.queryHistory()` uses Core NATS Request-Reply. `NatsService` exposes `historyState: StateFlow<HistoryQueryResult?>` with `ACTION_QUERY_HISTORY` intent and append-mode pagination. 7 parsing tests. [R-MOB-07][r-mob-07] satisfied. |
 | 2026-04-02 | C-16 | Remote Silent Mode implemented. CLI `renotify silent --device <id> on\|off` publishes `deviceControl` message (`command: "set_silent"`) to `resystems.renotify.{username}.device.{device_id}.control` via Core NATS Pub/Sub. Android `NatsConnectionManager` subscribes to the device-specific control subject on connect/reconnect. `NatsService.handleDeviceControl()` parses the command and calls `setSilentMode()` to update StateFlow + SharedPreferences. `--all` flag targets all paired devices. Device ID displayed on dashboard in small grey text below status line. No ACL changes needed — existing wildcards cover the new subject. 8 CLI tests. |
 | 2026-04-02 | M-05 | UI & Branding implemented. Resystems SVG logo converted to Android VectorDrawable (`res/drawable/ic_resystems_logo.xml`). Dancing Script Bold and Montserrat Regular fonts bundled in `assets/fonts/`. New `Brand.kt` centralises colour constants (13 named colours), font loading with caching, and `brandedName()` SpannableString builder using `CustomTypefaceSpan` with `RelativeSizeSpan(1.4f)` for the "Re" prefix. System ActionBar replaced with programmatic dark header (`#202020`) containing logo + branded "Renotify" text. Small "Resystems" footer right-justified below the button bar. All hardcoded hex colour literals (~25 occurrences) across `MainActivity`, `DashboardAdapter`, and `HistoryAdapter` extracted to `Brand` constants. Status bar coloured to match header. |
 | 2026-04-03 | — | Standard SSE transport (`/sse`) added alongside Streamable HTTP (`/mcp`) using go-sdk's built-in `mcp.SSEHandler`. Fixed `http.Flusher` forwarding in `httpserver` log middleware. SSE endpoint experimental — Antigravity testing showed protocol dialect mismatch (sends Streamable HTTP POST-first, not SSE GET-first). |
@@ -1261,14 +1262,14 @@ Record completed items here with the date.
 | 2026-04-03 | P-03 | APK management commands implemented as `renotify app apk extract` and `renotify app apk serve`. Extract writes the embedded APK to disk. Serve starts a temporary HTTP server with QR code download URL, uses `http.ServeContent` for Range request support (required by Firefox), and prints ufw firewall hints on Linux. IP discovery fixed: `FlagRunning` check filters virtual bridges (virbr0, docker0) that lack carrier. |
 | 2026-04-03 | V-01 | Test gap analysis and code quality pass. Removed dead `caCert` ReadFile in `broker/client.go`. Fixed duplicate `New()` comment in `mcpserver/server.go`. Extracted `sessionIDPayload` type in `stdio_relay.go`. Extracted shared `isErrorResponse()` helper from duplicated inline probes in `ask.go` and `dispatch.go` with 5 unit tests. Added 7 broker subject unit tests (service, device, MCP). Added MCP tool error-path tests (expired flow, terminated flow). Added APK extract write-path test (skipped when APK absent). |
 | 2026-04-03 | V-02 | README rewritten (~110 lines) with quick start, agent integration configs (Claude Code HTTP MCP, Antigravity/Cursor stdio, Claude Code hooks), CLI command table, and links to testing guides. New `docs/renotify-architecture.md` with system context prose, design principles, Mermaid system block diagram (concurrent HTTP MCP + stdio + terminal + multi-device), and sequence diagrams for post, ask, and interjection flows. Port architecture table and NATS subject namespace reference. Phase 7 complete. |
-| 2026-04-04 | — | Requirements gap analysis: R-CLI-20 (State Management Authority), R-CLI-21 (MCP Server as Broker Client), R-CLI-22 (In-Process Broker Transport) added. Phase 8 implementation plan (C-17 through C-19, V-04, V-05) defined. |
+| 2026-04-04 | — | Requirements gap analysis: [R-CLI-20][r-cli-20] (State Management Authority), [R-CLI-21][r-cli-21] (MCP Server as Broker Client), [R-CLI-22][r-cli-22] (In-Process Broker Transport) added. Phase 8 implementation plan (C-17 through C-19, V-04, V-05) defined. |
 | 2026-04-04 | C-17 | State management subsystem extracted. Registry extended with 4 write endpoints (`svc.insert-request`, `svc.insert-response`, `svc.insert-interjection`, `svc.update-activity`). New `statesvc` package with shared wire types. MCP server migrated to `stateClient` — all state access via NATS request-reply. Production `mcpserver` package has zero `ledger` import. Endpoint wire types migrated from `registry` to `statesvc`. All existing tests updated and passing (unit + integration). |
 | 2026-04-04 | C-19 | In-process NATS transport for embedded broker. `ConnectEmbedded()` now takes `*server.Server` and uses `nats.InProcessServer()` to connect via `net.Pipe()`. TCP listener remains for CLI. `HistoryRecord` wire format standardised to snake_case (was PascalCase from missing JSON tags); Android parser and tests updated to match. |
 | 2026-04-04 | V-04 | Decoupling verification. 4 write endpoint isolation tests (`TestInsertRequestEndpoint`, `TestInsertResponseEndpoint`, `TestInsertInterjectionEndpoint`, `TestUpdateActivityEndpoint`) verify NATS request-reply contract for each `svc.insert-*` endpoint. `TestController_SharedBrokerMCPRoundTrip` exercises the full MCP→stateClient→NATS TCP→registry→ledger path with the daemon connected to a shared broker (not embedded). All existing unit and integration tests continue to pass. |
 | 2026-04-04 | V-05 | Architecture document rewritten. System block diagram now shows state subsystem (registry + ledger endpoints), heartbeat publisher, and in-process NATS transport for daemon internals. Direct `MCP → Ledger` edge removed — all state access routes through the broker. New shared broker deployment section with second Mermaid diagram showing collocated + shared and separated + shared topologies. Sequence diagrams updated: post, ask, and interjection flows show state subsystem as explicit participant for ledger writes via `svc.*` NATS endpoints. Port architecture table corrected (4222 serves CLI, not daemon internal). NATS subject namespace table split into three categories (JetStream, state service, ephemeral) with 4 new `svc.insert-*` write subjects and caller attribution. Transport labels standardised throughout. Phase 8 complete. |
-| 2026-04-05 | M-10 | Notification tap-to-open implemented. R-MOB-12 requirement added. `PendingIntent.getActivity()` content intent added to `NatsService.buildNotification()` targeting `MainActivity` with `FLAG_ACTIVITY_SINGLE_TOP \| FLAG_ACTIVITY_CLEAR_TOP` and `FLAG_IMMUTABLE`. `android:launchMode="singleTop"` added to `MainActivity` in `AndroidManifest.xml` to prevent duplicate instances. R-MOB-12 satisfied. |
-| 2026-04-05 | M-11 | Content notification flow navigation implemented. R-MOB-13 requirement added. `NotificationRenderer.render()` now sets a `contentIntent` carrying `EXTRA_NAVIGATE_FLOW_ID` on all content notifications (informational and interactive). `MainActivity.handleFlowNavigationIntent()` switches to the dashboard tab and calls `DashboardAdapter.expandFlow()` to expand the originating flow. Gracefully ignored if the flow has ended. Per-notification `PendingIntent` keyed by `androidId` prevents intent reuse across notifications. R-MOB-13 satisfied. |
-| 2026-04-06 | — | Release keystore removed from repository (D-72, R-SEC-04). Signing config in `build.gradle.kts` conditional on local keystore presence; warns when absent. Passwords overridable via Gradle properties or Makefile variables (default `renotify`). New `make generate-keystore` target auto-generates developer-local ECDSA P-256 keystore, wired as prerequisite of `build`. `*.keystore` gitignored. Old key burned; history scrubbed in aad54e4. |
+| 2026-04-05 | M-10 | Notification tap-to-open implemented. [R-MOB-12][r-mob-12] requirement added. `PendingIntent.getActivity()` content intent added to `NatsService.buildNotification()` targeting `MainActivity` with `FLAG_ACTIVITY_SINGLE_TOP \| FLAG_ACTIVITY_CLEAR_TOP` and `FLAG_IMMUTABLE`. `android:launchMode="singleTop"` added to `MainActivity` in `AndroidManifest.xml` to prevent duplicate instances. [R-MOB-12][r-mob-12] satisfied. |
+| 2026-04-05 | M-11 | Content notification flow navigation implemented. [R-MOB-13][r-mob-13] requirement added. `NotificationRenderer.render()` now sets a `contentIntent` carrying `EXTRA_NAVIGATE_FLOW_ID` on all content notifications (informational and interactive). `MainActivity.handleFlowNavigationIntent()` switches to the dashboard tab and calls `DashboardAdapter.expandFlow()` to expand the originating flow. Gracefully ignored if the flow has ended. Per-notification `PendingIntent` keyed by `androidId` prevents intent reuse across notifications. [R-MOB-13][r-mob-13] satisfied. |
+| 2026-04-06 | — | Release keystore removed from repository (D-72, [R-SEC-04][r-sec-04]). Signing config in `build.gradle.kts` conditional on local keystore presence; warns when absent. Passwords overridable via Gradle properties or Makefile variables (default `renotify`). New `make generate-keystore` target auto-generates developer-local ECDSA P-256 keystore, wired as prerequisite of `build`. `*.keystore` gitignored. Old key burned; history scrubbed in aad54e4. |
 
 ## 6. References
 
@@ -1317,3 +1318,48 @@ Record completed items here with the date.
 [jnats]: https://github.com/nats-io/nats.java
 [cobra]: https://github.com/spf13/cobra
 [viper]: https://github.com/spf13/viper
+
+[n-01]: #n-01
+[n-02]: #n-02
+[n-03]: #n-03
+[n-04]: #n-04
+[n-05]: #n-05
+[r-api-01]: #r-api-01-notification-payload
+[r-api-02]: #r-api-02-response-payload
+[r-api-04]: #r-api-04-transport-protocol
+[r-api-07]: #r-api-07-flow-based-subject-routing
+[r-api-08]: #r-api-08-provisioning-schema
+[r-api-09]: #r-api-09-interjection-payload
+[r-api-11]: #r-api-11-error-response-payload
+[r-cli-01]: #r-cli-01-daemon-service
+[r-cli-02]: #r-cli-02-embedded-nats-broker-toggle
+[r-cli-03]: #r-cli-03-embedded-mcp-server-toggle
+[r-cli-04]: #r-cli-04-single-shot-mode
+[r-cli-05]: #r-cli-05-interactive-mode
+[r-cli-08]: #r-cli-08-mcp-server-mode
+[r-cli-10]: #r-cli-10-mcp-agent-notification-pattern
+[r-cli-12]: #r-cli-12-ephemeral-message-buffering
+[r-cli-13]: #r-cli-13-remote-history-provider
+[r-cli-14]: #r-cli-14-active-flow-registry-expiry
+[r-cli-15]: #r-cli-15-ephemeral-agent-state-negative-constraint
+[r-cli-16]: #r-cli-16-notification-rate-limiting
+[r-cli-17]: #r-cli-17-timeout-independence-from-mobile-connectivity
+[r-cli-18]: #r-cli-18-stale-flow-reaping
+[r-cli-19]: #r-cli-19-hook-dispatcher
+[r-cli-20]: #r-cli-20-state-management-authority
+[r-cli-21]: #r-cli-21-mcp-server-as-broker-client
+[r-cli-22]: #r-cli-22-in-process-broker-transport
+[r-mob-03]: #r-mob-03-presentation-prioritisation
+[r-mob-04]: #r-mob-04-rich-response-dispatcher
+[r-mob-07]: #r-mob-07-remote-history-viewer
+[r-mob-08]: #r-mob-08-proactive-interjection-interface
+[r-mob-09]: #r-mob-09-active-workspaces-dashboard
+[r-mob-10]: #r-mob-10-reconnection-ux
+[r-mob-11]: #r-mob-11-multi-device-support
+[r-mob-12]: #r-mob-12-notification-tap-navigation
+[r-mob-13]: #r-mob-13-content-notification-tap-navigation
+[r-sec-01]: #r-sec-01-token-revocation
+[r-sec-02]: #r-sec-02-per-device-pairing
+[r-sec-03]: #r-sec-03-post-mvp-security-deferral
+[r-sec-04]: #r-sec-04-release-keystore-exclusion
+[r-sys-01]: #r-sys-01-mvp-scale-bounds
