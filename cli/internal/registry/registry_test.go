@@ -746,7 +746,8 @@ func TestInsertRequestEndpoint(t *testing.T) {
 		t.Errorf("expected ok=true, got error: %s", result.Error)
 	}
 
-	// Verify the record is in the DB.
+	// Verify the record is in the DB. The total includes both
+	// lifecycle events (from RegisterFlow) and the notification.
 	hist, err := db.QueryHistory(ledger.HistoryQuery{
 		FlowID: "fl_WREQ01",
 		Limit:  10,
@@ -754,12 +755,18 @@ func TestInsertRequestEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hist.Total != 1 {
-		t.Fatalf("got %d history records, want 1", hist.Total)
+	// Find the notification record among the results.
+	var found bool
+	for _, r := range hist.Records {
+		if r.Type == ledger.HistoryTypeNotification &&
+			r.Request != nil && r.Request.ID == "ntf_WREQ01" {
+			found = true
+			break
+		}
 	}
-	if hist.Records[0].Request.ID != "ntf_WREQ01" {
-		t.Errorf("request id = %q, want %q",
-			hist.Records[0].Request.ID, "ntf_WREQ01")
+	if !found {
+		t.Errorf("notification ntf_WREQ01 not found in %d history records",
+			hist.Total)
 	}
 }
 
@@ -815,7 +822,8 @@ func TestInsertResponseEndpoint(t *testing.T) {
 	}
 	found := false
 	for _, rec := range hist.Records {
-		if rec.Request.ID == "ntf_WRSP01" && rec.Response != nil {
+		if rec.Request != nil && rec.Request.ID == "ntf_WRSP01" &&
+			rec.Response != nil {
 			if rec.Response.Accepted == nil || !*rec.Response.Accepted {
 				t.Error("expected accepted=true")
 			}

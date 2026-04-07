@@ -282,6 +282,19 @@ func (d *DB) ReapStaleFlows(gracePeriod time.Duration) ([]ActiveFlow, error) {
 	return flows, rows.Err()
 }
 
+// LookupActiveFlow returns a single active flow by flow ID, or
+// nil if the flow is not in the active registry.
+func (d *DB) LookupActiveFlow(flowID string) (*ActiveFlow, error) {
+	flows, err := d.ListActiveFlows(ActiveFlowsQuery{FlowID: flowID})
+	if err != nil {
+		return nil, err
+	}
+	if len(flows) == 0 {
+		return nil, nil
+	}
+	return &flows[0], nil
+}
+
 // marshalMetadata encodes a metadata map as a JSON string, or
 // returns a NullString for nil maps.
 func marshalMetadata(m map[string]string) sql.NullString {

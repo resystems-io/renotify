@@ -45,18 +45,29 @@ type HistoryQuery struct {
 	Offset      int
 }
 
-// HistoryRecord pairs a request with its optional response.
+// History record type discriminators.
+const (
+	HistoryTypeNotification = "notification"
+	HistoryTypeLifecycle    = "lifecycle"
+)
+
+// HistoryRecord represents a single entry in the unified history
+// timeline. It is either a notification (Request populated) or a
+// lifecycle event (Lifecycle populated), discriminated by Type.
+//
 // Username is included so records are self-describing when
 // histories from multiple daemons are aggregated. FlowLabel,
 // WorkspaceName, and WorkspacePath are snapshots captured at
 // notification time from the active flow context.
 type HistoryRecord struct {
+	Type          string
 	Username      string
 	FlowLabel     string
 	WorkspaceName string
 	WorkspacePath string
-	Request       payload.NotificationRequest
+	Request       *payload.NotificationRequest
 	Response      *payload.NotificationResponse
+	Lifecycle     *payload.FlowLifecycleEvent
 }
 
 // HistoryResult holds the paginated query result.

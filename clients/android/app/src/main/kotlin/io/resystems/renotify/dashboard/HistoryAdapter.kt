@@ -26,28 +26,44 @@ class HistoryAdapter :
     private var records: List<HistoryRecord> = emptyList()
     private var total: Int = 0
 
+    /** Filtered view of records for display. */
+    private var displayRecords: List<HistoryRecord> = emptyList()
+
     /** Adapter position of the currently expanded item, or -1. */
     private var expandedPosition: Int = -1
 
     /** Callback when the user taps "Load more". */
     var onLoadMore: (() -> Unit)? = null
 
+    /** Callback when lifecycle visibility changes. */
+    var onLifecycleToggled: ((Boolean) -> Unit)? = null
+
+    /** Whether lifecycle events (flow started/completed) are
+     *  shown. Hidden by default to reduce noise. */
+    var showLifecycle: Boolean = false
+        set(value) {
+            field = value
+            rebuildDisplay()
+            expandedPosition = -1
+            notifyDataSetChanged()
+            onLifecycleToggled?.invoke(value)
+        }
+
     /** Replace the full result set. */
     fun update(result: HistoryQueryResult) {
         records = result.records
         total = result.total
         expandedPosition = -1
+        rebuildDisplay()
         notifyDataSetChanged()
     }
 
     /** Append a page of records to the existing list. */
     fun append(result: HistoryQueryResult) {
-        val start = records.size
         records = records + result.records
         total = result.total
-        notifyItemRangeInserted(start, result.records.size)
-        // Refresh the load-more footer.
-        notifyItemChanged(records.size)
+        rebuildDisplay()
+        notifyDataSetChanged()
     }
 
     /** Current record count (for pagination offset). */
@@ -55,14 +71,27 @@ class HistoryAdapter :
 
     private val hasMore: Boolean get() = records.size < total
 
+    private fun rebuildDisplay() {
+        displayRecords = if (showLifecycle) {
+            records
+        } else {
+            records.filter { it !is LifecycleRecord }
+        }
+    }
+
     override fun getItemCount(): Int {
-        if (records.isEmpty()) return 1 // empty state
-        return records.size + if (hasMore) 1 else 0
+        if (displayRecords.isEmpty()) return 1 // empty state
+        return displayRecords.size + if (hasMore) 1 else 0
     }
 
     override fun getItemViewType(position: Int): Int {
-        if (records.isEmpty()) return VIEW_EMPTY
-        if (position < records.size) return VIEW_RECORD
+        if (displayRecords.isEmpty()) return VIEW_EMPTY
+        if (position < displayRecords.size) {
+            return when (displayRecords[position]) {
+                is LifecycleRecord -> VIEW_LIFECYCLE
+                is NotificationRecord -> VIEW_RECORD
+            }
+        }
         return VIEW_LOAD_MORE
     }
 
@@ -135,6 +164,19 @@ class HistoryAdapter :
                 ViewHolder(root)
             }
 
+            VIEW_LIFECYCLE -> {
+                val tv = TextView(ctx).apply {
+                    textSize = 12f
+                    setTextColor(Brand.TEXT_SECONDARY)
+                    setPadding(dp(16), dp(6), dp(16), dp(6))
+                    layoutParams = RecyclerView.LayoutParams(
+                        RecyclerView.LayoutParams.MATCH_PARENT,
+                        RecyclerView.LayoutParams.WRAP_CONTENT
+                    )
+                }
+                ViewHolder(tv)
+            }
+
             VIEW_LOAD_MORE -> {
                 val tv = TextView(ctx).apply {
                     text = "Load more\u2026"
@@ -170,9 +212,25 @@ class HistoryAdapter :
     }
 
     override fun onBindViewHolder(holder: ViewHolder, pos: Int) {
-        if (records.isEmpty() || pos >= records.size) return
+        if (displayRecords.isEmpty() || pos >= displayRecords.size) return
 
-        val rec = records[pos]
+        when (val rec = displayRecords[pos]) {
+            is LifecycleRecord -> bindLifecycle(holder, rec)
+            is NotificationRecord -> bindNotification(holder, pos, rec)
+        }
+    }
+
+    private fun bindLifecycle(holder: ViewHolder, rec: LifecycleRecord) {
+        val tv = holder.itemView as? TextView ?: return
+        val ts = formatTimestamp(rec.timestamp)
+        tv.text = "$ts \u00b7 ${rec.summary}"
+    }
+
+    private fun bindNotification(
+        holder: ViewHolder,
+        pos: Int,
+        rec: NotificationRecord
+    ) {
         val root = holder.itemView as? LinearLayout ?: return
 
         // Title (child 0).
@@ -211,8 +269,8 @@ class HistoryAdapter :
         root.setOnClickListener {
             val adapterPos = holder.bindingAdapterPosition
             if (adapterPos == RecyclerView.NO_POSITION) return@setOnClickListener
-            val clicked = records.getOrNull(adapterPos) ?: return@setOnClickListener
-            if (!clicked.isExpandable) return@setOnClickListener
+            val clicked = displayRecords.getOrNull(adapterPos)
+            if (clicked !is NotificationRecord || !clicked.isExpandable) return@setOnClickListener
 
             val prev = expandedPosition
             expandedPosition = if (prev == adapterPos) -1 else adapterPos
@@ -227,7 +285,7 @@ class HistoryAdapter :
      */
     private fun bindExpansion(
         root: LinearLayout,
-        rec: HistoryRecord,
+        rec: NotificationRecord,
         expanded: Boolean
     ) {
         val bodyView = root.getChildAt(4) as? TextView
@@ -268,6 +326,7 @@ class HistoryAdapter :
         private const val VIEW_RECORD = 0
         private const val VIEW_LOAD_MORE = 1
         private const val VIEW_EMPTY = 2
+        private const val VIEW_LIFECYCLE = 3
 
         /** Format an RFC 3339 timestamp for display. */
         private fun formatTimestamp(rfc3339: String): String {

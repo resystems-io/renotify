@@ -46,7 +46,7 @@ class HistoryItemTest {
         assertEquals(1, result.total)
         assertEquals(1, result.records.size)
 
-        val rec = result.records[0]
+        val rec = result.records[0] as NotificationRecord
         assertEquals("ntf_001", rec.id)
         assertEquals("fl_001", rec.flowId)
         assertEquals("Deploy?", rec.title)
@@ -83,7 +83,7 @@ class HistoryItemTest {
         """.trimIndent()
 
         val result = HistoryQueryResult.fromJson(json)
-        val rec = result.records[0]
+        val rec = result.records[0] as NotificationRecord
         assertEquals("ntf_002", rec.id)
         assertNull(rec.body)
         assertNull(rec.responseAccepted)
@@ -120,7 +120,7 @@ class HistoryItemTest {
         """.trimIndent()
 
         val result = HistoryQueryResult.fromJson(json)
-        val rec = result.records[0]
+        val rec = result.records[0] as NotificationRecord
         assertTrue(rec.hasResponse)
         assertEquals("staging", rec.responseSummary)
     }
@@ -154,7 +154,7 @@ class HistoryItemTest {
         """.trimIndent()
 
         val result = HistoryQueryResult.fromJson(json)
-        val rec = result.records[0]
+        val rec = result.records[0] as NotificationRecord
         assertTrue(rec.hasResponse)
         assertEquals("Looks good to me", rec.responseSummary)
     }
@@ -188,7 +188,7 @@ class HistoryItemTest {
         """.trimIndent()
 
         val result = HistoryQueryResult.fromJson(json)
-        val rec = result.records[0]
+        val rec = result.records[0] as NotificationRecord
         assertEquals(false, rec.responseAccepted)
         assertEquals("denied", rec.responseSummary)
     }
@@ -240,8 +240,8 @@ class HistoryItemTest {
         val result = HistoryQueryResult.fromJson(json)
         assertEquals(5, result.total)
         assertEquals(2, result.records.size)
-        assertEquals("ntf_A", result.records[0].id)
-        assertEquals("ntf_B", result.records[1].id)
+        assertEquals("ntf_A", (result.records[0] as NotificationRecord).id)
+        assertEquals("ntf_B", (result.records[1] as NotificationRecord).id)
     }
 
     // --- hasResponse ---
@@ -357,7 +357,7 @@ class HistoryItemTest {
             }
         """.trimIndent()
 
-        val rec = HistoryQueryResult.fromJson(json).records[0]
+        val rec = HistoryQueryResult.fromJson(json).records[0] as NotificationRecord
         assertEquals("2026-04-01T15:00:30Z", rec.responseTimestamp)
     }
 
@@ -388,7 +388,7 @@ class HistoryItemTest {
             }
         """.trimIndent()
 
-        val rec = HistoryQueryResult.fromJson(json).records[0]
+        val rec = HistoryQueryResult.fromJson(json).records[0] as NotificationRecord
         assertNull(rec.responseTimestamp)
     }
 
@@ -473,7 +473,7 @@ class HistoryItemTest {
             }
         """.trimIndent()
 
-        val rec = HistoryQueryResult.fromJson(json).records[0]
+        val rec = HistoryQueryResult.fromJson(json).records[0] as NotificationRecord
         assertEquals(listOf("choice"), rec.responseTypes)
         assertEquals(listOf("staging", "prod"), rec.actions)
         assertTrue(rec.isInteractive)
@@ -502,7 +502,7 @@ class HistoryItemTest {
             }
         """.trimIndent()
 
-        val rec = HistoryQueryResult.fromJson(json).records[0]
+        val rec = HistoryQueryResult.fromJson(json).records[0] as NotificationRecord
         assertEquals(listOf("none"), rec.responseTypes)
         assertNull(rec.actions)
         assertFalse(rec.isInteractive)
@@ -531,7 +531,7 @@ class HistoryItemTest {
             }
         """.trimIndent()
 
-        val rec = HistoryQueryResult.fromJson(json).records[0]
+        val rec = HistoryQueryResult.fromJson(json).records[0] as NotificationRecord
         assertNull(rec.actions)
     }
 
@@ -563,7 +563,7 @@ class HistoryItemTest {
             }
         """.trimIndent()
 
-        val rec = HistoryQueryResult.fromJson(json).records[0]
+        val rec = HistoryQueryResult.fromJson(json).records[0] as NotificationRecord
         assertEquals("CI Pipeline", rec.flowLabel)
         assertEquals("renotify", rec.workspaceName)
     }
@@ -591,7 +591,7 @@ class HistoryItemTest {
             }
         """.trimIndent()
 
-        val rec = HistoryQueryResult.fromJson(json).records[0]
+        val rec = HistoryQueryResult.fromJson(json).records[0] as NotificationRecord
         assertNull(rec.flowLabel)
         assertNull(rec.workspaceName)
     }
@@ -606,7 +606,7 @@ class HistoryItemTest {
         responseAction: String? = null,
         responseText: String? = null,
         responseTimestamp: String? = null
-    ) = HistoryRecord(
+    ) = NotificationRecord(
         id = "ntf_test",
         flowId = "fl_test",
         workspaceId = "ws_test",

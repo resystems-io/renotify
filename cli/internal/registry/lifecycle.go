@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -45,7 +46,9 @@ func (s *Service) startLifecycleConsumer(ctx context.Context) error {
 }
 
 // consumeLifecycle reads messages from the JetStream iterator
-// until the context is cancelled.
+// until the context is cancelled. The consumer receives lifecycle,
+// request, and response messages and routes each to the
+// appropriate handler based on the subject suffix.
 func (s *Service) consumeLifecycle(
 	ctx context.Context,
 	iter natsjs.MessagesContext,
@@ -65,7 +68,34 @@ func (s *Service) consumeLifecycle(
 			}
 		}
 
+		s.processMessage(msg)
+	}
+}
+
+// subjectSuffix extracts the last segment of a NATS subject.
+// e.g. "resystems.renotify.alice.flow.fl_X.lifecycle" → "lifecycle"
+func subjectSuffix(subject string) string {
+	if i := strings.LastIndexByte(subject, '.'); i >= 0 {
+		return subject[i+1:]
+	}
+	return subject
+}
+
+// processMessage routes a JetStream message to the appropriate
+// handler based on the subject suffix (lifecycle, request, or
+// response).
+func (s *Service) processMessage(msg natsjs.Msg) {
+	switch subjectSuffix(msg.Subject()) {
+	case "lifecycle":
 		s.processLifecycleEvent(msg)
+	case "request":
+		s.processRequest(msg)
+	case "response":
+		s.processResponse(msg)
+	default:
+		s.logger.Warn("unknown subject suffix",
+			"subject", msg.Subject())
+		msg.Ack()
 	}
 }
 
@@ -92,6 +122,75 @@ func (s *Service) processLifecycleEvent(msg natsjs.Msg) {
 
 	msg.Ack()
 	s.rebuildWorkspaceSnapshot()
+}
+
+// processRequest records a NotificationRequest in the history
+// ledger. This captures notifications from all sources (CLI,
+// MCP, dispatch) via the JetStream stream. INSERT OR IGNORE
+// ensures idempotency with MCP's direct svc.insert-request calls.
+func (s *Service) processRequest(msg natsjs.Msg) {
+	var req payload.NotificationRequest
+	if err := json.Unmarshal(msg.Data(), &req); err != nil {
+		s.logger.Error("request unmarshal",
+			"err", err, "subject", msg.Subject())
+		msg.Ack()
+		return
+	}
+
+	// Build WriteContext from the active flow (if registered).
+	wc := ledger.WriteContext{Username: s.username}
+	flow, err := s.dbFunc().LookupActiveFlow(req.FlowID)
+	if err == nil && flow != nil {
+		wc.FlowLabel = flow.Label
+		wc.WorkspaceName = flow.DisplayName
+		wc.WorkspacePath = flow.AbsPath
+	}
+
+	if err := s.dbFunc().InsertRequest(wc, &req); err != nil {
+		s.logger.Error("insert request",
+			"id", req.ID, "err", err)
+	}
+
+	msg.Ack()
+}
+
+// processResponse records a NotificationResponse in the history
+// ledger. ErrorResponses (timeouts) are ignored — only human
+// responses are persisted.
+func (s *Service) processResponse(msg natsjs.Msg) {
+	// Discriminate ErrorResponse from NotificationResponse.
+	if isErrorResponse(msg.Data()) {
+		msg.Ack()
+		return
+	}
+
+	var resp payload.NotificationResponse
+	if err := json.Unmarshal(msg.Data(), &resp); err != nil {
+		s.logger.Error("response unmarshal",
+			"err", err, "subject", msg.Subject())
+		msg.Ack()
+		return
+	}
+
+	if err := s.dbFunc().InsertResponse(&resp); err != nil {
+		s.logger.Error("insert response",
+			"request_id", resp.RequestID, "err", err)
+	}
+
+	msg.Ack()
+}
+
+// isErrorResponse checks whether raw JSON contains an
+// ErrorResponse (has a non-empty "code" field) rather than a
+// NotificationResponse.
+func isErrorResponse(data []byte) bool {
+	var probe struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return false
+	}
+	return probe.Code != ""
 }
 
 // handleActive registers a new flow or refreshes an existing one.

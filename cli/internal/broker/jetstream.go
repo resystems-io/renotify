@@ -166,11 +166,19 @@ func mobileDeviceConsumerConfig(
 }
 
 // lifecycleConsumerConfig builds the daemon's flow lifecycle
-// consumer for maintaining the active flow registry.
+// consumer. Subscribes to lifecycle, request, and response
+// subjects so the daemon can maintain the active flow registry
+// and record all notifications in the history ledger regardless
+// of their origin (CLI, MCP, or dispatch).
 func lifecycleConsumerConfig(username string) natsjs.ConsumerConfig {
+	prefix := "resystems.renotify." + username + ".flow.*."
 	return natsjs.ConsumerConfig{
-		Durable:           LifecycleConsumerName(username),
-		FilterSubject:     "resystems.renotify." + username + ".flow.*.lifecycle",
+		Durable: LifecycleConsumerName(username),
+		FilterSubjects: []string{
+			prefix + "lifecycle",
+			prefix + "request",
+			prefix + "response",
+		},
 		AckPolicy:         natsjs.AckExplicitPolicy,
 		MaxDeliver:        3,
 		MaxAckPending:     64,

@@ -20,13 +20,14 @@ import (
 
 func newHistoryCmd(app *App) *cobra.Command {
 	var (
-		workspaceID string
-		flowID      string
-		since       string
-		until       string
-		limit       int
-		offset      int
-		format      string
+		workspaceID    string
+		flowID         string
+		since          string
+		until          string
+		limit          int
+		offset         int
+		format         string
+		showLifecycle  bool
 	)
 
 	cmd := &cobra.Command{
@@ -98,7 +99,7 @@ by workspace, flow, time range, and pagination via limit/offset.`,
 				return enc.Encode(result)
 			}
 
-			return formatHistoryText(cmd, &result)
+			return formatHistoryText(cmd, &result, showLifecycle)
 		},
 	}
 
@@ -116,40 +117,76 @@ by workspace, flow, time range, and pagination via limit/offset.`,
 		"skip first N records (pagination)")
 	cmd.Flags().StringVar(&format, "format", "text",
 		"output format: json|text")
+	cmd.Flags().BoolVar(&showLifecycle, "show-lifecycle", false,
+		"include flow start/end events in output")
 
 	return cmd
 }
 
 // formatHistoryText renders history records in a human-readable
-// tabular format.
+// tabular format. Lifecycle records are hidden unless
+// showLifecycle is true.
 func formatHistoryText(
 	cmd *cobra.Command,
 	result *statesvc.HistoryQueryResult,
+	showLifecycle bool,
 ) error {
 	out := cmd.OutOrStdout()
 
-	if len(result.Records) == 0 {
+	// Filter records for display.
+	var display []statesvc.HistoryRecord
+	for _, rec := range result.Records {
+		if rec.Type == "lifecycle" && !showLifecycle {
+			continue
+		}
+		display = append(display, rec)
+	}
+
+	if len(display) == 0 {
 		fmt.Fprintln(out, "No history records.")
 		return nil
 	}
 
-	fmt.Fprintf(out, "Showing %d of %d records\n\n",
-		len(result.Records), result.Total)
+	fmt.Fprintf(out, "Showing %d of %d records",
+		len(display), result.Total)
+	if !showLifecycle {
+		fmt.Fprint(out, " (use --show-lifecycle to include lifecycle events)")
+	}
+	fmt.Fprintln(out)
+	fmt.Fprintln(out)
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tTIMESTAMP\tTITLE\tPRIORITY\tRESPONSE")
+	fmt.Fprintln(w, "TYPE\tTIMESTAMP\tID\tTITLE\tRESPONSE")
 
-	for _, rec := range result.Records {
-		r := rec.Request
-		respStr := formatResponse(rec.Response)
-
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-			r.ID,
-			r.Timestamp.Format("2006-01-02 15:04:05"),
-			truncate(r.Title, 40),
-			r.Priority,
-			respStr,
-		)
+	for _, rec := range display {
+		switch rec.Type {
+		case "lifecycle":
+			if rec.Lifecycle != nil {
+				lc := rec.Lifecycle
+				label := lc.Label
+				if label == "" {
+					label = lc.FlowID
+				}
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t-\n",
+					string(lc.Status),
+					lc.Timestamp.Format("2006-01-02 15:04:05"),
+					lc.FlowID,
+					truncate(label, 40),
+				)
+			}
+		default:
+			if rec.Request != nil {
+				r := rec.Request
+				respStr := formatResponse(rec.Response)
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+					string(r.Priority),
+					r.Timestamp.Format("2006-01-02 15:04:05"),
+					r.ID,
+					truncate(r.Title, 40),
+					respStr,
+				)
+			}
+		}
 	}
 
 	w.Flush()

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	"go.resystems.io/renotify/cli/internal/payload"
@@ -14,9 +15,12 @@ import (
 
 const defaultHistoryLimit = 50
 
-// QueryHistory executes the paginated history query with optional
-// filters (Section 4.1). Returns requests LEFT JOINed with their
-// responses.
+// QueryHistory returns a unified timeline of notification records
+// and flow lifecycle events, sorted by timestamp (newest first).
+// Notification records are LEFT JOINed with their responses.
+// Lifecycle events (flow started, completed, failed) are
+// interleaved by timestamp. Both record types respect the same
+// filter parameters.
 func (d *DB) QueryHistory(q HistoryQuery) (*HistoryResult, error) {
 	limit := q.Limit
 	if limit <= 0 {
@@ -41,22 +45,31 @@ func (d *DB) QueryHistory(q HistoryQuery) (*HistoryResult, error) {
 	wsID := sql.NullString{String: q.WorkspaceID, Valid: q.WorkspaceID != ""}
 	fID := sql.NullString{String: q.FlowID, Valid: q.FlowID != ""}
 
-	// Total count (without LIMIT/OFFSET).
+	// Total count across both tables.
 	var total int
 	err := d.db.QueryRow(`
-		SELECT COUNT(*) FROM notification_requests req
-		WHERE (? IS NULL OR req.workspace_id = ?)
-		  AND (? IS NULL OR req.flow_id = ?)
-		  AND (? IS NULL OR req.timestamp >= ?)
-		  AND (? IS NULL OR req.timestamp <= ?)`,
+		SELECT (
+			SELECT COUNT(*) FROM notification_requests req
+			WHERE (? IS NULL OR req.workspace_id = ?)
+			  AND (? IS NULL OR req.flow_id = ?)
+			  AND (? IS NULL OR req.timestamp >= ?)
+			  AND (? IS NULL OR req.timestamp <= ?)
+		) + (
+			SELECT COUNT(*) FROM flow_lifecycle_events lc
+			WHERE (? IS NULL OR lc.workspace_id = ?)
+			  AND (? IS NULL OR lc.flow_id = ?)
+			  AND (? IS NULL OR lc.timestamp >= ?)
+			  AND (? IS NULL OR lc.timestamp <= ?)
+		)`,
+		wsID, wsID, fID, fID, since, since, until, until,
 		wsID, wsID, fID, fID, since, since, until, until,
 	).Scan(&total)
 	if err != nil {
 		return nil, fmt.Errorf("ledger: count history: %w", err)
 	}
 
-	// Records query with LEFT JOIN.
-	rows, err := d.db.Query(`
+	// Notification records with LEFT JOIN.
+	notifRows, err := d.db.Query(`
 		SELECT
 		    req.username,
 		    req.flow_label, req.workspace_name, req.workspace_path,
@@ -72,39 +85,135 @@ func (d *DB) QueryHistory(q HistoryQuery) (*HistoryResult, error) {
 		  AND (? IS NULL OR req.flow_id = ?)
 		  AND (? IS NULL OR req.timestamp >= ?)
 		  AND (? IS NULL OR req.timestamp <= ?)
-		ORDER BY req.timestamp DESC
-		LIMIT ? OFFSET ?`,
+		ORDER BY req.timestamp DESC`,
 		wsID, wsID, fID, fID, since, since, until, until,
-		limit, q.Offset,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("ledger: query history: %w", err)
+		return nil, fmt.Errorf("ledger: query notifications: %w", err)
 	}
-	defer rows.Close()
+	defer notifRows.Close()
 
-	var records []HistoryRecord
-	for rows.Next() {
-		rec, err := scanHistoryRow(rows)
+	var all []HistoryRecord
+	for notifRows.Next() {
+		rec, err := scanHistoryRow(notifRows)
 		if err != nil {
 			return nil, err
 		}
-		records = append(records, rec)
+		all = append(all, rec)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("ledger: iterate history: %w", err)
-	}
-
-	if records == nil {
-		records = []HistoryRecord{}
+	if err := notifRows.Err(); err != nil {
+		return nil, fmt.Errorf("ledger: iterate notifications: %w", err)
 	}
 
-	return &HistoryResult{Records: records, Total: total}, nil
+	// Lifecycle events.
+	lcRows, err := d.db.Query(`
+		SELECT username, flow_id, daemon_id, workspace_id,
+		       status, label, metadata, timestamp
+		FROM flow_lifecycle_events
+		WHERE (? IS NULL OR workspace_id = ?)
+		  AND (? IS NULL OR flow_id = ?)
+		  AND (? IS NULL OR timestamp >= ?)
+		  AND (? IS NULL OR timestamp <= ?)
+		ORDER BY timestamp DESC`,
+		wsID, wsID, fID, fID, since, since, until, until,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("ledger: query lifecycle: %w", err)
+	}
+	defer lcRows.Close()
+
+	for lcRows.Next() {
+		rec, err := scanLifecycleRow(lcRows)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, rec)
+	}
+	if err := lcRows.Err(); err != nil {
+		return nil, fmt.Errorf("ledger: iterate lifecycle: %w", err)
+	}
+
+	// Sort combined records by timestamp descending.
+	sort.Slice(all, func(i, j int) bool {
+		return recordTimestamp(all[i]).After(recordTimestamp(all[j]))
+	})
+
+	// Apply pagination.
+	if q.Offset > 0 && q.Offset < len(all) {
+		all = all[q.Offset:]
+	} else if q.Offset >= len(all) {
+		all = nil
+	}
+	if limit < len(all) {
+		all = all[:limit]
+	}
+
+	if all == nil {
+		all = []HistoryRecord{}
+	}
+
+	return &HistoryResult{Records: all, Total: total}, nil
+}
+
+// recordTimestamp extracts the timestamp from a HistoryRecord
+// regardless of type.
+func recordTimestamp(r HistoryRecord) time.Time {
+	if r.Request != nil {
+		return r.Request.Timestamp
+	}
+	if r.Lifecycle != nil {
+		return r.Lifecycle.Timestamp
+	}
+	return time.Time{}
+}
+
+// scanLifecycleRow scans a single row from the lifecycle events
+// query into a HistoryRecord with Type "lifecycle".
+func scanLifecycleRow(rows *sql.Rows) (HistoryRecord, error) {
+	var (
+		username, flowID, daemonID, wsID string
+		status, timestamp                string
+		label, metadata                  sql.NullString
+	)
+
+	err := rows.Scan(
+		&username, &flowID, &daemonID, &wsID,
+		&status, &label, &metadata, &timestamp,
+	)
+	if err != nil {
+		return HistoryRecord{},
+			fmt.Errorf("ledger: scan lifecycle row: %w", err)
+	}
+
+	ts, _ := time.Parse(time.RFC3339, timestamp)
+
+	var meta map[string]string
+	if metadata.Valid {
+		json.Unmarshal([]byte(metadata.String), &meta)
+	}
+
+	return HistoryRecord{
+		Type:     HistoryTypeLifecycle,
+		Username: username,
+		Lifecycle: &payload.FlowLifecycleEvent{
+			FlowID:      flowID,
+			DaemonID:    daemonID,
+			WorkspaceID: wsID,
+			Status:      payload.FlowStatus(status),
+			Label:       label.String,
+			Metadata:    meta,
+			Timestamp:   ts,
+		},
+	}, nil
 }
 
 // scanHistoryRow scans a single row from the history LEFT JOIN
 // query into a HistoryRecord.
 func scanHistoryRow(rows *sql.Rows) (HistoryRecord, error) {
-	var rec HistoryRecord
+	rec := HistoryRecord{
+		Type:    HistoryTypeNotification,
+		Request: &payload.NotificationRequest{},
+	}
 
 	// Flow context fields (nullable — NULL for pre-V3 rows).
 	var flowLabel, wsName, wsPath sql.NullString

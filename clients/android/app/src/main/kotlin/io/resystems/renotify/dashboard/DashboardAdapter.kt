@@ -135,7 +135,7 @@ class DashboardAdapter :
         flowNotifications[flowId] = result
         flowCounts[flowId] = Pair(
             result.total,
-            result.records.count { it.isOpen }
+            result.records.count { it is NotificationRecord && it.isOpen }
         )
         val pos = items.indexOfFirst {
             it is DashboardItem.FlowItem && it.flowId == flowId
@@ -541,7 +541,7 @@ class DashboardAdapter :
         val ctx = container.context
 
         // Summary header.
-        val openCount = result.records.count { it.isOpen }
+        val openCount = result.records.count { it is NotificationRecord && it.isOpen }
         val headerText = buildString {
             append("${result.total} notification")
             if (result.total != 1) append("s")
@@ -561,8 +561,9 @@ class DashboardAdapter :
                 LinearLayout.LayoutParams.MATCH_PARENT, 1)
         })
 
-        // Sub-items.
-        for (rec in result.records) {
+        // Sub-items (notification records only; lifecycle records
+        // are shown in the main history view).
+        for (rec in result.records.filterIsInstance<NotificationRecord>()) {
             container.addView(
                 createNotificationSubItem(ctx, flowId, rec))
         }
@@ -586,7 +587,7 @@ class DashboardAdapter :
     private fun createNotificationSubItem(
         ctx: android.content.Context,
         flowId: String,
-        rec: HistoryRecord
+        rec: NotificationRecord
     ): LinearLayout {
         val root = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
@@ -699,7 +700,7 @@ class DashboardAdapter :
     private fun populateResponseControls(
         container: LinearLayout,
         flowId: String,
-        rec: HistoryRecord
+        rec: NotificationRecord
     ) {
         container.removeAllViews()
         val ctx = container.context

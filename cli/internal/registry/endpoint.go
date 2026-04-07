@@ -120,12 +120,14 @@ func (s *Service) handleHistoryQuery(msg *nats.Msg) {
 	records := make([]statesvc.HistoryRecord, len(result.Records))
 	for i, r := range result.Records {
 		records[i] = statesvc.HistoryRecord{
+			Type:          r.Type,
 			Username:      r.Username,
 			FlowLabel:     r.FlowLabel,
 			WorkspaceName: r.WorkspaceName,
 			WorkspacePath: r.WorkspacePath,
 			Request:       r.Request,
 			Response:      r.Response,
+			Lifecycle:     r.Lifecycle,
 		}
 	}
 
