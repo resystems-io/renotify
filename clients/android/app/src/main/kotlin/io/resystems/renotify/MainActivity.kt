@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var recycler: RecyclerView
     private lateinit var tabDashboard: TextView
     private lateinit var tabHistory: TextView
+    private lateinit var lifecycleToggle: TextView
     private var activeTab = TAB_DASHBOARD
 
     /**
@@ -197,6 +199,23 @@ class MainActivity : ComponentActivity() {
         tabBar.addView(tabHistory)
 
         root.addView(tabBar)
+
+        // Lifecycle toggle — small link below tabs, visible only
+        // on the history tab.
+        lifecycleToggle = TextView(this).apply {
+            text = "Show lifecycle"
+            textSize = 11f
+            setTextColor(Brand.LINK)
+            setPadding(dp(16), dp(2), dp(16), dp(4))
+            gravity = Gravity.END
+            visibility = View.GONE
+            setOnClickListener {
+                historyAdapter.showLifecycle =
+                    !historyAdapter.showLifecycle
+            }
+        }
+        root.addView(lifecycleToggle)
+
         updateTabStyles()
 
         // Dashboard adapter (M-09) with interjection actions
@@ -243,6 +262,10 @@ class MainActivity : ComponentActivity() {
         // History adapter (M-07).
         historyAdapter = HistoryAdapter()
         historyAdapter.onLoadMore = { loadMoreHistory() }
+        historyAdapter.onLifecycleToggled = { showing ->
+            lifecycleToggle.text = if (showing)
+                "Hide lifecycle" else "Show lifecycle"
+        }
 
         // Shared RecyclerView — adapter swapped by tab.
         recycler = RecyclerView(this).apply {
@@ -511,9 +534,11 @@ class MainActivity : ComponentActivity() {
         when (tab) {
             TAB_DASHBOARD -> {
                 recycler.adapter = dashboardAdapter
+                lifecycleToggle.visibility = View.GONE
             }
             TAB_HISTORY -> {
                 recycler.adapter = historyAdapter
+                lifecycleToggle.visibility = View.VISIBLE
                 queryHistory(offset = 0, append = false)
             }
         }

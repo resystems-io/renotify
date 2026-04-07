@@ -164,8 +164,20 @@ func TestLifecycleConsumerConfig(t *testing.T) {
 	if cc.Durable != "daemon-lifecycle-alice" {
 		t.Errorf("durable = %q", cc.Durable)
 	}
-	if cc.FilterSubject != "resystems.renotify.alice.flow.*.lifecycle" {
-		t.Errorf("filter = %q", cc.FilterSubject)
+	wantSubjects := []string{
+		"resystems.renotify.alice.flow.*.lifecycle",
+		"resystems.renotify.alice.flow.*.request",
+		"resystems.renotify.alice.flow.*.response",
+	}
+	if len(cc.FilterSubjects) != len(wantSubjects) {
+		t.Fatalf("filter subjects = %v, want %v",
+			cc.FilterSubjects, wantSubjects)
+	}
+	for i, want := range wantSubjects {
+		if cc.FilterSubjects[i] != want {
+			t.Errorf("filter[%d] = %q, want %q",
+				i, cc.FilterSubjects[i], want)
+		}
 	}
 	if cc.MaxAckPending != 64 {
 		t.Errorf("max_ack_pending = %d, want 64", cc.MaxAckPending)

@@ -59,14 +59,18 @@ type HistoryQueryRequest struct {
 	Offset      int        `json:"offset,omitempty"`
 }
 
-// HistoryRecord pairs a request with its optional response.
+// HistoryRecord represents a single entry in the unified history
+// timeline. It is either a notification (Request populated) or a
+// lifecycle event (Lifecycle populated), discriminated by Type.
 type HistoryRecord struct {
+	Type          string                        `json:"type"`
 	Username      string                        `json:"username"`
 	FlowLabel     string                        `json:"flow_label,omitempty"`
 	WorkspaceName string                        `json:"workspace_name,omitempty"`
 	WorkspacePath string                        `json:"workspace_path,omitempty"`
-	Request       payload.NotificationRequest   `json:"request"`
+	Request       *payload.NotificationRequest  `json:"request,omitempty"`
 	Response      *payload.NotificationResponse `json:"response,omitempty"`
+	Lifecycle     *payload.FlowLifecycleEvent   `json:"lifecycle,omitempty"`
 }
 
 // HistoryQueryResult is the response payload for the svc.history

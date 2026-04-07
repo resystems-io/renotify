@@ -10,9 +10,35 @@ import org.json.JSONObject
  * its optional response. Mirrors the Go wire format from
  * [registry.HistoryQueryResult].
  */
-data class HistoryRecord(
+/**
+ * A single history record in the unified timeline. Either a
+ * notification (type "notification") or a lifecycle event
+ * (type "lifecycle"), discriminated by [type].
+ */
+sealed class HistoryRecord {
+    abstract val type: String
+    abstract val timestamp: String
+    abstract val flowId: String
+
+    companion object {
+        fun fromJson(obj: JSONObject): HistoryRecord {
+            val type = obj.optString("type", "notification")
+            return if (type == "lifecycle") {
+                LifecycleRecord.fromJson(obj)
+            } else {
+                NotificationRecord.fromJson(obj)
+            }
+        }
+    }
+}
+
+/**
+ * A notification history record pairing a request with its
+ * optional response.
+ */
+data class NotificationRecord(
     val id: String,
-    val flowId: String,
+    override val flowId: String,
     val workspaceId: String,
     val flowLabel: String?,
     val workspaceName: String?,
@@ -22,12 +48,14 @@ data class HistoryRecord(
     val source: String,
     val responseTypes: List<String>,
     val actions: List<String>?,
-    val timestamp: String,
+    override val timestamp: String,
     val responseAccepted: Boolean?,
     val responseAction: String?,
     val responseText: String?,
     val responseTimestamp: String?
-) {
+) : HistoryRecord() {
+    override val type: String get() = "notification"
+
     /** True when a human response was received. */
     val hasResponse: Boolean
         get() = responseAccepted != null ||
@@ -72,13 +100,13 @@ data class HistoryRecord(
         }
 
     companion object {
-        fun fromJson(obj: JSONObject): HistoryRecord {
+        fun fromJson(obj: JSONObject): NotificationRecord {
             val req = obj.getJSONObject("request")
             val resp = if (obj.has("response") &&
                 !obj.isNull("response")
             ) obj.getJSONObject("response") else null
 
-            return HistoryRecord(
+            return NotificationRecord(
                 id = req.getString("id"),
                 flowId = req.getString("flow_id"),
                 workspaceId = req.getString("workspace_id"),
@@ -118,6 +146,56 @@ data class HistoryRecord(
                     ?.ifEmpty { null },
                 responseTimestamp = resp?.optString("timestamp", "")
                     ?.ifEmpty { null }
+            )
+        }
+    }
+}
+
+/**
+ * A flow lifecycle event (started, completed, failed) in the
+ * history timeline.
+ */
+data class LifecycleRecord(
+    override val flowId: String,
+    val daemonId: String,
+    val workspaceId: String,
+    val status: String,
+    val label: String?,
+    val metadata: Map<String, String>?,
+    override val timestamp: String
+) : HistoryRecord() {
+    override val type: String get() = "lifecycle"
+
+    /** Human-readable summary for display. */
+    val summary: String
+        get() {
+            val name = label ?: flowId
+            return when (status) {
+                "active" -> "Flow started: $name"
+                "completed" -> "Flow completed: $name"
+                "failed" -> "Flow failed: $name"
+                else -> "Flow $status: $name"
+            }
+        }
+
+    companion object {
+        fun fromJson(obj: JSONObject): LifecycleRecord {
+            val lc = obj.getJSONObject("lifecycle")
+            val meta = if (lc.has("metadata") &&
+                !lc.isNull("metadata")
+            ) {
+                val m = lc.getJSONObject("metadata")
+                m.keys().asSequence().associateWith { m.getString(it) }
+            } else null
+
+            return LifecycleRecord(
+                flowId = lc.getString("flow_id"),
+                daemonId = lc.getString("daemon_id"),
+                workspaceId = lc.getString("workspace_id"),
+                status = lc.getString("status"),
+                label = lc.optString("label", "").ifEmpty { null },
+                metadata = meta,
+                timestamp = lc.getString("timestamp")
             )
         }
     }
