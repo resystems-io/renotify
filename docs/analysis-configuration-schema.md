@@ -270,6 +270,8 @@ type InterjectionConfig struct {
 | `timeout.default_ask_timeout`         | `"5m"`  | R-CLI-06 | Overridable per-invocation via `--timeout` flag                                                                                                                                                                                                              |
 | `heartbeat.interval`                  | `"30s"` | R-CLI-14 | Periodic `DaemonHeartbeat`; also triggers on state changes                                                                                                                                                                                                   |
 | `interjection.debounce_window`        | `"5s"`  | R-API-09 | `InterjectionCommand` is not idempotent — a duplicate `stop` from a rapid double-tap would trigger redundant termination. This window drops identical flow_id + action pairs within the period. The stop handler also has a no-op guard as defence in depth. |
+| `device_presence.stale_threshold`     | `"2m"`  | R-CLI-23 | Duration after last device heartbeat before device is considered offline                                                                                                                                                                                     |
+| `device_presence.heartbeat_interval`  | `"30s"` | R-MOB-14 | Heartbeat interval communicated to mobile app via daemon heartbeat payload                                                                                                                                                                                   |
 
 ### 2.7 Daemon Runtime
 

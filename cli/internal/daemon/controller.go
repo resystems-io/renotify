@@ -39,6 +39,11 @@ type Controller struct {
 	// Nil disables reload support.
 	ReloadCh <-chan os.Signal
 
+	// OnReloadDevices is called after a successful auth reload
+	// with the refreshed device list. The presence tracker uses
+	// this to update its device map. Nil disables the callback.
+	OnReloadDevices func([]state.PairedDevice)
+
 	// Overridable paths for testing.
 	DaemonIDPath      string
 	InternalTokenPath string
@@ -235,6 +240,10 @@ func (c *Controller) reloadAuth(
 		c.cfg.JetStream, c.logger,
 	); err != nil {
 		c.logger.Error("reload: ensure consumers", "err", err)
+	}
+
+	if c.OnReloadDevices != nil {
+		c.OnReloadDevices(devices)
 	}
 
 	c.logger.Info("auth reloaded",

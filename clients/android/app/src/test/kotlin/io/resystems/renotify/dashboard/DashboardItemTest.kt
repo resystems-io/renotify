@@ -27,6 +27,7 @@ class DashboardItemTest {
             username = "test",
             hostname = "host",
             gracePeriodMs = 900_000,
+            deviceHeartbeatIntervalMs = 0,
             workspaces = emptyList(),
             timestamp = "2026-04-01T10:00:00Z"
         )
@@ -47,6 +48,7 @@ class DashboardItemTest {
             username = "test",
             hostname = "host",
             gracePeriodMs = 900_000,
+            deviceHeartbeatIntervalMs = 0,
             workspaces = listOf(
                 WorkspaceInfo(
                     workspaceId = "ws_01",
@@ -87,6 +89,7 @@ class DashboardItemTest {
             username = "test",
             hostname = "host",
             gracePeriodMs = 900_000,
+            deviceHeartbeatIntervalMs = 0,
             workspaces = listOf(
                 WorkspaceInfo(
                     workspaceId = "ws_01",
@@ -126,6 +129,7 @@ class DashboardItemTest {
             username = "test",
             hostname = "host",
             gracePeriodMs = 900_000,
+            deviceHeartbeatIntervalMs = 0,
             workspaces = listOf(
                 WorkspaceInfo(
                     workspaceId = "ws_01",

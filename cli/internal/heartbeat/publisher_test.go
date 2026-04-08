@@ -134,7 +134,8 @@ func TestPayload_EmptyWorkspaces(t *testing.T) {
 
 func TestPublisher_Name(t *testing.T) {
 	p := New("dn_TEST", "testuser", "host",
-		5*time.Minute, time.Second, discardLogger())
+		5*time.Minute, 30*time.Second, time.Second,
+		discardLogger())
 	if p.Name() != "heartbeat" {
 		t.Errorf("Name = %q, want heartbeat", p.Name())
 	}
@@ -151,7 +152,8 @@ func TestPublisher_ImmediatePublish(t *testing.T) {
 	nc.Flush()
 
 	p := New("dn_TEST", "testuser", "testhost",
-		5*time.Minute, 10*time.Second, discardLogger())
+		5*time.Minute, 30*time.Second, 10*time.Second,
+		discardLogger())
 
 	ready := make(chan error, 1)
 	if err := p.Start(context.Background(), nc, ready); err != nil {
@@ -199,7 +201,8 @@ func TestPublisher_PeriodicPublish(t *testing.T) {
 
 	// Use a short interval to keep the test fast.
 	p := New("dn_TEST", "testuser", "testhost",
-		5*time.Minute, 50*time.Millisecond, discardLogger())
+		5*time.Minute, 30*time.Second, 50*time.Millisecond,
+		discardLogger())
 
 	ready := make(chan error, 1)
 	if err := p.Start(context.Background(), nc, ready); err != nil {
@@ -228,7 +231,8 @@ func TestPublisher_Stop(t *testing.T) {
 	nc.Flush()
 
 	p := New("dn_TEST", "testuser", "testhost",
-		5*time.Minute, 50*time.Millisecond, discardLogger())
+		5*time.Minute, 30*time.Second, 50*time.Millisecond,
+		discardLogger())
 
 	ready := make(chan error, 1)
 	if err := p.Start(context.Background(), nc, ready); err != nil {
@@ -261,7 +265,8 @@ func TestPublisher_SetWorkspaces(t *testing.T) {
 	nc.Flush()
 
 	p := New("dn_TEST", "testuser", "testhost",
-		5*time.Minute, 10*time.Second, discardLogger())
+		5*time.Minute, 30*time.Second, 10*time.Second,
+		discardLogger())
 
 	ready := make(chan error, 1)
 	if err := p.Start(context.Background(), nc, ready); err != nil {

@@ -15,17 +15,18 @@ import (
 // compiled defaults; the settings.json file provides overrides.
 // See docs/analysis-configuration-schema.md Section 2.
 type Config struct {
-	Username     string             `json:"username"      mapstructure:"username"`
-	Broker       BrokerConfig       `json:"broker"        mapstructure:"broker"`
-	MCP          MCPConfig          `json:"mcp"           mapstructure:"mcp"`
-	JetStream    JetStreamConfig    `json:"jetstream"     mapstructure:"jetstream"`
-	SharedBroker SharedBrokerConfig `json:"shared_broker" mapstructure:"shared_broker"`
-	RateLimit    RateLimitConfig    `json:"rate_limit"    mapstructure:"rate_limit"`
-	Reaping      ReapingConfig      `json:"reaping"       mapstructure:"reaping"`
-	Timeout      TimeoutConfig      `json:"timeout"       mapstructure:"timeout"`
-	Heartbeat    HeartbeatConfig    `json:"heartbeat"     mapstructure:"heartbeat"`
-	Interjection InterjectionConfig `json:"interjection"  mapstructure:"interjection"`
-	Daemon       DaemonConfig       `json:"daemon"        mapstructure:"daemon"`
+	Username       string               `json:"username"      mapstructure:"username"`
+	Broker         BrokerConfig         `json:"broker"        mapstructure:"broker"`
+	MCP            MCPConfig            `json:"mcp"           mapstructure:"mcp"`
+	JetStream      JetStreamConfig      `json:"jetstream"     mapstructure:"jetstream"`
+	SharedBroker   SharedBrokerConfig   `json:"shared_broker" mapstructure:"shared_broker"`
+	RateLimit      RateLimitConfig      `json:"rate_limit"    mapstructure:"rate_limit"`
+	Reaping        ReapingConfig        `json:"reaping"       mapstructure:"reaping"`
+	Timeout        TimeoutConfig        `json:"timeout"       mapstructure:"timeout"`
+	Heartbeat      HeartbeatConfig      `json:"heartbeat"     mapstructure:"heartbeat"`
+	Interjection   InterjectionConfig   `json:"interjection"     mapstructure:"interjection"`
+	DevicePresence DevicePresenceConfig `json:"device_presence"  mapstructure:"device_presence"`
+	Daemon         DaemonConfig         `json:"daemon"           mapstructure:"daemon"`
 }
 
 // BrokerConfig controls the embedded NATS server. When Enabled is
@@ -104,6 +105,16 @@ type InterjectionConfig struct {
 	DebounceWindow Duration `json:"debounce_window" mapstructure:"debounce_window"`
 }
 
+// DevicePresenceConfig controls device presence tracking
+// (R-CLI-23). The daemon subscribes to mobile device heartbeats
+// and marks a device as offline when no heartbeat has been
+// received within the stale threshold. The heartbeat interval is
+// communicated to the mobile app via the daemon heartbeat payload.
+type DevicePresenceConfig struct {
+	StaleThreshold    Duration `json:"stale_threshold"    mapstructure:"stale_threshold"`
+	HeartbeatInterval Duration `json:"heartbeat_interval" mapstructure:"heartbeat_interval"`
+}
+
 // DaemonConfig controls daemon process behaviour.
 type DaemonConfig struct {
 	Foreground bool   `json:"foreground" mapstructure:"foreground"`
@@ -156,6 +167,10 @@ func Default() *Config {
 		},
 		Interjection: InterjectionConfig{
 			DebounceWindow: NewDuration(5 * time.Second),
+		},
+		DevicePresence: DevicePresenceConfig{
+			StaleThreshold:    NewDuration(2 * time.Minute),
+			HeartbeatInterval: NewDuration(30 * time.Second),
 		},
 		Daemon: DaemonConfig{
 			Foreground: false,
@@ -244,6 +259,12 @@ func (c *Config) Validate() error {
 	}
 	if c.Interjection.DebounceWindow.Duration < time.Second {
 		return fmt.Errorf("interjection.debounce_window must be at least 1 second")
+	}
+	if c.DevicePresence.StaleThreshold.Duration < 10*time.Second {
+		return fmt.Errorf("device_presence.stale_threshold must be at least 10 seconds")
+	}
+	if c.DevicePresence.HeartbeatInterval.Duration < 5*time.Second {
+		return fmt.Errorf("device_presence.heartbeat_interval must be at least 5 seconds")
 	}
 
 	switch c.Daemon.LogLevel {

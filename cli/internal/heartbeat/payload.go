@@ -34,12 +34,13 @@ type WorkspaceInfo struct {
 // by each daemon instance. The mobile app uses it to build the
 // dashboard hierarchy: flows → workspaces → daemons → hosts.
 type DaemonHeartbeat struct {
-	DaemonID    string          `json:"daemon_id"`
-	Username    string          `json:"username"`
-	Hostname    string          `json:"hostname"`
-	GracePeriod string          `json:"grace_period,omitempty"`
-	Workspaces  []WorkspaceInfo `json:"workspaces"`
-	Timestamp   time.Time       `json:"timestamp"`
+	DaemonID                string          `json:"daemon_id"`
+	Username                string          `json:"username"`
+	Hostname                string          `json:"hostname"`
+	GracePeriod             string          `json:"grace_period,omitempty"`
+	DeviceHeartbeatInterval string          `json:"device_heartbeat_interval,omitempty"`
+	Workspaces              []WorkspaceInfo `json:"workspaces"`
+	Timestamp               time.Time       `json:"timestamp"`
 }
 
 // Subject returns the NATS subject for the heartbeat:

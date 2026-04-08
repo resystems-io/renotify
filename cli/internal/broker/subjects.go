@@ -90,6 +90,21 @@ func DeviceControlSubject(username, deviceID string) string {
 		username, deviceID)
 }
 
+// DeviceHeartbeatSubject returns the Core NATS Pub/Sub subject
+// for a mobile device's application-level heartbeat (R-MOB-14).
+func DeviceHeartbeatSubject(username, deviceID string) string {
+	return fmt.Sprintf("resystems.renotify.%s.device.%s.heartbeat",
+		username, deviceID)
+}
+
+// ServiceDevicePresenceSubject returns the Core NATS
+// Request-Reply subject for the device presence query
+// endpoint (R-CLI-23).
+func ServiceDevicePresenceSubject(username string) string {
+	return fmt.Sprintf("resystems.renotify.%s.svc.device-presence",
+		username)
+}
+
 // MCP stdio relay subjects. These carry raw JSON-RPC messages
 // between the `renotify mcp` CLI process and the daemon's
 // mcp.Server via Core NATS Pub/Sub (ephemeral, not JetStream).

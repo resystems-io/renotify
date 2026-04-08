@@ -18,7 +18,9 @@ import (
 	"go.resystems.io/renotify/cli/internal/heartbeat"
 	"go.resystems.io/renotify/cli/internal/ledger"
 	"go.resystems.io/renotify/cli/internal/payload"
+	"go.resystems.io/renotify/cli/internal/presence"
 	"go.resystems.io/renotify/cli/internal/registry"
+	"go.resystems.io/renotify/cli/internal/state"
 	"go.resystems.io/renotify/cli/internal/statesvc"
 	"go.resystems.io/renotify/cli/internal/testutil"
 
@@ -84,7 +86,8 @@ func openTestLedger(t *testing.T) *ledger.DB {
 func newTestHeartbeat(t *testing.T, nc *nats.Conn) *heartbeat.Publisher {
 	t.Helper()
 	hb := heartbeat.New(testDaemonID, testUsername, "test-host",
-		5*time.Minute, 30*time.Second, slog.Default())
+		5*time.Minute, 30*time.Second, 30*time.Second,
+		slog.Default())
 	ready := make(chan error, 1)
 	if err := hb.Start(t.Context(), nc, ready); err != nil {
 		t.Fatal(err)
@@ -100,7 +103,8 @@ func startRegistry(
 	hb *heartbeat.Publisher,
 ) *registry.Service {
 	t.Helper()
-	svc := registry.New(func() *ledger.DB { return db }, hb, testUsername, testDaemonID,
+	svc := registry.New(func() *ledger.DB { return db }, hb, nil,
+		testUsername, testDaemonID,
 		config.ReapingConfig{
 			GracePeriod: config.Duration{Duration: 5 * time.Minute},
 			Interval:    config.Duration{Duration: 30 * time.Second},
@@ -251,7 +255,8 @@ func TestStaleReaper(t *testing.T) {
 
 	// Start registry with a very short grace period so the
 	// reaper fires immediately on startup reconciliation.
-	svc := registry.New(func() *ledger.DB { return db }, hb, testUsername, testDaemonID,
+	svc := registry.New(func() *ledger.DB { return db }, hb, nil,
+		testUsername, testDaemonID,
 		config.ReapingConfig{
 			GracePeriod: config.Duration{Duration: 1 * time.Second},
 			Interval:    config.Duration{Duration: 30 * time.Second},
@@ -920,5 +925,100 @@ func TestUpdateActivityEndpoint(t *testing.T) {
 	if !flows[0].LastActivityTimestamp.After(earlier) {
 		t.Errorf("last_activity not updated: %v",
 			flows[0].LastActivityTimestamp)
+	}
+}
+
+func TestDevicePresenceEndpoint(t *testing.T) {
+	srv, nc := startTestNATS(t)
+	_ = srv
+	db := openTestLedger(t)
+	hb := newTestHeartbeat(t, nc)
+
+	devices := []state.PairedDevice{
+		{DeviceID: "mb_DEV01", PairedAt: time.Now().UTC()},
+	}
+	tracker := presence.New(testUsername, 5*time.Second,
+		devices, slog.Default())
+	trackerReady := make(chan error, 1)
+	if err := tracker.Start(t.Context(), nc, trackerReady); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-trackerReady:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("tracker start timeout")
+	}
+	t.Cleanup(func() { tracker.Stop(t.Context()) })
+
+	// Start registry with the tracker.
+	svc := registry.New(func() *ledger.DB { return db }, hb,
+		tracker, testUsername, testDaemonID,
+		config.ReapingConfig{
+			GracePeriod: config.Duration{Duration: 5 * time.Minute},
+			Interval:    config.Duration{Duration: 30 * time.Second},
+		},
+		slog.Default())
+	ready := make(chan error, 1)
+	if err := svc.Start(t.Context(), nc, ready); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-ready:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("registry start timeout")
+	}
+	t.Cleanup(func() { svc.Stop(t.Context()) })
+
+	// Query before any heartbeat — device should be offline.
+	subject := broker.ServiceDevicePresenceSubject(testUsername)
+	msg, err := nc.Request(subject, nil, 2*time.Second)
+	if err != nil {
+		t.Fatalf("presence query: %v", err)
+	}
+	var result statesvc.DevicePresenceResult
+	if err := json.Unmarshal(msg.Data, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(result.Devices) != 1 {
+		t.Fatalf("expected 1 device, got %d", len(result.Devices))
+	}
+	if result.Devices[0].Online {
+		t.Error("device should be offline before heartbeat")
+	}
+
+	// Publish a heartbeat.
+	hbSubject := broker.DeviceHeartbeatSubject(testUsername,
+		"mb_DEV01")
+	hbData := []byte(`{"device_id":"mb_DEV01",` +
+		`"timestamp":"2026-04-08T10:00:00Z"}`)
+	if err := nc.Publish(hbSubject, hbData); err != nil {
+		t.Fatal(err)
+	}
+	nc.Flush()
+	time.Sleep(50 * time.Millisecond)
+
+	// Query again — device should be online.
+	msg, err = nc.Request(subject, nil, 2*time.Second)
+	if err != nil {
+		t.Fatalf("presence query after heartbeat: %v", err)
+	}
+	if err := json.Unmarshal(msg.Data, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !result.Devices[0].Online {
+		t.Error("device should be online after heartbeat")
+	}
+	if result.Devices[0].LastSeen == nil {
+		t.Error("last_seen should be set")
+	}
+	if result.Devices[0].Username != testUsername {
+		t.Errorf("username = %q, want %q",
+			result.Devices[0].Username, testUsername)
 	}
 }

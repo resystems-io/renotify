@@ -231,6 +231,14 @@ class NatsService : Service() {
             val json = String(data, Charsets.UTF_8)
             val heartbeat = DaemonHeartbeat.fromJson(json)
             _dashboardState.value = heartbeat
+
+            // Update the device heartbeat interval if the daemon
+            // communicates a non-zero value (R-MOB-14).
+            if (heartbeat.deviceHeartbeatIntervalMs > 0) {
+                manager.updateHeartbeatInterval(
+                    heartbeat.deviceHeartbeatIntervalMs)
+            }
+
             Log.d(TAG, "Heartbeat: ${heartbeat.hostname} " +
                 "${heartbeat.workspaces.size} workspace(s)")
         } catch (e: Exception) {

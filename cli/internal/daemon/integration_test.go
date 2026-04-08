@@ -352,8 +352,9 @@ func TestController_MCPToolEndToEnd(t *testing.T) {
 	mcpSrv := mcpserver.New(httpSrv, logger,
 		cfg.Username, "dn_INTEGTEST01", cfg)
 	hbPub := heartbeat.New("dn_INTEGTEST01", cfg.Username,
-		"test-host", 15*time.Minute, 30*time.Second, logger)
-	regSvc := registry.New(ledgerSub.DB, hbPub,
+		"test-host", 15*time.Minute, 30*time.Second,
+		30*time.Second, logger)
+	regSvc := registry.New(ledgerSub.DB, hbPub, nil,
 		cfg.Username, "dn_INTEGTEST01",
 		cfg.Reaping, logger)
 
@@ -654,8 +655,9 @@ func TestController_SharedBrokerMCPRoundTrip(t *testing.T) {
 	mcpSrv := mcpserver.New(httpSrv, logger,
 		cfg.Username, "dn_SHARED01", cfg)
 	hbPub := heartbeat.New("dn_SHARED01", cfg.Username,
-		"test-host", 15*time.Minute, 30*time.Second, logger)
-	regSvc := registry.New(ledgerSub.DB, hbPub,
+		"test-host", 15*time.Minute, 30*time.Second,
+		30*time.Second, logger)
+	regSvc := registry.New(ledgerSub.DB, hbPub, nil,
 		cfg.Username, "dn_SHARED01",
 		cfg.Reaping, logger)
 

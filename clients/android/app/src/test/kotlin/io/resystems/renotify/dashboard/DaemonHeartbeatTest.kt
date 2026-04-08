@@ -213,4 +213,50 @@ class DaemonHeartbeatTest {
         val hb = DaemonHeartbeat.fromJson(json)
         assertEquals(0, hb.gracePeriodMs)
     }
+
+    // --- deviceHeartbeatIntervalMs in heartbeat ---
+
+    @Test
+    fun parsesDeviceHeartbeatInterval() {
+        val json = """
+            {
+                "daemon_id": "dn_DHI01",
+                "device_heartbeat_interval": "30s",
+                "workspaces": [],
+                "timestamp": "2026-04-08T10:00:00Z"
+            }
+        """.trimIndent()
+
+        val hb = DaemonHeartbeat.fromJson(json)
+        assertEquals(30_000, hb.deviceHeartbeatIntervalMs)
+    }
+
+    @Test
+    fun parsesDeviceHeartbeatInterval_minutes() {
+        val json = """
+            {
+                "daemon_id": "dn_DHI02",
+                "device_heartbeat_interval": "1m0s",
+                "workspaces": [],
+                "timestamp": "2026-04-08T10:00:00Z"
+            }
+        """.trimIndent()
+
+        val hb = DaemonHeartbeat.fromJson(json)
+        assertEquals(60_000, hb.deviceHeartbeatIntervalMs)
+    }
+
+    @Test
+    fun missingDeviceHeartbeatInterval_defaultsToZero() {
+        val json = """
+            {
+                "daemon_id": "dn_DHI03",
+                "workspaces": [],
+                "timestamp": "2026-04-08T10:00:00Z"
+            }
+        """.trimIndent()
+
+        val hb = DaemonHeartbeat.fromJson(json)
+        assertEquals(0, hb.deviceHeartbeatIntervalMs)
+    }
 }

@@ -54,7 +54,17 @@ class NatsConnectionManager(
         private set
 
     private var connectJob: Job? = null
+    private var heartbeatJob: Job? = null
     private var payload: ProvisioningPayload? = null
+
+    /**
+     * Device heartbeat interval in milliseconds. Starts at the
+     * compiled default and is updated when a daemon heartbeat
+     * arrives containing `device_heartbeat_interval`.
+     */
+    @Volatile
+    var deviceHeartbeatIntervalMs: Long = DEFAULT_HEARTBEAT_INTERVAL_MS
+        private set
 
     /** Tracks rendered notification IDs for deduplication. */
     private val renderedIds = mutableSetOf<String>()
@@ -134,6 +144,7 @@ class NatsConnectionManager(
             subscribeToConsumer(nc, payload)
             subscribeToHeartbeat(nc, payload)
             subscribeToDeviceControl(nc, payload)
+            startDeviceHeartbeat(nc, payload)
             queryInitialDashboard(nc, payload)
 
             _state.value = ConnectionState.Connected
@@ -151,6 +162,7 @@ class NatsConnectionManager(
             // push consumer's deliver-subject binding on the
             // server, then enter reconnection loop.
             Log.w(TAG, "Connection lost, status: ${nc.status}")
+            heartbeatJob?.cancel()
             closeQuietly(nc)
             connection = null
             reconnect(payload)
@@ -309,6 +321,7 @@ class NatsConnectionManager(
                 subscribeToConsumer(nc, payload)
                 subscribeToHeartbeat(nc, payload)
                 subscribeToDeviceControl(nc, payload)
+                startDeviceHeartbeat(nc, payload)
                 queryInitialDashboard(nc, payload)
 
                 _state.value = ConnectionState.Connected
@@ -320,6 +333,7 @@ class NatsConnectionManager(
                     delay(1000)
                 }
                 Log.w(TAG, "Connection lost again")
+                heartbeatJob?.cancel()
                 closeQuietly(nc)
                 connection = null
                 attempt = 0 // reset backoff after a period of
@@ -370,9 +384,67 @@ class NatsConnectionManager(
         }
     }
 
+    /**
+     * Start publishing device heartbeats to the daemon. The
+     * heartbeat identifies this device and tells the daemon the
+     * device is online (R-MOB-14). The interval is read from
+     * [deviceHeartbeatIntervalMs] on each iteration, so it
+     * adjusts when the daemon communicates a new value via its
+     * own heartbeat.
+     */
+    private fun startDeviceHeartbeat(
+        nc: Connection,
+        payload: ProvisioningPayload
+    ) {
+        if (payload.deviceId.isEmpty()) return
+
+        heartbeatJob?.cancel()
+        heartbeatJob = scope.launch(Dispatchers.IO) {
+            val subject =
+                "resystems.renotify.${payload.username}" +
+                ".device.${payload.deviceId}.heartbeat"
+            Log.i(TAG, "Device heartbeat started: $subject")
+            try {
+                while (nc.status == Connection.Status.CONNECTED) {
+                    val json = org.json.JSONObject().apply {
+                        put("device_id", payload.deviceId)
+                        put("timestamp",
+                            java.time.Instant.now().toString())
+                    }
+                    nc.publish(subject,
+                        json.toString().toByteArray())
+                    delay(deviceHeartbeatIntervalMs)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Device heartbeat error", e)
+            }
+            Log.i(TAG, "Device heartbeat stopped")
+        }
+    }
+
+    /**
+     * Update the heartbeat interval from a daemon heartbeat.
+     * Called by [NatsService] when a daemon heartbeat arrives
+     * containing a non-zero `device_heartbeat_interval`.
+     */
+    fun updateHeartbeatInterval(intervalMs: Long) {
+        if (intervalMs > 0 &&
+            intervalMs != deviceHeartbeatIntervalMs
+        ) {
+            Log.i(TAG, "Device heartbeat interval updated: " +
+                "${intervalMs}ms")
+            deviceHeartbeatIntervalMs = intervalMs
+        }
+    }
+
     companion object {
         private const val TAG = "NatsConnectionManager"
         private const val STREAM_NAME = "RENOTIFY"
+
+        /** Default device heartbeat interval (30 seconds). */
+        private const val DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000L
 
         /** Max backoff delay in milliseconds. */
         private const val MAX_BACKOFF_MS = 30_000L

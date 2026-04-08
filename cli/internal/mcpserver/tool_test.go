@@ -85,7 +85,8 @@ func startTestRegistry(
 ) {
 	t.Helper()
 	hb := heartbeat.New(testDaemonID, testUsername, "testhost",
-		5*time.Minute, 30*time.Second, slog.Default())
+		5*time.Minute, 30*time.Second, 30*time.Second,
+		slog.Default())
 	hbReady := make(chan error, 1)
 	if err := hb.Start(t.Context(), nc, hbReady); err != nil {
 		t.Fatal(err)
@@ -95,7 +96,7 @@ func startTestRegistry(
 
 	regCfg := config.Default().Reaping
 	regSvc := registry.New(
-		func() *ledger.DB { return db }, hb,
+		func() *ledger.DB { return db }, hb, nil,
 		testUsername, testDaemonID, regCfg, slog.Default())
 	regReady := make(chan error, 1)
 	if err := regSvc.Start(t.Context(), nc, regReady); err != nil {

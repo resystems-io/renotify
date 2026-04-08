@@ -32,6 +32,8 @@ collisions without encoding workspace or daemon identity in the subject.
 | `resystems.renotify.{username}.daemon.{daemon_id}.heartbeat` | Core NATS Pub/Sub       | Daemon          | Mobile app         | `DaemonHeartbeat`                            | None (ephemeral)   | R-CLI-14           |
 | `resystems.renotify.{username}.svc.flows`                    | Core NATS Request-Reply | Mobile app      | Daemon             | `ActiveFlowsQuery` / `ActiveFlowsResult`     | None (synchronous) | R-CLI-14, R-MOB-09 |
 | `resystems.renotify.{username}.svc.history`                  | Core NATS Request-Reply | Mobile app      | Daemon             | `HistoryQueryRequest` / `HistoryQueryResult` | None (synchronous) | R-CLI-13, R-MOB-07 |
+| `resystems.renotify.{username}.device.{device_id}.heartbeat` | Core NATS Pub/Sub       | Mobile app      | Daemon             | `DeviceHeartbeat`                            | None (ephemeral)   | R-MOB-14           |
+| `resystems.renotify.{username}.svc.device-presence`          | Core NATS Request-Reply | CLI             | Daemon             | `DevicePresenceQuery` / `DevicePresenceResult` | None (synchronous) | R-CLI-23         |
 
 **Design rule:** All subjects under `resystems.renotify.{username}.flow.*` use
 JetStream for durable delivery within the TTL window. All other subjects use
@@ -542,6 +544,7 @@ publish to subjects that represent legitimate user actions:
 | Subscribe | `resystems.renotify.{username}.>`                | Receive all user traffic (notifications, heartbeats, lifecycle) |
 | Publish   | `resystems.renotify.{username}.flow.*.response`  | Send notification responses                                     |
 | Publish   | `resystems.renotify.{username}.flow.*.interject` | Send interjection commands                                      |
+| Publish   | `resystems.renotify.{username}.device.{device_id}.heartbeat` | Send device presence heartbeat (device-specific, not wildcard) |
 | Publish   | `resystems.renotify.{username}.svc.*`            | Send service requests (active flows, history queries)           |
 | Publish   | `$JS.ACK.>`                                      | Acknowledge JetStream messages                                  |
 | Publish   | `$JS.FC.>`                                       | JetStream flow control                                          |
@@ -549,15 +552,19 @@ publish to subjects that represent legitimate user actions:
 | Subscribe | `_INBOX.>`                                       | Receive Core NATS request-reply responses                       |
 
 **Security property:** The mobile client cannot publish to `*.request`,
-`*.lifecycle`, or `*.heartbeat` subjects. This prevents a compromised mobile
-device from:
+`*.lifecycle`, or daemon `*.heartbeat` subjects. Each device may only
+publish to its own device-specific heartbeat subject
+(`device.{device_id}.heartbeat`), not to other devices' heartbeat
+subjects. This prevents a compromised mobile device from:
 
 * Injecting fake notifications (`.request`)
 * Fabricating flow lifecycle events (`.lifecycle`)
-* Impersonating a daemon (`.heartbeat`)
+* Impersonating a daemon (`daemon.*.heartbeat`)
+* Impersonating another device (`device.{other_id}.heartbeat`)
 
-The mobile client can only respond to notifications, issue interjections, and
-query the daemon — the legitimate actions a human developer takes.
+The mobile client can only respond to notifications, issue interjections,
+publish its own device heartbeat, and query the daemon — the legitimate
+actions a human developer takes.
 
 ### 7.4 Post-MVP ACL Enhancements
 
