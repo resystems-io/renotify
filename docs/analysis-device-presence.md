@@ -70,14 +70,14 @@ NATS service endpoint (`svc.device-presence`).
 
 This approach satisfies all five constraints from Section 2:
 
-| Criterion         | Assessment                                         |
-| :---------------- | :------------------------------------------------- |
-| Mobile changes    | New periodic publisher in `NatsConnectionManager`  |
-| Daemon changes    | New presence tracker subsystem + service endpoint  |
-| CLI changes       | New `renotify devices` command                     |
-| Latency           | Eventually consistent (up to heartbeat interval)   |
-| Data richness     | Device ID, timestamp (extensible)                  |
-| Shared broker     | **Works** (application-level, broker-independent)  |
+| Criterion      | Assessment                                        |
+|:---------------|:--------------------------------------------------|
+| Mobile changes | New periodic publisher in `NatsConnectionManager` |
+| Daemon changes | New presence tracker subsystem + service endpoint |
+| CLI changes    | New `renotify devices` command                    |
+| Latency        | Eventually consistent (up to heartbeat interval)  |
+| Data richness  | Device ID, timestamp (extensible)                 |
+| Shared broker  | **Works** (application-level, broker-independent) |
 
 **Known trade-offs:**
 - Stale-state window (30–120s after disconnect). Acceptable for a
@@ -180,7 +180,7 @@ effect within one heartbeat interval — no re-pairing required.
 ### 4.3 Default and Fallback Behaviour
 
 | Scenario                          | Mobile behaviour                  |
-| :-------------------------------- | :-------------------------------- |
+|:----------------------------------|:----------------------------------|
 | Daemon heartbeat received         | Use `device_heartbeat_interval`   |
 | Field absent or zero              | Use compiled default (30 seconds) |
 | Daemon heartbeat not yet received | Use compiled default (30 seconds) |
@@ -247,10 +247,10 @@ The existing wildcard `prefix + ".svc.*"` already covers the
 }
 ```
 
-| Field       | Type   | Required | Description                      |
-| :---------- | :----- | :------- | :------------------------------- |
-| `device_id` | string | yes      | Device identity from pairing     |
-| `timestamp` | string | yes      | ISO 8601 / RFC 3339 timestamp    |
+| Field       | Type   | Required | Description                   |
+|:------------|:-------|:---------|:------------------------------|
+| `device_id` | string | yes      | Device identity from pairing  |
+| `timestamp` | string | yes      | ISO 8601 / RFC 3339 timestamp |
 
 Minimal payload (~80 bytes). Additional fields (app version, battery
 level) can be added in the future without breaking existing parsers
@@ -260,9 +260,9 @@ due to `omitempty` convention.
 
 New optional field added to the existing `DaemonHeartbeat` payload:
 
-| Field                        | Type   | Required | Description                     |
-| :--------------------------- | :----- | :------- | :------------------------------ |
-| `device_heartbeat_interval`  | string | no       | Go duration (e.g. `"30s"`)      |
+| Field                       | Type   | Required | Description                |
+|:----------------------------|:-------|:---------|:---------------------------|
+| `device_heartbeat_interval` | string | no       | Go duration (e.g. `"30s"`) |
 
 ### 6.3 DevicePresenceResult (svc.device-presence Response)
 
@@ -287,13 +287,13 @@ New optional field added to the existing `DaemonHeartbeat` payload:
 }
 ```
 
-| Field       | Type    | Description                                    |
-| :---------- | :------ | :--------------------------------------------- |
-| `username`  | string  | Owning daemon username                         |
-| `device_id` | string  | Device identity                                |
-| `paired_at` | string  | RFC 3339 pairing timestamp                     |
-| `online`    | boolean | True if last heartbeat within stale threshold  |
-| `last_seen` | string  | RFC 3339 timestamp of last heartbeat, or null  |
+| Field       | Type    | Description                                   |
+|:------------|:--------|:----------------------------------------------|
+| `username`  | string  | Owning daemon username                        |
+| `device_id` | string  | Device identity                               |
+| `paired_at` | string  | RFC 3339 pairing timestamp                    |
+| `online`    | boolean | True if last heartbeat within stale threshold |
+| `last_seen` | string  | RFC 3339 timestamp of last heartbeat, or null |
 
 ---
 
@@ -301,10 +301,10 @@ New optional field added to the existing `DaemonHeartbeat` payload:
 
 ### 7.1 New Configuration Parameters
 
-| Key                                | Type     | Default | Env Var                                      | Description                                             |
-| :--------------------------------- | :------- | :------ | :------------------------------------------- | :------------------------------------------------------ |
-| `device_presence.stale_threshold`  | duration | `2m`    | `RENOTIFY_DEVICE_PRESENCE_STALE_THRESHOLD`   | Time after last heartbeat before device is offline       |
-| `device_presence.heartbeat_interval` | duration | `30s` | `RENOTIFY_DEVICE_PRESENCE_HEARTBEAT_INTERVAL` | Heartbeat interval communicated to mobile via heartbeat |
+| Key                                  | Type     | Default | Env Var                                       | Description                                             |
+|:-------------------------------------|:---------|:--------|:----------------------------------------------|:--------------------------------------------------------|
+| `device_presence.stale_threshold`    | duration | `2m`    | `RENOTIFY_DEVICE_PRESENCE_STALE_THRESHOLD`    | Time after last heartbeat before device is offline      |
+| `device_presence.heartbeat_interval` | duration | `30s`   | `RENOTIFY_DEVICE_PRESENCE_HEARTBEAT_INTERVAL` | Heartbeat interval communicated to mobile via heartbeat |
 
 ### 7.2 Validation Constraints
 
@@ -539,17 +539,17 @@ is Android. Steps 10–11 are verification and documentation.
 
 ## 10. Impact on Existing Requirements
 
-| Requirement  | Impact                                              |
-| :----------- | :-------------------------------------------------- |
-| R-CLI-14     | Minor — registry gains one more service endpoint    |
-| R-CLI-20     | Aligned — new endpoint follows NATS service pattern |
-| R-CLI-21     | None — presence tracker is not in the MCP server    |
-| R-MOB-10     | Enhanced — mobile app gains a daemon-visible signal |
-| R-MOB-11     | None — per-device identity already established      |
-| R-SEC-02     | Minor — mobile ACL extended with heartbeat subject  |
-| R-SYS-01     | Negligible — one heartbeat per device per interval  |
-| D-09         | Extended — daemon heartbeat gains new field         |
-| D-16         | Updated — mobile publish ACL adds heartbeat subject |
+| Requirement | Impact                                              |
+|:------------|:----------------------------------------------------|
+| R-CLI-14    | Minor — registry gains one more service endpoint    |
+| R-CLI-20    | Aligned — new endpoint follows NATS service pattern |
+| R-CLI-21    | None — presence tracker is not in the MCP server    |
+| R-MOB-10    | Enhanced — mobile app gains a daemon-visible signal |
+| R-MOB-11    | None — per-device identity already established      |
+| R-SEC-02    | Minor — mobile ACL extended with heartbeat subject  |
+| R-SYS-01    | Negligible — one heartbeat per device per interval  |
+| D-09        | Extended — daemon heartbeat gains new field         |
+| D-16        | Updated — mobile publish ACL adds heartbeat subject |
 
 ---
 

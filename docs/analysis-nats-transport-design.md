@@ -23,17 +23,26 @@ collisions without encoding workspace or daemon identity in the subject.
 
 ### 1.1 Subject Registry
 
-| Subject Pattern                                              | Transport               | Publisher       | Subscriber(s)      | Payload                                      | Persistence        | Req Trace          |
-|:-------------------------------------------------------------|:------------------------|:----------------|:-------------------|:---------------------------------------------|:-------------------|:-------------------|
-| `resystems.renotify.{username}.flow.{flow_id}.request`       | JetStream               | CLI / MCP Agent | Mobile app         | `NotificationRequest`                        | Memory, 30-min TTL | R-API-01, R-API-07 |
-| `resystems.renotify.{username}.flow.{flow_id}.response`      | JetStream               | Mobile app      | CLI / MCP Agent    | `NotificationResponse`                       | Memory, 30-min TTL | R-API-02, R-API-07 |
-| `resystems.renotify.{username}.flow.{flow_id}.lifecycle`     | JetStream               | CLI / MCP Agent | Daemon, Mobile app | `FlowLifecycleEvent`                         | Memory, 30-min TTL | R-API-10           |
-| `resystems.renotify.{username}.flow.{flow_id}.interject`     | JetStream               | Mobile app      | Daemon             | `InterjectionCommand`                        | Memory, 30-min TTL | R-API-09           |
-| `resystems.renotify.{username}.daemon.{daemon_id}.heartbeat` | Core NATS Pub/Sub       | Daemon          | Mobile app         | `DaemonHeartbeat`                            | None (ephemeral)   | R-CLI-14           |
-| `resystems.renotify.{username}.svc.flows`                    | Core NATS Request-Reply | Mobile app      | Daemon             | `ActiveFlowsQuery` / `ActiveFlowsResult`     | None (synchronous) | R-CLI-14, R-MOB-09 |
-| `resystems.renotify.{username}.svc.history`                  | Core NATS Request-Reply | Mobile app      | Daemon             | `HistoryQueryRequest` / `HistoryQueryResult` | None (synchronous) | R-CLI-13, R-MOB-07 |
-| `resystems.renotify.{username}.device.{device_id}.heartbeat` | Core NATS Pub/Sub       | Mobile app      | Daemon             | `DeviceHeartbeat`                            | None (ephemeral)   | R-MOB-14           |
-| `resystems.renotify.{username}.svc.device-presence`          | Core NATS Request-Reply | CLI             | Daemon             | `DevicePresenceQuery` / `DevicePresenceResult` | None (synchronous) | R-CLI-23         |
+| Subject Pattern                                              | Transport               | Publisher            | Subscriber(s)        | Payload                                        | Persistence        | Req Trace          |
+|:-------------------------------------------------------------|:------------------------|:---------------------|:---------------------|:-----------------------------------------------|:-------------------|:-------------------|
+| `resystems.renotify.{username}.flow.{flow_id}.request`       | JetStream               | CLI / MCP Agent      | Mobile app           | `NotificationRequest`                          | Memory, 30-min TTL | R-API-01, R-API-07 |
+| `resystems.renotify.{username}.flow.{flow_id}.response`      | JetStream               | Mobile app           | CLI / MCP Agent      | `NotificationResponse`                         | Memory, 30-min TTL | R-API-02, R-API-07 |
+| `resystems.renotify.{username}.flow.{flow_id}.lifecycle`     | JetStream               | CLI / MCP Agent      | Daemon, Mobile app   | `FlowLifecycleEvent`                           | Memory, 30-min TTL | R-API-10           |
+| `resystems.renotify.{username}.flow.{flow_id}.interject`     | JetStream               | Mobile app           | Daemon               | `InterjectionCommand`                          | Memory, 30-min TTL | R-API-09           |
+| `resystems.renotify.{username}.daemon.{daemon_id}.heartbeat` | Core NATS Pub/Sub       | Daemon               | Mobile app           | `DaemonHeartbeat`                              | None (ephemeral)   | R-CLI-14           |
+| `resystems.renotify.{username}.svc.flows`                    | Core NATS Request-Reply | Mobile app           | Daemon               | `ActiveFlowsQuery` / `ActiveFlowsResult`       | None (synchronous) | R-CLI-14, R-MOB-09 |
+| `resystems.renotify.{username}.svc.history`                  | Core NATS Request-Reply | Mobile app           | Daemon               | `HistoryQueryRequest` / `HistoryQueryResult`   | None (synchronous) | R-CLI-13, R-MOB-07 |
+| `resystems.renotify.{username}.device.{device_id}.heartbeat` | Core NATS Pub/Sub       | Mobile app           | Daemon               | `DeviceHeartbeat`                              | None (ephemeral)   | R-MOB-14           |
+| `resystems.renotify.{username}.svc.insert-request`           | Core NATS Request-Reply | MCP server           | Daemon               | `InsertRequestCmd` / `WriteResult`             | None (synchronous) | R-CLI-20           |
+| `resystems.renotify.{username}.svc.insert-response`          | Core NATS Request-Reply | MCP server           | Daemon               | `InsertResponseCmd` / `WriteResult`            | None (synchronous) | R-CLI-20           |
+| `resystems.renotify.{username}.svc.insert-interjection`      | Core NATS Request-Reply | MCP server           | Daemon               | `InsertInterjectionCmd` / `WriteResult`        | None (synchronous) | R-CLI-20           |
+| `resystems.renotify.{username}.svc.update-activity`          | Core NATS Request-Reply | MCP server           | Daemon               | `UpdateActivityCmd` / `WriteResult`            | None (synchronous) | R-CLI-20           |
+| `resystems.renotify.{username}.svc.device-presence`          | Core NATS Request-Reply | CLI                  | Daemon               | `DevicePresenceQuery` / `DevicePresenceResult` | None (synchronous) | R-CLI-23           |
+| `resystems.renotify.{username}.device.{device_id}.control`   | Core NATS Pub/Sub       | CLI                  | Mobile app           | `DeviceControl`                                | None (ephemeral)   | C-16               |
+| `resystems.renotify.{username}.mcp.{session_id}.c2s`         | Core NATS Pub/Sub       | CLI (`renotify mcp`) | Daemon               | Raw JSON-RPC (NDJSON)                          | None (ephemeral)   | —                  |
+| `resystems.renotify.{username}.mcp.{session_id}.s2c`         | Core NATS Pub/Sub       | Daemon               | CLI (`renotify mcp`) | Raw JSON-RPC (NDJSON)                          | None (ephemeral)   | —                  |
+| `resystems.renotify.{username}.mcp.open`                     | Core NATS Pub/Sub       | CLI (`renotify mcp`) | Daemon               | Session open event                             | None (ephemeral)   | —                  |
+| `resystems.renotify.{username}.mcp.close`                    | Core NATS Pub/Sub       | CLI (`renotify mcp`) | Daemon               | Session close event                            | None (ephemeral)   | —                  |
 
 **Design rule:** All subjects under `resystems.renotify.{username}.flow.*` use
 JetStream for durable delivery within the TTL window. All other subjects use
@@ -87,31 +96,42 @@ type JetStreamConfig struct {
 
 ### 2.2 Consumer Definitions
 
-Four consumers operate against the `RENOTIFY` stream. Consumer names include the
-username or flow ID to scope their state.
+The `RENOTIFY` stream has 3 fixed durable consumers plus one
+per-device durable consumer (N paired devices = N+3 durables) and
+ephemeral consumers created by CLI commands.
 
-| Consumer Name                 | Type      | Filter Subject                                          | Ack Policy | Max Deliver | Max Ack Pending | Deliver Policy | Inactive Threshold | Purpose                                                             |
-|:------------------------------|:----------|:--------------------------------------------------------|:-----------|:------------|:----------------|:---------------|:-------------------|:--------------------------------------------------------------------|
-| `mobile-{username}`           | Durable   | `resystems.renotify.{username}.flow.>`                  | Explicit   | 3           | 256             | All            | None               | Mobile app: receives all flow events; persists until device revoked |
-| `daemon-lifecycle-{username}` | Durable   | `resystems.renotify.{username}.flow.*.lifecycle`        | Explicit   | 3           | 64              | All            | 5 minutes          | Daemon: maintains the active flow registry                          |
-| `daemon-interject-{username}` | Durable   | `resystems.renotify.{username}.flow.*.interject`        | Explicit   | 3           | 64              | All            | 5 minutes          | Daemon: routes interjections to flow handlers                       |
-| `cli-response-{flow_id}`      | Ephemeral | `resystems.renotify.{username}.flow.{flow_id}.response` | Explicit   | 1           | 1               | New            | N/A                | CLI `ask`: blocks for exactly one response                          |
+| Consumer Name                   | Type      | Filter Subjects                                         | Ack Policy | Max Deliver | Max Ack Pending | Deliver Policy | Inactive Threshold | Purpose                                                             |
+|:--------------------------------|:----------|:--------------------------------------------------------|:-----------|:------------|:----------------|:---------------|:-------------------|:--------------------------------------------------------------------|
+| `mobile-{username}` (legacy)    | Durable   | `resystems.renotify.{username}.flow.>`                  | Explicit   | 3           | 256             | All            | None               | Legacy single-device consumer; retained for migration               |
+| `mobile-{username}-{device_id}` | Durable   | `resystems.renotify.{username}.flow.>`                  | Explicit   | 3           | 256             | All            | None               | Per-device: receives all flow events; persists until device revoked |
+| `daemon-lifecycle-{username}`   | Durable   | `*.lifecycle`, `*.request`, `*.response`                | Explicit   | 3           | 64              | All            | 5 minutes          | Daemon: maintains the active flow registry and history ledger       |
+| `daemon-interject-{username}`   | Durable   | `resystems.renotify.{username}.flow.*.interject`        | Explicit   | 3           | 64              | All            | 5 minutes          | Daemon: routes interjections to flow handlers                       |
+| `cli-response-{flow_id}`        | Ephemeral | `resystems.renotify.{username}.flow.{flow_id}.response` | Explicit   | 1           | 1               | New            | N/A                | CLI `ask`: blocks for exactly one response                          |
 
-**Mobile consumer:** Durable push consumer with a deliver subject
-(`resystems.renotify.{username}.mobile.deliver`). The deliver subject is within
-the user's namespace so it falls under the mobile account's existing subscribe
-ACL. Push delivery is required because the jnats client library's
-`PushSubscribeOptions.bind()` expects a deliver subject to subscribe to; without
-one the consumer would be pull-only and require a different subscription API.
-No inactive threshold is set — the consumer persists until the device is
-explicitly revoked via `renotify revoke`. An inactive threshold would cause the
-consumer to be auto-deleted during prolonged disconnections (e.g. overnight),
-preventing the app from rebinding on reconnect without a daemon restart.
-AckExplicit
-ensures the mobile app positively acknowledges each message after rendering; if
-the app crashes mid-render, the message is redelivered on reconnect (up to
-MaxDeliver=3). MaxAckPending=256 allows the app to process a backlog of
-buffered messages after reconnection without back-pressure stalling.
+**Per-device mobile consumers:** Each paired device gets its own
+durable push consumer with a device-specific deliver subject
+(`resystems.renotify.{username}.mobile.{device_id}.deliver`). The
+deliver subject is within the user's namespace so it falls under
+the mobile account's existing subscribe ACL. Push delivery is
+required because the jnats client library's
+`PushSubscribeOptions.bind()` expects a deliver subject to subscribe
+to; without one the consumer would be pull-only and require a
+different subscription API. No inactive threshold is set — the
+consumer persists until the device is explicitly revoked via
+`renotify revoke --device`. An inactive threshold would cause the
+consumer to be auto-deleted during prolonged disconnections (e.g.
+overnight), preventing the app from rebinding on reconnect without
+a daemon restart. AckExplicit ensures the mobile app positively
+acknowledges each message after rendering; if the app crashes
+mid-render, the message is redelivered on reconnect (up to
+MaxDeliver=3). MaxAckPending=256 allows the app to process a
+backlog of buffered messages after reconnection without
+back-pressure stalling.
+
+**Lifecycle consumer:** Filters on three subject patterns
+(`*.lifecycle`, `*.request`, `*.response`) so the registry service
+can maintain both the active flow table and the notification history
+ledger from a single consumer.
 
 **Daemon consumers:** Durable for the same ack-position persistence reason. The
 5-minute inactive threshold matches the stale-flow reaping grace period
@@ -415,26 +435,38 @@ practical brute-force threshold.
 
 ### 6.3 Storage
 
-| Artifact             | Path                                        | Permissions |
-|:---------------------|:--------------------------------------------|:------------|
-| Active pairing token | `$XDG_STATE_HOME/renotify/pairing/token`    | 0600        |
-| Associated username  | `$XDG_STATE_HOME/renotify/pairing/username` | 0600        |
+| Artifact        | Path                                            | Permissions |
+|:----------------|:------------------------------------------------|:------------|
+| Device registry | `$XDG_STATE_HOME/renotify/pairing/devices.json` | 0600        |
+
+The device registry is a JSON array of `PairedDevice` entries, each
+containing `device_id`, `token`, and `paired_at`. Legacy
+single-token files (`pairing/token`, `pairing/username`) are
+auto-migrated to the registry on daemon startup.
 
 ### 6.4 NATS Auth Integration (Embedded Broker)
 
-The embedded NATS server is configured with a two-account model.
-Both accounts use NATS username/password authentication (not token
-auth):
+The embedded NATS server is configured with a dynamic per-device
+account model. All accounts use NATS username/password
+authentication (not token auth):
 
 * **Daemon account:** NATS username `daemon`, password = internal
   token. Used by the daemon's own NATS connection and co-located
   CLI processes connecting via the loopback TCP listener. Full
   publish/subscribe permissions scoped to
   `resystems.renotify.{username}.>` (see Section 7).
-* **Mobile account:** NATS username `mobile`, password = pairing
-  token (`rn_tk_...`). Used by the Android app connecting via
-  WSS. Scoped publish/subscribe permissions within
-  `resystems.renotify.{username}.>` (see Section 7).
+* **Per-device mobile accounts:** One NATS account per paired
+  device. Username = `mobile-{device_id}` (e.g.,
+  `mobile-mb_ABCDE12345678`), password = the device's auth token
+  (`rn_tk_...`). Each account has scoped publish/subscribe
+  permissions within `resystems.renotify.{username}.>` (see
+  Section 7). The total number of accounts is 1 (daemon) + N
+  (paired devices).
+
+When a new device is paired via `renotify pair`, a new NATS account
+is added to the auth configuration. When a device is revoked, its
+account is removed. The auth configuration is hot-reloaded via
+SIGHUP without restarting the broker.
 
 The `{username}` in the ACL subject patterns is the daemon
 operator's identity (e.g., `alice` from `config.Username`), not
@@ -450,9 +482,9 @@ daemon is running, the auth configuration is hot-reloaded without
 restarting the broker.
 
 **Internal token persistence.** The internal token is generated
-once on first daemon startup using the same algorithm as the
-pairing token (`rn_tk_` prefix + 52 Crockford Base32 characters,
-256-bit entropy) and persisted to:
+once on first daemon startup using the same algorithm as device
+tokens (`rn_tk_` prefix + 52 Crockford Base32 characters, 256-bit
+entropy) and persisted to:
 
 | Artifact       | Path                                      | Permissions |
 |:---------------|:------------------------------------------|:------------|
@@ -466,23 +498,25 @@ listener. If the file does not exist, the CLI reports an error
 
 ### 6.5 NATS Auth Integration (Shared Broker)
 
-The pairing token is generated by the daemon and included in the QR
-`ProvisioningPayload`, but the shared broker's administrator must provision it
-into the broker's auth configuration (e.g., `nats-server.conf` or an external
-auth service). The daemon does not manage shared broker auth — it only generates
-the token value.
+Each device's auth token is generated by the daemon and included in
+the QR `ProvisioningPayload`, but the shared broker's administrator
+must provision each device's credentials (username
+`mobile-{device_id}`, password = token) into the broker's auth
+configuration (e.g., `nats-server.conf` or an external auth
+service). The daemon does not manage shared broker auth — it only
+generates the credential values.
 
-Shared broker operators must map the token to the correct username-scoped
-permissions as defined in Section 7.
+Shared broker operators must map each device to the correct
+username-scoped permissions as defined in Section 7.
 
-### 6.6 Token Lifecycle
+### 6.6 Device Credential Lifecycle
 
-| Event                               | Action                                                                                                                                                                         |
-|:------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `renotify pair` (no existing token) | Generate new token, store in XDG state, configure embedded NATS auth, include in QR payload                                                                                    |
-| `renotify pair` (existing token)    | Revoke old token (R-SEC-02: re-pairing supersedes prior token), generate new token                                                                                             |
-| `renotify revoke`                   | Remove token from NATS auth configuration, send client disconnect signal, delete stored token file                                                                             |
-| Daemon startup                      | Load stored token from XDG state, configure embedded NATS auth. If no token exists, the broker starts without a mobile account (no mobile connectivity until `renotify pair`). |
+| Event                                  | Action                                                                                                                                                                    |
+|:---------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `renotify pair`                        | Generate new device ID and token, append to `devices.json`, send SIGHUP to hot-reload auth and create per-device JetStream consumer, include credentials in v2 QR payload |
+| `renotify revoke --device {device_id}` | Remove device from `devices.json`, send SIGHUP to remove NATS account and disconnect the device                                                                           |
+| `renotify revoke --all`                | Remove all devices from `devices.json`, send SIGHUP to remove all mobile NATS accounts                                                                                    |
+| Daemon startup                         | Load `devices.json`, configure one NATS account per device, create per-device JetStream consumers. If no devices are paired, the broker starts without mobile accounts    |
 
 ### 6.7 Why Token Authentication Over NKeys
 
@@ -518,10 +552,10 @@ identity).
 
 ### 7.1 Actor Roles
 
-| Role              | Connection Type        | Auth Credential                                | Typical Client               |
-|:------------------|:-----------------------|:-----------------------------------------------|:-----------------------------|
-| Daemon (internal) | Native TCP on loopback | Internal token (auto-generated, never exposed) | Daemon process, CLI commands |
-| Mobile client     | WSS over network       | Pairing token (`rn_tk_...`)                    | Android app                  |
+| Role              | Connection Type        | Auth Credential                                               | Typical Client               |
+|:------------------|:-----------------------|:--------------------------------------------------------------|:-----------------------------|
+| Daemon (internal) | Native TCP on loopback | Internal token (auto-generated, never exposed)                | Daemon process, CLI commands |
+| Mobile device     | WSS over network       | Per-device token (`rn_tk_...`), username `mobile-{device_id}` | Android app (one per device) |
 
 ### 7.2 Daemon (Internal) Permissions
 
@@ -539,17 +573,17 @@ The daemon account has full access within its user's namespace:
 The mobile account has scoped access — it can subscribe broadly but can only
 publish to subjects that represent legitimate user actions:
 
-| Direction | Subject Pattern                                  | Purpose                                                         |
-|:----------|:-------------------------------------------------|:----------------------------------------------------------------|
-| Subscribe | `resystems.renotify.{username}.>`                | Receive all user traffic (notifications, heartbeats, lifecycle) |
-| Publish   | `resystems.renotify.{username}.flow.*.response`  | Send notification responses                                     |
-| Publish   | `resystems.renotify.{username}.flow.*.interject` | Send interjection commands                                      |
-| Publish   | `resystems.renotify.{username}.device.{device_id}.heartbeat` | Send device presence heartbeat (device-specific, not wildcard) |
-| Publish   | `resystems.renotify.{username}.svc.*`            | Send service requests (active flows, history queries)           |
-| Publish   | `$JS.ACK.>`                                      | Acknowledge JetStream messages                                  |
-| Publish   | `$JS.FC.>`                                       | JetStream flow control                                          |
-| Publish   | `$JS.API.CONSUMER.INFO.>`                        | Look up consumer info for push subscription binding             |
-| Subscribe | `_INBOX.>`                                       | Receive Core NATS request-reply responses                       |
+| Direction | Subject Pattern                                              | Purpose                                                         |
+|:----------|:-------------------------------------------------------------|:----------------------------------------------------------------|
+| Subscribe | `resystems.renotify.{username}.>`                            | Receive all user traffic (notifications, heartbeats, lifecycle) |
+| Publish   | `resystems.renotify.{username}.flow.*.response`              | Send notification responses                                     |
+| Publish   | `resystems.renotify.{username}.flow.*.interject`             | Send interjection commands                                      |
+| Publish   | `resystems.renotify.{username}.device.{device_id}.heartbeat` | Send device presence heartbeat (device-specific, not wildcard)  |
+| Publish   | `resystems.renotify.{username}.svc.*`                        | Send service requests (active flows, history queries)           |
+| Publish   | `$JS.ACK.>`                                                  | Acknowledge JetStream messages                                  |
+| Publish   | `$JS.FC.>`                                                   | JetStream flow control                                          |
+| Publish   | `$JS.API.CONSUMER.INFO.>`                                    | Look up consumer info for push subscription binding             |
+| Subscribe | `_INBOX.>`                                                   | Receive Core NATS request-reply responses                       |
 
 **Security property:** The mobile client cannot publish to `*.request`,
 `*.lifecycle`, or daemon `*.heartbeat` subjects. Each device may only
@@ -572,7 +606,9 @@ The following are explicitly deferred per R-SEC-03:
 
 * Fine-grained per-workspace mobile permissions.
 * Automatic token rotation on a scheduled cadence.
-* Multi-device pairing support (multiple mobile accounts).
+
+Multi-device pairing support was implemented in D-68
+(R-MOB-11, R-SEC-02).
 
 ---
 
@@ -580,27 +616,36 @@ The following are explicitly deferred per R-SEC-03:
 
 ### 8.1 Daemon Startup (Embedded Broker)
 
-1. Load daemon configuration from `$XDG_CONFIG_HOME/renotify/settings.json`.
-2. Load `daemon_id` from `$XDG_STATE_HOME/renotify/daemon_id` (or generate on
-   first run).
-3. Load TLS certificate and private key from `$XDG_STATE_HOME/renotify/tls/`. If
-   missing, log a warning and skip the WSS listener (TCP-only mode; mobile
-   connectivity unavailable until `renotify pair`).
-4. Load pairing token from `$XDG_STATE_HOME/renotify/pairing/token`. If missing,
-   start without a mobile account.
-5. Configure embedded NATS server: a. TCP listener on `127.0.0.1:4222` (no TLS).
-   b. WSS listener on `0.0.0.0:4223` with TLS cert/key (if available). c. Auth
-   accounts: daemon internal + mobile (if token exists).
+1. Load daemon configuration from
+   `$XDG_CONFIG_HOME/renotify/settings.json`.
+2. Load `daemon_id` from `$XDG_STATE_HOME/renotify/daemon_id`
+   (or generate on first run).
+3. Load TLS certificate and private key from
+   `$XDG_STATE_HOME/renotify/tls/`. If missing, log a warning
+   and skip the WSS listener (TCP-only mode; mobile connectivity
+   unavailable until `renotify pair`).
+4. Load paired devices from
+   `$XDG_STATE_HOME/renotify/pairing/devices.json`. If empty or
+   missing, start without mobile accounts.
+5. Configure embedded NATS server:
+   a. TCP listener on `127.0.0.1:4222` (no TLS).
+   b. WSS listener on `0.0.0.0:4223` with TLS cert/key (if
+      available).
+   c. Auth accounts: daemon internal + one per paired device.
 6. Start embedded NATS server.
 7. Enable JetStream with memory storage.
-8. Create or verify the `RENOTIFY` stream with the configured subject filter and
-   limits.
-9. Create or verify durable consumers (`mobile-{username}`,
-   `daemon-lifecycle-{username}`, `daemon-interject-{username}`).
-10. Subscribe to lifecycle, interjection, and service subjects.
-11. Load active flow registry from SQLite and reconcile against any buffered
-    lifecycle events.
-12. Publish an immediate `DaemonHeartbeat`. Begin the 30-second periodic
+8. Create or verify the `RENOTIFY` stream with the configured
+   subject filter and limits.
+9. Create or verify durable consumers: `mobile-{username}` (legacy),
+   `mobile-{username}-{device_id}` (one per paired device),
+   `daemon-lifecycle-{username}`, `daemon-interject-{username}`.
+10. Start subsystems: ledger, HTTP, MCP, heartbeat publisher,
+    device presence tracker, active flow registry.
+11. Subscribe to lifecycle, interjection, service, and device
+    presence subjects.
+12. Load active flow registry from SQLite and reconcile against
+    any buffered lifecycle events.
+13. Publish an immediate `DaemonHeartbeat`. Begin the periodic
     heartbeat timer.
 
 ### 8.2 Daemon Startup (Shared Broker)
@@ -618,38 +663,52 @@ The following are explicitly deferred per R-SEC-03:
 
 ### 8.3 Pairing (`renotify pair`)
 
-1. Check for an existing pairing token. If one exists, revoke it (R-SEC-02):
-   remove from NATS auth, disconnect mobile client, delete stored token.
-2. Check for an existing TLS certificate. If none exists, generate an ECDSA
-   P-256 self-signed certificate with SANs for all discovered non-loopback IPs
-   + `127.0.0.1` + `localhost`. Store in XDG state.
-3. Discover the local IP address. Prefer non-loopback, non-link-local addresses.
-   Allow `--ip` flag override.
-4. Generate a new auth token: 32 bytes from `crypto/rand`, Crockford Base32
-   encoded, prepended with `rn_tk_`.
-5. Store the token in XDG state.
-6. If the daemon is running, hot-reload the NATS auth configuration to add the
-   mobile account with the new token.
+1. Check for an existing TLS certificate. If none exists, generate
+   an ECDSA P-256 self-signed certificate with SANs for all
+   discovered non-loopback IPs + `127.0.0.1` + `localhost`. Store
+   in XDG state.
+2. Discover the local IP address. Prefer non-loopback, non-link-local
+   addresses. Allow `--ip` flag override.
+3. Generate a new device identity: `mb_` + 13 Crockford Base32 chars
+   (65-bit entropy).
+4. Generate a new per-device auth token: 32 bytes from `crypto/rand`,
+   Crockford Base32 encoded, prepended with `rn_tk_` (256-bit
+   entropy).
+5. Append the new device to the `devices.json` registry. Multiple
+   devices coexist — pairing does not revoke existing devices.
+6. If the daemon is running, send SIGHUP to hot-reload the NATS
+   auth configuration and create a per-device JetStream consumer.
 7. Compute the certificate fingerprint (SHA-256 of DER, hex-encoded).
-8. Assemble the `ProvisioningPayload`:
-   `{"h":"{ip}","p":4223,"t":"{token}","c":"{fingerprint}"}`.
-9. Encode as minified JSON and render as an ASCII QR code to the terminal.
+8. Assemble the v2 `ProvisioningPayload`:
+   `{"v":2,"h":"{ip}","p":4223,"t":"{token}","c":"{fingerprint}","u":"{username}","d":"{device_id}","n":"mobile-{device_id}"}`.
+9. Encode as minified JSON and render as an ASCII QR code to the
+   terminal.
 
 ### 8.4 Mobile First Connection
 
-1. User scans the QR code. The app decodes the `ProvisioningPayload`: host, WSS
-   port, auth token, and certificate fingerprint.
+1. User scans the QR code. The app decodes the v2
+   `ProvisioningPayload`: host, WSS port, auth token, certificate
+   fingerprint, username, device_id, and nats_username.
 2. Store provisioning data in the app's encrypted local storage.
 3. Initiate a WSS connection to `wss://{host}:{port}`.
-4. During the TLS handshake, the NATS server presents its full certificate. The
-   app's custom `X509TrustManager` computes the SHA-256 fingerprint of the
-   received certificate and compares it against the stored value.
-5. If the fingerprint does not match: abort the connection, display an error.
+4. During the TLS handshake, the NATS server presents its full
+   certificate. The app's custom `X509TrustManager` computes the
+   SHA-256 fingerprint of the received certificate and compares it
+   against the stored value.
+5. If the fingerprint does not match: abort the connection, display
+   an error.
 6. If the fingerprint matches: the TLS handshake completes.
-7. Authenticate with the pairing token via NATS `CONNECT` protocol.
-8. Create or resume the durable JetStream consumer `mobile-{username}`.
-9. Subscribe to `resystems.renotify.{username}.>` via the consumer.
-10. Display connection status indicator: connected.
+7. Authenticate as `mobile-{device_id}` with the device token via
+   NATS `CONNECT` protocol.
+8. Bind to the durable JetStream consumer
+   `mobile-{username}-{device_id}`.
+9. Subscribe to daemon heartbeat
+   (`resystems.renotify.{username}.daemon.*.heartbeat`) and device
+   control (`resystems.renotify.{username}.device.{device_id}.control`)
+   via Core NATS Pub/Sub.
+10. Start the device heartbeat publisher (R-MOB-14).
+11. Query `svc.flows` for the initial dashboard snapshot.
+12. Display connection status indicator: connected.
 
 ### 8.5 Mobile Reconnection After Network Drop
 
@@ -737,19 +796,19 @@ only, no response wait or interjection subscription) and
 `renotify history` (connects, sends a Core NATS request to
 `svc.history`, prints result, disconnects).
 
-### 8.7 Token Revocation (`renotify revoke`)
+### 8.7 Device Revocation (`renotify revoke`)
 
-1. Load the stored pairing token from XDG state.
-2. If the daemon is running with an embedded broker:
-   - a. Remove the mobile account from the NATS auth configuration.
-   - b. Signal the NATS server to disconnect any client authenticated with the
-        revoked token.
-   - c. Hot-reload the auth configuration.
-3. If the daemon uses a shared broker:
-   - Log a message that shared broker token revocation requires operator
-     intervention.
-   - (The daemon cannot reconfigure shared broker auth.)
-4. Delete the stored token file from XDG state.
+1. Identify the target device(s): `--device {device_id}` for a
+   specific device, or `--all` for all paired devices.
+2. Remove the target device(s) from `devices.json`.
+3. If the daemon is running, send SIGHUP:
+   a. The daemon re-reads `devices.json` and rebuilds the NATS
+      auth configuration, removing the revoked device's account.
+   b. The NATS server disconnects any client authenticated with
+      the revoked credentials.
+   c. The presence tracker updates its device map.
+4. If the daemon uses a shared broker, log a message that shared
+   broker credential revocation requires operator intervention.
 5. Confirm revocation to the user via terminal output.
 
 ### 8.8 Interjection Delivery
@@ -852,7 +911,7 @@ based on its own logic.
 | **Consumer creation**        | Daemon creates all consumers                                    | Daemon creates its consumers; mobile consumer may be operator-managed     |
 | **TLS certificates**         | Self-signed ECDSA P-256, generated by `renotify pair`           | Operator-managed (CA-signed or self-signed)                               |
 | **Auth token**               | Daemon manages via embedded NATS server API                     | Operator provisions into broker's auth configuration                      |
-| **ACL enforcement**          | Daemon configures two-account model via embedded API            | Operator configures in `nats-server.conf` or auth callout                 |
+| **ACL enforcement**          | Daemon configures per-device account model via embedded API     | Operator configures in `nats-server.conf` or auth callout                 |
 | **Mobile connection target** | Daemon's IP:`4223` (WSS)                                        | Shared broker's address and WSS port                                      |
 | **`renotify pair` output**   | QR with daemon's local IP and WSS port                          | QR with shared broker's address and WSS port (from daemon config)         |
 | **`renotify revoke`**        | Daemon removes token and disconnects client                     | Daemon deletes local token; operator must revoke on broker                |
