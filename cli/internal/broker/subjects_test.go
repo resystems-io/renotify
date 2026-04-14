@@ -34,6 +34,22 @@ func TestDeviceControlSubject(t *testing.T) {
 	}
 }
 
+func TestDeviceHeartbeatSubject(t *testing.T) {
+	got := DeviceHeartbeatSubject("alice", "mb_DEV01")
+	want := "resystems.renotify.alice.device.mb_DEV01.heartbeat"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestServiceDevicePresenceSubject(t *testing.T) {
+	got := ServiceDevicePresenceSubject("alice")
+	want := "resystems.renotify.alice.svc.device-presence"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func TestMCPSubjects(t *testing.T) {
 	tests := []struct {
 		name string

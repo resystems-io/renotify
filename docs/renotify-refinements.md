@@ -650,6 +650,32 @@ WSS as determined by the URL scheme).
   correctly with the in-process transport when the embedded broker
   is enabled.
 
+#### R-CLI-23: Device Presence
+**Statement:** The daemon must track the connectivity state of each paired
+mobile device. The system must provide a query interface that returns, for every
+paired device, at minimum: the owning username, the device identity, the pairing
+timestamp, and a presence indicator (online/offline with a last-seen timestamp
+when offline). The presence mechanism must operate at the application level so
+that it functions identically across both embedded and shared broker deployment
+topologies. Pairing data that is stored locally (device registry) and presence
+data that is derived from the running daemon must be retrievable through
+separate, clearly delineated interfaces — one file-based and one query-based —
+to avoid mixing static and dynamic data sources.
+
+* **Rationale (A1):** When notifications are not being received, the
+  developer needs to distinguish between "device not connected" and
+  "daemon or routing misconfigured." Without a presence signal the
+  developer must resort to inspecting Android logcat or NATS
+  monitoring to diagnose delivery failures. Separating file-based
+  pairing data from query-based presence data ensures each interface
+  remains independently extensible and testable.
+* **Trace to Parent (A4):** [R-MOB-10][r-mob-10], [R-MOB-11][r-mob-11],
+  [R-SEC-02][r-sec-02]
+* **Allocation (A8):** Go CLI Application
+* **V&V Method (A2):** Test — verify presence reports online when
+  a device is connected and offline (with last-seen timestamp) when
+  a device disconnects.
+
 ### 2.4 Android Application
 
 #### R-MOB-01: Programming Language
@@ -783,6 +809,27 @@ dashboard must still open without error.
 * **Trace to Parent (A4):** [R-MOB-03][r-mob-03], [R-MOB-09][r-mob-09]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Demonstration
+
+#### R-MOB-14: Device Heartbeat
+**Statement:** The mobile client must publish a periodic
+application-level heartbeat to the daemon while connected. The
+heartbeat must identify the originating device and must be
+publishable over the standard NATS connection without requiring
+broker-internal monitoring features. The heartbeat interval and the
+staleness threshold after which the daemon considers a device
+offline must be configurable on the daemon side.
+* **Rationale (A1):** The daemon's device presence tracking
+  ([R-CLI-23][r-cli-23]) requires an application-level signal that
+  works identically across embedded and shared broker deployments.
+  Broker-internal mechanisms (e.g. connection monitoring APIs) are
+  only available when the daemon controls the broker process, making
+  them unsuitable as the sole presence source in a shared-broker
+  topology.
+* **Trace to Parent (A4):** [R-CLI-23][r-cli-23], [R-MOB-10][r-mob-10]
+* **Allocation (A8):** Android Application
+* **V&V Method (A2):** Test — verify the daemon detects a device as
+  online while heartbeats are arriving and as offline after the
+  staleness threshold expires.
 
 ### 2.5 Security Lifecycle
 
@@ -1185,6 +1232,7 @@ implemented — implementation detail belongs in the Section 5 change log.
 | D-70 | State access decoupled from MCP server: all ledger reads and writes route through NATS request-reply endpoints. MCP server has no direct ledger dependency. Shared wire types in `statesvc` package used by both MCP and CLI.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | —                                                                                                        | 2026-04-04 |
 | D-71 | Embedded broker uses in-process NATS transport (`net.Pipe`) instead of TCP loopback. Eliminates local TCP round-trip for daemon internals. External TCP listener retained for CLI connections.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | —                                                                                                        | 2026-04-04 |
 | D-72 | Release keystores excluded from repository ([R-SEC-04][r-sec-04]). Signing conditional on local keystore presence; passwords overridable via Gradle properties or Makefile variables. Committed key considered burned.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | —                                                                                                        | 2026-04-06 |
+| D-73 | Device presence ([R-CLI-23][r-cli-23], [R-MOB-14][r-mob-14]): application-level heartbeat from mobile to daemon (`device.{device_id}.heartbeat` subject, Core NATS Pub/Sub). Daemon maintains per-device last-seen map, exposes via `svc.device-presence` NATS endpoint. Connz API used as optional startup seed for embedded broker only. File-based pairing data and query-based presence data served through separate interfaces. Shared broker supported — no broker-internal monitoring dependency. Heartbeat interval communicated to mobile app via existing daemon heartbeat payload, not provisioning QR code. | [Device Presence](analysis-device-presence.md) | 2026-04-08 |
 
 *Note:* IDs D-53, D-55, D-62, D-63, D-64, and D-67 were removed
 during a register cleanup on 2026-04-06. They recorded refactoring
@@ -1270,6 +1318,9 @@ Record completed items here with the date.
 | 2026-04-05 | M-10 | Notification tap-to-open implemented. [R-MOB-12][r-mob-12] requirement added. `PendingIntent.getActivity()` content intent added to `NatsService.buildNotification()` targeting `MainActivity` with `FLAG_ACTIVITY_SINGLE_TOP \| FLAG_ACTIVITY_CLEAR_TOP` and `FLAG_IMMUTABLE`. `android:launchMode="singleTop"` added to `MainActivity` in `AndroidManifest.xml` to prevent duplicate instances. [R-MOB-12][r-mob-12] satisfied. |
 | 2026-04-05 | M-11 | Content notification flow navigation implemented. [R-MOB-13][r-mob-13] requirement added. `NotificationRenderer.render()` now sets a `contentIntent` carrying `EXTRA_NAVIGATE_FLOW_ID` on all content notifications (informational and interactive). `MainActivity.handleFlowNavigationIntent()` switches to the dashboard tab and calls `DashboardAdapter.expandFlow()` to expand the originating flow. Gracefully ignored if the flow has ended. Per-notification `PendingIntent` keyed by `androidId` prevents intent reuse across notifications. [R-MOB-13][r-mob-13] satisfied. |
 | 2026-04-06 | — | Release keystore removed from repository (D-72, [R-SEC-04][r-sec-04]). Signing config in `build.gradle.kts` conditional on local keystore presence; warns when absent. Passwords overridable via Gradle properties or Makefile variables (default `renotify`). New `make generate-keystore` target auto-generates developer-local ECDSA P-256 keystore, wired as prerequisite of `build`. `*.keystore` gitignored. Old key burned; history scrubbed in aad54e4. |
+| 2026-04-08 | Review | New requirements [R-CLI-23][r-cli-23] (Device Presence) and [R-MOB-14][r-mob-14] (Device Heartbeat). D-73 records design: application-level heartbeat from mobile, daemon-side last-seen map, separate file-based and query-based interfaces, shared-broker compatible. |
+| 2026-04-08 | C-20 | Device presence tracking implemented (daemon side). New `presence/` package: `Tracker` subsystem subscribes to `device.*.heartbeat` wildcard, maintains per-device last-seen map, exposes `DevicePresence()` for the registry endpoint. New `svc.device-presence` Core NATS Request-Reply endpoint in registry. New `renotify devices` CLI command queries daemon and displays username, device ID, online/offline status, last seen, and paired-at. `DevicePresenceConfig` added to config with `stale_threshold` (default 2m) and `heartbeat_interval` (default 30s). `DaemonHeartbeat` payload extended with `device_heartbeat_interval` field to communicate interval to mobile app. Mobile ACL updated with device-specific heartbeat publish permission. `DeviceStatus` and `DevicePresenceResult` wire types in `statesvc`. SIGHUP handler calls `Tracker.ReloadDevices()` for hot-reload after pair/revoke. Daemon startup order: Ledger → HTTP → MCP → Heartbeat → Presence → Registry. [R-CLI-23][r-cli-23] satisfied (daemon side). 6 presence tests, all existing tests pass including integration. |
+| 2026-04-08 | M-14 | Android device heartbeat publisher implemented. `NatsConnectionManager` launches a coroutine after connect/reconnect that publishes `DeviceHeartbeat` JSON (`device_id`, `timestamp`) to `device.{device_id}.heartbeat` every 30s (compiled default). Interval dynamically adjusted when daemon heartbeat arrives with non-zero `device_heartbeat_interval`. `DaemonHeartbeat.kt` extended with `deviceHeartbeatIntervalMs` field, parsed via existing `parseGoDuration()`. `NatsService.handleHeartbeat()` passes interval to `manager.updateHeartbeatInterval()`. Heartbeat coroutine auto-stops on disconnect, restarts on reconnect. [R-MOB-14][r-mob-14] satisfied. All Android JVM tests pass. |
 
 ## 6. References
 
@@ -1349,6 +1400,7 @@ Record completed items here with the date.
 [r-cli-20]: #r-cli-20-state-management-authority
 [r-cli-21]: #r-cli-21-mcp-server-as-broker-client
 [r-cli-22]: #r-cli-22-in-process-broker-transport
+[r-cli-23]: #r-cli-23-device-presence
 [r-mob-03]: #r-mob-03-presentation-prioritisation
 [r-mob-04]: #r-mob-04-rich-response-dispatcher
 [r-mob-07]: #r-mob-07-remote-history-viewer
@@ -1358,6 +1410,7 @@ Record completed items here with the date.
 [r-mob-11]: #r-mob-11-multi-device-support
 [r-mob-12]: #r-mob-12-notification-tap-navigation
 [r-mob-13]: #r-mob-13-content-notification-tap-navigation
+[r-mob-14]: #r-mob-14-device-heartbeat
 [r-sec-01]: #r-sec-01-token-revocation
 [r-sec-02]: #r-sec-02-per-device-pairing
 [r-sec-03]: #r-sec-03-post-mvp-security-deferral

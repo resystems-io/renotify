@@ -60,6 +60,7 @@ func BuildAuthConfig(
 					Allow: []string{
 						prefix + ".flow.*.response",
 						prefix + ".flow.*.interject",
+						prefix + ".device." + d.DeviceID + ".heartbeat",
 						prefix + ".svc.*",
 						"$JS.ACK.>",
 						"$JS.FC.>",

@@ -22,12 +22,13 @@ import (
 // Publish triggers an immediate out-of-cycle heartbeat for
 // on-change events (flow started/ended, workspace added/removed).
 type Publisher struct {
-	daemonID    string
-	username    string
-	hostname    string
-	gracePeriod time.Duration
-	interval    time.Duration
-	logger      *slog.Logger
+	daemonID                string
+	username                string
+	hostname                string
+	gracePeriod             time.Duration
+	deviceHeartbeatInterval time.Duration
+	interval                time.Duration
+	logger                  *slog.Logger
 
 	nc     *nats.Conn
 	cancel context.CancelFunc
@@ -38,18 +39,21 @@ type Publisher struct {
 
 // New creates a heartbeat Publisher. Call Start to begin
 // publishing. The gracePeriod is included in each heartbeat
-// so the mobile app can compute flow TTL locally.
+// so the mobile app can compute flow TTL locally. The
+// deviceHeartbeatInterval is communicated to mobile devices
+// so they know how often to publish their own heartbeats.
 func New(daemonID, username, hostname string,
-	gracePeriod, interval time.Duration,
+	gracePeriod, deviceHeartbeatInterval, interval time.Duration,
 	logger *slog.Logger) *Publisher {
 	return &Publisher{
-		daemonID:    daemonID,
-		username:    username,
-		hostname:    hostname,
-		gracePeriod: gracePeriod,
-		interval:    interval,
-		logger:      logger,
-		workspaces:  []WorkspaceInfo{},
+		daemonID:                daemonID,
+		username:                username,
+		hostname:                hostname,
+		gracePeriod:             gracePeriod,
+		deviceHeartbeatInterval: deviceHeartbeatInterval,
+		interval:                interval,
+		logger:                  logger,
+		workspaces:              []WorkspaceInfo{},
 	}
 }
 
@@ -122,12 +126,13 @@ func (p *Publisher) publish() {
 	p.mu.RUnlock()
 
 	hb := DaemonHeartbeat{
-		DaemonID:    p.daemonID,
-		Username:    p.username,
-		Hostname:    p.hostname,
-		GracePeriod: p.gracePeriod.String(),
-		Workspaces:  ws,
-		Timestamp:   time.Now().UTC(),
+		DaemonID:                p.daemonID,
+		Username:                p.username,
+		Hostname:                p.hostname,
+		GracePeriod:             p.gracePeriod.String(),
+		DeviceHeartbeatInterval: p.deviceHeartbeatInterval.String(),
+		Workspaces:              ws,
+		Timestamp:               time.Now().UTC(),
 	}
 
 	data, err := json.Marshal(hb)

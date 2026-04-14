@@ -20,14 +20,14 @@ import (
 
 func newHistoryCmd(app *App) *cobra.Command {
 	var (
-		workspaceID    string
-		flowID         string
-		since          string
-		until          string
-		limit          int
-		offset         int
-		format         string
-		showLifecycle  bool
+		workspaceID   string
+		flowID        string
+		since         string
+		until         string
+		limit         int
+		offset        int
+		format        string
+		showLifecycle bool
 	)
 
 	cmd := &cobra.Command{

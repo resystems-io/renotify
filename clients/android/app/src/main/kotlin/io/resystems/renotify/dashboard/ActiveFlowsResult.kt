@@ -62,6 +62,7 @@ data class ActiveFlowsResult(
             username = "",
             hostname = "",
             gracePeriodMs = 0,
+            deviceHeartbeatIntervalMs = 0,
             workspaces = workspaces,
             timestamp = firstFlow?.registeredAt ?: ""
         )

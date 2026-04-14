@@ -25,6 +25,7 @@ import (
 	"go.resystems.io/renotify/cli/internal/httpserver"
 	"go.resystems.io/renotify/cli/internal/ledger"
 	"go.resystems.io/renotify/cli/internal/mcpserver"
+	"go.resystems.io/renotify/cli/internal/presence"
 	"go.resystems.io/renotify/cli/internal/registry"
 	"go.resystems.io/renotify/cli/internal/state"
 	"go.resystems.io/renotify/cli/internal/xdg"
@@ -398,13 +399,22 @@ func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
 	// Heartbeat publisher (Section 8.1 step 12).
 	hbPub := heartbeat.New(daemonID, cfg.Username, hostname,
 		cfg.Reaping.GracePeriod.Duration,
+		cfg.DevicePresence.HeartbeatInterval.Duration,
 		cfg.Heartbeat.Interval.Duration, logger)
 	opts = append(opts, daemon.WithSubsystem(hbPub))
+
+	// Device presence tracker (R-CLI-23).
+	devices, _ := state.LoadDevices(xdg.DevicesPath())
+	presTracker := presence.New(
+		cfg.Username,
+		cfg.DevicePresence.StaleThreshold.Duration,
+		devices, logger)
+	opts = append(opts, daemon.WithSubsystem(presTracker))
 
 	// Active flow registry (C-10). Starts after heartbeat so the
 	// publisher is ready to receive workspace snapshots.
 	regSvc := registry.New(
-		ledgerSub.DB, hbPub,
+		ledgerSub.DB, hbPub, presTracker,
 		cfg.Username, daemonID,
 		cfg.Reaping, logger)
 	opts = append(opts, daemon.WithSubsystem(regSvc))
@@ -421,6 +431,7 @@ func runDaemon(cmd *cobra.Command, cfg *config.Config) error {
 
 	ctrl := daemon.NewController(cfg, opts...)
 	ctrl.ReloadCh = reloadCh
+	ctrl.OnReloadDevices = presTracker.ReloadDevices
 	if err := ctrl.Run(ctx); err != nil {
 		return exitcode.Errorf(exitcode.Error, "%v", err)
 	}

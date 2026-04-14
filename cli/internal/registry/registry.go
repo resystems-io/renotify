@@ -19,14 +19,17 @@ import (
 	"go.resystems.io/renotify/cli/internal/config"
 	"go.resystems.io/renotify/cli/internal/heartbeat"
 	"go.resystems.io/renotify/cli/internal/ledger"
+	"go.resystems.io/renotify/cli/internal/presence"
 )
 
 // Service is a daemon.Subsystem that manages the active flow
-// registry. It depends on the ledger (for SQLite CRUD) and the
-// heartbeat publisher (for workspace snapshot updates).
+// registry. It depends on the ledger (for SQLite CRUD), the
+// heartbeat publisher (for workspace snapshot updates), and
+// optionally the presence tracker (for device status queries).
 type Service struct {
 	dbFunc   func() *ledger.DB
 	hb       *heartbeat.Publisher
+	presence *presence.Tracker
 	username string
 	daemonID string
 	cfg      config.ReapingConfig
@@ -39,10 +42,12 @@ type Service struct {
 
 // New creates a registry Service. The dbFunc parameter is a lazy
 // accessor that returns the ledger DB after the ledger subsystem
-// has started.
+// has started. The presence tracker may be nil if device presence
+// tracking is not configured.
 func New(
 	dbFunc func() *ledger.DB,
 	hb *heartbeat.Publisher,
+	pres *presence.Tracker,
 	username, daemonID string,
 	cfg config.ReapingConfig,
 	logger *slog.Logger,
@@ -50,6 +55,7 @@ func New(
 	return &Service{
 		dbFunc:   dbFunc,
 		hb:       hb,
+		presence: pres,
 		username: username,
 		daemonID: daemonID,
 		cfg:      cfg,
@@ -91,6 +97,7 @@ func (s *Service) Start(
 		s.subscribeInsertResponseEndpoint,
 		s.subscribeInsertInterjectionEndpoint,
 		s.subscribeUpdateActivityEndpoint,
+		s.subscribeDevicePresenceEndpoint,
 	}
 	for _, subscribe := range endpoints {
 		sub, err := subscribe()

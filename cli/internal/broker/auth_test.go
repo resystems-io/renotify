@@ -107,8 +107,41 @@ func TestBuildAuth_MobileCannotPublishRequest(t *testing.T) {
 		if strings.Contains(s, ".lifecycle") {
 			t.Errorf("mobile should not be able to publish to .lifecycle, found %q", s)
 		}
-		if strings.Contains(s, ".heartbeat") {
-			t.Errorf("mobile should not be able to publish to .heartbeat, found %q", s)
+		// Mobile must not publish the daemon heartbeat (daemon.*.heartbeat),
+		// but it may publish its own device heartbeat (device.{id}.heartbeat).
+		if strings.Contains(s, "daemon") && strings.Contains(s, "heartbeat") {
+			t.Errorf("mobile should not be able to publish daemon heartbeat, found %q", s)
+		}
+	}
+}
+
+func TestBuildAuth_MobileDeviceHeartbeat(t *testing.T) {
+	devices := []state.PairedDevice{{
+		DeviceID: "mb_TESTDEV01",
+		Token:    "rn_tk_TESTTOKEN",
+	}}
+	users := BuildAuthConfig("alice", "internal_tok", devices)
+	mobile := users[1]
+	pub := mobile.Permissions.Publish.Allow
+
+	// Device-specific heartbeat must be in the publish ACL.
+	want := "resystems.renotify.alice.device.mb_TESTDEV01.heartbeat"
+	assertContains(t, pub, want, "mobile device heartbeat")
+}
+
+func TestBuildAuth_MobileHeartbeatIsDeviceSpecific(t *testing.T) {
+	devices := []state.PairedDevice{
+		{DeviceID: "mb_DEV01", Token: "rn_tk_TOK01"},
+		{DeviceID: "mb_DEV02", Token: "rn_tk_TOK02"},
+	}
+	users := BuildAuthConfig("alice", "internal_tok", devices)
+
+	// Device 1 must not be able to publish device 2's heartbeat.
+	dev1Pub := users[1].Permissions.Publish.Allow
+	dev2Hb := "resystems.renotify.alice.device.mb_DEV02.heartbeat"
+	for _, s := range dev1Pub {
+		if s == dev2Hb {
+			t.Errorf("device mb_DEV01 should not have permission for %q", dev2Hb)
 		}
 	}
 }

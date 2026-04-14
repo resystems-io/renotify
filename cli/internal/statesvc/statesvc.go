@@ -112,6 +112,29 @@ type UpdateActivityCmd struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
+// --- Device presence query (R-CLI-23) ---
+
+// DevicePresenceQuery holds optional filters for the
+// svc.device-presence endpoint. Currently empty; reserved for
+// future filtering (e.g. by device ID or online/offline).
+type DevicePresenceQuery struct{}
+
+// DeviceStatus represents the presence state of a single
+// paired device.
+type DeviceStatus struct {
+	Username string     `json:"username"`
+	DeviceID string     `json:"device_id"`
+	PairedAt time.Time  `json:"paired_at"`
+	Online   bool       `json:"online"`
+	LastSeen *time.Time `json:"last_seen,omitempty"`
+}
+
+// DevicePresenceResult is the response payload for the
+// svc.device-presence endpoint.
+type DevicePresenceResult struct {
+	Devices []DeviceStatus `json:"devices"`
+}
+
 // WriteResult is the generic response for write endpoints.
 type WriteResult struct {
 	OK    bool   `json:"ok"`

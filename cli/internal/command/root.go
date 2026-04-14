@@ -58,6 +58,7 @@ back to the originating pipeline.`,
 
 	root.AddCommand(
 		newDaemonCmd(app),
+		newDevicesCmd(app),
 		newPostCmd(app),
 		newAskCmd(app),
 		newAnswerCmd(app),

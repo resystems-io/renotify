@@ -41,6 +41,7 @@ data class DaemonHeartbeat(
     val username: String,
     val hostname: String,
     val gracePeriodMs: Long,
+    val deviceHeartbeatIntervalMs: Long,
     val workspaces: List<WorkspaceInfo>,
     val timestamp: String
 ) {
@@ -106,12 +107,16 @@ data class DaemonHeartbeat(
 
             val gracePeriodStr = obj.optString(
                 "grace_period", "")
+            val deviceHbIntervalStr = obj.optString(
+                "device_heartbeat_interval", "")
 
             return DaemonHeartbeat(
                 daemonId = obj.getString("daemon_id"),
                 username = obj.optString("username", ""),
                 hostname = obj.optString("hostname", ""),
                 gracePeriodMs = parseGoDuration(gracePeriodStr),
+                deviceHeartbeatIntervalMs = parseGoDuration(
+                    deviceHbIntervalStr),
                 workspaces = workspaces,
                 timestamp = obj.optString("timestamp", "")
             )

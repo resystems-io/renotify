@@ -20,7 +20,7 @@ func TestRegistry_AllKeysResolve(t *testing.T) {
 func TestRegistry_Count(t *testing.T) {
 	// Guard against accidentally dropping entries. Update this
 	// count when adding new config parameters.
-	const expected = 29
+	const expected = 31
 	if len(Registry) != expected {
 		t.Errorf("Registry has %d entries, want %d",
 			len(Registry), expected)

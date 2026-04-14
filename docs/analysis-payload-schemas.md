@@ -938,11 +938,13 @@ type WorkspaceInfo struct {
 }
 
 type DaemonHeartbeat struct {
-	DaemonID   string          `json:"daemon_id"`
-	Username   string          `json:"username"`
-	Hostname   string          `json:"hostname"`
-	Workspaces []WorkspaceInfo `json:"workspaces"`
-	Timestamp  time.Time       `json:"timestamp"`
+	DaemonID                string          `json:"daemon_id"`
+	Username                string          `json:"username"`
+	Hostname                string          `json:"hostname"`
+	GracePeriod             string          `json:"grace_period,omitempty"`
+	DeviceHeartbeatInterval string          `json:"device_heartbeat_interval,omitempty"`
+	Workspaces              []WorkspaceInfo `json:"workspaces"`
+	Timestamp               time.Time       `json:"timestamp"`
 }
 ```
 
@@ -965,7 +967,31 @@ type DaemonHeartbeat struct {
       "active_flows": []
     }
   ],
+  "grace_period": "15m0s",
+  "device_heartbeat_interval": "30s",
   "timestamp": "2026-03-27T14:00:00Z"
+}
+```
+
+### DeviceHeartbeat
+
+Published by each mobile device on its device-specific heartbeat
+subject (`device.{device_id}.heartbeat`) at a periodic interval
+communicated by the daemon via the `DaemonHeartbeat` payload. The
+daemon uses these heartbeats to track device presence (R-CLI-23,
+R-MOB-14). See [Device Presence Analysis](analysis-device-presence.md).
+
+```go
+type DeviceHeartbeat struct {
+	DeviceID  string    `json:"device_id"`
+	Timestamp time.Time `json:"timestamp"`
+}
+```
+
+```json
+{
+  "device_id": "mb_3G2K7V9WNFQ4J",
+  "timestamp": "2026-04-08T10:00:00Z"
 }
 ```
 

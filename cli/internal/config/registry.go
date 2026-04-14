@@ -196,6 +196,20 @@ var Registry = []ParamInfo{
 		Resolve:     func(c *Config) any { return c.Interjection.DebounceWindow },
 	},
 
+	// --- Device presence ---
+	{
+		Key: "device_presence.stale_threshold", Type: "duration",
+		EnvVar:      "RENOTIFY_DEVICE_PRESENCE_STALE_THRESHOLD",
+		Description: "duration after last heartbeat before device is offline",
+		Resolve:     func(c *Config) any { return c.DevicePresence.StaleThreshold },
+	},
+	{
+		Key: "device_presence.heartbeat_interval", Type: "duration",
+		EnvVar:      "RENOTIFY_DEVICE_PRESENCE_HEARTBEAT_INTERVAL",
+		Description: "heartbeat interval communicated to mobile app",
+		Resolve:     func(c *Config) any { return c.DevicePresence.HeartbeatInterval },
+	},
+
 	// --- Daemon runtime ---
 	{
 		Key: "daemon.foreground", Type: "bool",
