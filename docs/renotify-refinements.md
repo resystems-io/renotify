@@ -897,6 +897,43 @@ and a maximum individual payload size of 64 KB.
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Test
 
+### 2.7 Operations & Telemetry
+
+#### R-OPS-01: Incident Telemetry
+**Statement:** The system must be capable of capturing and centralising unhandled exceptions, unmanaged kills (e.g., OOM, ANR), and native crashes occurring on the mobile client.
+* **Rationale (A1):** Without telemetry, intermittent failures in the background service or during transitions remain opaque and difficult to debug remotely.
+* **Trace to Parent (A4):** [N-01][n-01]
+* **Allocation (A8):** System-wide
+* **V&V Method (A2):** Demonstration
+
+#### R-OPS-02: Mobile Capture
+**Statement:** The Android client must capture JVM crashes using `UncaughtExceptionHandler` and unmanaged terminations using `ApplicationExitInfo` (API 30+), persisting the payload locally to device storage immediately upon capture.
+* **Rationale (A1):** Android processes are ephemeral; attempting to transmit telemetry during a crash is highly unreliable. Persistence ensures the payload survives until the application recovers.
+* **Trace to Parent (A4):** [R-OPS-01](#r-ops-01-incident-telemetry)
+* **Allocation (A8):** Android Application
+* **V&V Method (A2):** Test
+
+#### R-OPS-03: Deferred Transmission
+**Statement:** The Android client must upload persisted telemetry payloads to the daemon's dedicated telemetry stream via NATS JetStream upon connection recovery or app restart.
+* **Rationale (A1):** Decouples telemetry transmission from the crash event, ensuring network unavailability does not cause diagnostic data loss.
+* **Trace to Parent (A4):** [R-OPS-02](#r-ops-02-mobile-capture)
+* **Allocation (A8):** Android Application
+* **V&V Method (A2):** Test
+
+#### R-OPS-04: File-Backed Stream
+**Statement:** The daemon must configure a durable, file-backed JetStream stream (`RENOTIFY_TELEMETRY`) under `$XDG_STATE_HOME/renotify/jetstream` explicitly for diagnostic data. This data must remain isolated in JetStream and not be drained into the operational SQLite database.
+* **Rationale (A1):** Telemetry requires true durability and longer retention than ephemeral operational events. Isolating it from SQLite preserves the boundary between operational flow state and diagnostic logs.
+* **Trace to Parent (A4):** [R-OPS-01](#r-ops-01-incident-telemetry)
+* **Allocation (A8):** Go CLI Application
+* **V&V Method (A2):** Inspection
+
+#### R-OPS-05: CLI Telemetry Tooling
+**Statement:** The CLI must provide tooling (e.g., `renotify telemetry list` and `renotify telemetry fetch`) to query the JetStream telemetry stream directly, outputting a list of reports or dumping the raw JSON payloads into a local folder.
+* **Rationale (A1):** Since telemetry is isolated from the SQLite ledger and history APIs, operators need a dedicated mechanism to extract diagnostic reports.
+* **Trace to Parent (A4):** [R-OPS-04](#r-ops-04-file-backed-stream)
+* **Allocation (A8):** Go CLI Application
+* **V&V Method (A2):** Test
+
 ---
 
 ## 3. Implementation Plan
@@ -1155,6 +1192,15 @@ shared broker is in use.)*
   `MCP --> Ledger` edge and route state access through the broker
   via the state management subsystem.
 
+### Phase 9: Incident Reporting
+*(Goal: Implement end-to-end telemetry capture, transmission, and tooling for mobile incidents.)*
+
+- [ ] **M-12: Mobile Crash Capture:** Implement `Thread.UncaughtExceptionHandler` and `ApplicationExitInfo` ingestion on the Android client to capture managed exceptions and unmanaged terminations, persisting `IncidentReport` payloads locally ([R-OPS-02][r-ops-02]).
+- [ ] **M-13: Deferred Transmission:** Implement Android `WorkManager` (or `NatsService` startup hooks) to reliably upload persisted `IncidentReport` payloads to the `resystems.renotify.{username}.device.{device_id}.telemetry.crash` NATS JetStream subject upon network recovery ([R-OPS-03][r-ops-03]).
+- [ ] **C-21: File-Backed Telemetry Stream:** Update the daemon's JetStream configuration to provision a dedicated, file-backed `RENOTIFY_TELEMETRY` stream explicitly for diagnostic data, bypassing the SQLite database ([R-OPS-04][r-ops-04]).
+- [ ] **C-22: CLI Telemetry Tooling:** Implement `renotify telemetry list` and `renotify telemetry fetch` commands in the Go CLI to directly query the `RENOTIFY_TELEMETRY` stream and dump JSON payloads to a local directory ([R-OPS-05][r-ops-05]).
+- [ ] **V-06: Telemetry Verification:** Test the end-to-end telemetry pipeline by simulating a managed crash and an unmanaged kill on the Android client, verifying that the payload survives restart, is transmitted to the file-backed JetStream, and can be retrieved via the CLI tools.
+
 ---
 
 ## 4. Design Decision Register
@@ -1411,6 +1457,11 @@ Record completed items here with the date.
 [r-mob-12]: #r-mob-12-notification-tap-navigation
 [r-mob-13]: #r-mob-13-content-notification-tap-navigation
 [r-mob-14]: #r-mob-14-device-heartbeat
+[r-ops-01]: #r-ops-01-incident-telemetry
+[r-ops-02]: #r-ops-02-mobile-capture
+[r-ops-03]: #r-ops-03-deferred-transmission
+[r-ops-04]: #r-ops-04-file-backed-stream
+[r-ops-05]: #r-ops-05-cli-telemetry-tooling
 [r-sec-01]: #r-sec-01-token-revocation
 [r-sec-02]: #r-sec-02-per-device-pairing
 [r-sec-03]: #r-sec-03-post-mvp-security-deferral
