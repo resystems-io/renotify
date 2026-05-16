@@ -17,6 +17,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
+        android:name=".RenotifyApplication"
         android:label="Renotify"
         android:icon="@mipmap/ic_launcher"
         android:supportsRtl="true">
