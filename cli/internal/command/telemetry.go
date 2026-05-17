@@ -183,9 +183,10 @@ func runTelemetryList(app *App, cmd *cobra.Command, format string) error {
 	}
 
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	fmt.Fprintf(w, "TIMESTAMP\tDEVICE ID\tTYPE\tEXCEPTION\n")
+	fmt.Fprintf(w, "REPORT ID\tTIMESTAMP\tDEVICE ID\tTYPE\tEXCEPTION\n")
 	for _, r := range reports {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+			r.ReportID,
 			r.Timestamp,
 			r.DeviceID,
 			r.IncidentType,

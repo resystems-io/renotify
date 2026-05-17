@@ -89,6 +89,12 @@ func TestTelemetryList_TextAndJSON(t *testing.T) {
 	if !strings.Contains(stdoutText, "mb_testdevice") {
 		t.Errorf("text output missing device ID, got: %q", stdoutText)
 	}
+	if !strings.Contains(stdoutText, "ntf_crash001") {
+		t.Errorf("text output missing report ID ntf_crash001, got: %q", stdoutText)
+	}
+	if !strings.Contains(stdoutText, "ntf_kill002") {
+		t.Errorf("text output missing report ID ntf_kill002, got: %q", stdoutText)
+	}
 
 	// Test JSON output format.
 	stdoutJSON, _, err := executeCommand("telemetry", "list", "--format", "json")
