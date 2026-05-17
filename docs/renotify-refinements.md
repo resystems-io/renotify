@@ -1201,15 +1201,15 @@ mobile incidents.)*
   configuration to provision a dedicated, file-backed `RENOTIFY_TELEMETRY`
   stream explicitly for diagnostic data, bypassing the SQLite database
   ([R-OPS-04][r-ops-04]).
+- [x] **C-22: CLI Telemetry Tooling:** Implement `renotify telemetry list` and
+  `renotify telemetry fetch` commands in the Go CLI to directly query the
+  `RENOTIFY_TELEMETRY` stream and dump JSON payloads to a local directory
+  ([R-OPS-05][r-ops-05]).
 - [ ] **M-13: Deferred Transmission:** Implement Android `WorkManager` (or
   `NatsService` startup hooks) to reliably upload persisted `IncidentReport`
   payloads to the
   `resystems.renotify.{username}.device.{device_id}.telemetry.crash` NATS
   JetStream subject upon network recovery ([R-OPS-03][r-ops-03]).
-- [ ] **C-22: CLI Telemetry Tooling:** Implement `renotify telemetry list` and
-  `renotify telemetry fetch` commands in the Go CLI to directly query the
-  `RENOTIFY_TELEMETRY` stream and dump JSON payloads to a local directory
-  ([R-OPS-05][r-ops-05]).
 - [ ] **V-06: Telemetry Verification:** Test the end-to-end telemetry pipeline
   by simulating a managed crash and an unmanaged kill on the Android client,
   verifying that the payload survives restart, is transmitted to the file-backed
@@ -1382,6 +1382,7 @@ Record completed items here with the date.
 | 2026-04-08 | M-14 | Android device heartbeat publisher implemented. `NatsConnectionManager` launches a coroutine after connect/reconnect that publishes `DeviceHeartbeat` JSON (`device_id`, `timestamp`) to `device.{device_id}.heartbeat` every 30s (compiled default). Interval dynamically adjusted when daemon heartbeat arrives with non-zero `device_heartbeat_interval`. `DaemonHeartbeat.kt` extended with `deviceHeartbeatIntervalMs` field, parsed via existing `parseGoDuration()`. `NatsService.handleHeartbeat()` passes interval to `manager.updateHeartbeatInterval()`. Heartbeat coroutine auto-stops on disconnect, restarts on reconnect. [R-MOB-14][r-mob-14] satisfied. All Android JVM tests pass. |
 | 2026-05-17 | M-12 | Mobile crash capture implemented. Added a custom JVM `UncaughtExceptionHandler` and historical `ApplicationExitInfo` processor on the Android client to capture managed exceptions and unmanaged terminations, persisting `IncidentReport` JSON payloads to the secure local sandbox (`cache/telemetry/crashes/`). Verification playbook added to `device-testing.md`. |
 | 2026-05-17 | C-21 | File-Backed Telemetry Stream implemented. Updated embedded NATS configuration to support persistent StoreDir ($XDG_STATE_HOME/renotify/jetstream) in production. Configured RENOTIFY_TELEMETRY stream under resystems.renotify.*.device.*.telemetry.> with FileStorage, LimitsPolicy, 28-day MaxAge, and 100MB MaxBytes. Added unit tests for telemetry configuration, provisioning, and stream isolation. |
+| 2026-05-17 | C-22 | CLI Telemetry Tooling implemented. Added `telemetry` command group and `list` / `fetch` subcommands to the Cobra CLI. `list` connects to NATS and outputs a tabwriter-formatted summary (Timestamp, Device ID, Type, Exception) or JSON array of all captured incident reports. `fetch` downloads all JSON payloads from the stream sequentially to a designated local directory. Added automated unit tests using mock NATS brokers for list (text and JSON formats) and fetch commands. All tests pass successfully. |
 
 ## 6. References
 

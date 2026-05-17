@@ -164,18 +164,18 @@ func streamConfig(cfg config.JetStreamConfig) natsjs.StreamConfig {
 // with a 28-day retention period.
 func telemetryStreamConfig(cfg config.JetStreamConfig) natsjs.StreamConfig {
 	return natsjs.StreamConfig{
-		Name:              TelemetryStreamName,
-		Subjects:          []string{TelemetryStreamSubjects},
-		Storage:           natsjs.FileStorage, // Durable, file-backed stream (R-OPS-04)
-		Retention:         natsjs.LimitsPolicy,
-		Discard:           natsjs.DiscardOld,
-		Replicas:          1,
-		MaxAge:            28 * 24 * time.Hour, // 28 Days retention as requested by user
-		MaxBytes:          100 * 1024 * 1024,   // 100 MB limit
-		MaxMsgSize:        cfg.MaxMsgSize,      // Reuses overall max message size limit
-		Duplicates:        cfg.DupWindow.Duration,
-		MaxConsumers:      -1,
-		MaxMsgs:           -1,
+		Name:         TelemetryStreamName,
+		Subjects:     []string{TelemetryStreamSubjects},
+		Storage:      natsjs.FileStorage, // Durable, file-backed stream (R-OPS-04)
+		Retention:    natsjs.LimitsPolicy,
+		Discard:      natsjs.DiscardOld,
+		Replicas:     1,
+		MaxAge:       28 * 24 * time.Hour, // 28 Days retention as requested by user
+		MaxBytes:     100 * 1024 * 1024,   // 100 MB limit
+		MaxMsgSize:   cfg.MaxMsgSize,      // Reuses overall max message size limit
+		Duplicates:   cfg.DupWindow.Duration,
+		MaxConsumers: -1,
+		MaxMsgs:      -1,
 	}
 }
 
