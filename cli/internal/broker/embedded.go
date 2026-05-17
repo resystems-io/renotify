@@ -34,25 +34,36 @@ type EmbeddedConfig struct {
 	Devices       []state.PairedDevice // paired mobile devices
 
 	JetStreamMaxMem int64
+	StoreDir        string // persistent store directory path (if non-empty)
 }
 
 // EmbeddedServer wraps a nats-server with Renotify configuration.
 type EmbeddedServer struct {
-	srv      *server.Server
-	opts     *server.Options
-	logger   *slog.Logger
-	storeDir string // temp dir for JetStream metadata; cleaned on shutdown
+	srv       *server.Server
+	opts      *server.Options
+	logger    *slog.Logger
+	storeDir  string // dir for JetStream metadata
+	isTempDir bool   // whether storeDir is temporary and needs cleanup
 }
 
 // NewEmbeddedServer creates an embedded NATS server from the
 // given configuration. Call Start() to begin listening.
 func NewEmbeddedServer(cfg EmbeddedConfig, logger *slog.Logger) (*EmbeddedServer, error) {
-	// JetStream needs a StoreDir even for memory-only storage
-	// (metadata). Use a unique temp dir to avoid conflicts
-	// between concurrent instances.
-	storeDir, err := os.MkdirTemp("", "renotify-jetstream-*")
-	if err != nil {
-		return nil, fmt.Errorf("create JetStream store dir: %w", err)
+	var storeDir string
+	var isTemp bool
+	var err error
+
+	if cfg.StoreDir != "" {
+		storeDir = cfg.StoreDir
+	} else {
+		// JetStream needs a StoreDir even for memory-only storage
+		// (metadata). Use a unique temp dir to avoid conflicts
+		// between concurrent instances.
+		storeDir, err = os.MkdirTemp("", "renotify-jetstream-*")
+		if err != nil {
+			return nil, fmt.Errorf("create JetStream store dir: %w", err)
+		}
+		isTemp = true
 	}
 
 	opts := &server.Options{
@@ -76,7 +87,9 @@ func NewEmbeddedServer(cfg EmbeddedConfig, logger *slog.Logger) (*EmbeddedServer
 	if cfg.TLSCert != "" && cfg.TLSKey != "" {
 		cert, err := tls.LoadX509KeyPair(cfg.TLSCert, cfg.TLSKey)
 		if err != nil {
-			os.RemoveAll(storeDir)
+			if isTemp {
+				os.RemoveAll(storeDir)
+			}
 			return nil, fmt.Errorf("load TLS cert/key: %w", err)
 		}
 		opts.Websocket = server.WebsocketOpts{
@@ -91,9 +104,10 @@ func NewEmbeddedServer(cfg EmbeddedConfig, logger *slog.Logger) (*EmbeddedServer
 	}
 
 	return &EmbeddedServer{
-		opts:     opts,
-		logger:   logger,
-		storeDir: storeDir,
+		opts:      opts,
+		logger:    logger,
+		storeDir:  storeDir,
+		isTempDir: isTemp,
 	}, nil
 }
 
@@ -127,7 +141,7 @@ func (s *EmbeddedServer) Shutdown(_ context.Context) error {
 		s.srv.WaitForShutdown()
 		s.logger.Info("embedded NATS server stopped")
 	}
-	if s.storeDir != "" {
+	if s.storeDir != "" && s.isTempDir {
 		os.RemoveAll(s.storeDir)
 	}
 	return nil

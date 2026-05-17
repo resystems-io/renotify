@@ -463,3 +463,100 @@ func TestEnsureJetStream_ConsumerIsolation(t *testing.T) {
 		t.Errorf("interject received %d, want 0", interjectCount)
 	}
 }
+
+func TestTelemetryStreamConfig_Defaults(t *testing.T) {
+	cfg := telemetryStreamConfig(defaultJSConfig())
+
+	if cfg.Name != "RENOTIFY_TELEMETRY" {
+		t.Errorf("name = %q, want RENOTIFY_TELEMETRY", cfg.Name)
+	}
+	if len(cfg.Subjects) != 1 || cfg.Subjects[0] != TelemetryStreamSubjects {
+		t.Errorf("subjects = %v, want [%s]", cfg.Subjects, TelemetryStreamSubjects)
+	}
+	if cfg.Storage != natsjs.FileStorage {
+		t.Errorf("storage = %v, want FileStorage", cfg.Storage)
+	}
+	if cfg.Retention != natsjs.LimitsPolicy {
+		t.Errorf("retention = %v, want LimitsPolicy", cfg.Retention)
+	}
+	if cfg.Discard != natsjs.DiscardOld {
+		t.Errorf("discard = %v, want DiscardOld", cfg.Discard)
+	}
+	if cfg.Replicas != 1 {
+		t.Errorf("replicas = %d, want 1", cfg.Replicas)
+	}
+	if cfg.MaxAge != 28*24*time.Hour {
+		t.Errorf("max_age = %v, want 28d", cfg.MaxAge)
+	}
+	if cfg.MaxBytes != 100*1024*1024 {
+		t.Errorf("max_bytes = %d, want 100MB", cfg.MaxBytes)
+	}
+}
+
+func TestEnsureJetStream_CreatesTelemetryStream(t *testing.T) {
+	_, nc := startTestServer(t)
+	ctx := context.Background()
+
+	err := EnsureJetStream(ctx, nc, "testuser", nil,
+		defaultJSConfig(), testLogger())
+	if err != nil {
+		t.Fatalf("EnsureJetStream: %v", err)
+	}
+
+	js, _ := natsjs.New(nc)
+
+	// Verify telemetry stream exists and is configured correctly.
+	stream, err := js.Stream(ctx, TelemetryStreamName)
+	if err != nil {
+		t.Fatalf("telemetry stream not found: %v", err)
+	}
+	info := stream.CachedInfo()
+	if info.Config.Storage != natsjs.FileStorage {
+		t.Error("telemetry stream storage should be file storage")
+	}
+	if info.Config.MaxAge != 28*24*time.Hour {
+		t.Errorf("telemetry stream max_age = %v, want 28d", info.Config.MaxAge)
+	}
+}
+
+func TestTelemetryStreamIsolation(t *testing.T) {
+	_, nc := startTestServer(t)
+	ctx := context.Background()
+
+	if err := EnsureJetStream(ctx, nc, "testuser", nil,
+		defaultJSConfig(), testLogger()); err != nil {
+		t.Fatalf("EnsureJetStream: %v", err)
+	}
+
+	js, _ := natsjs.New(nc)
+
+	// Publish a telemetry incident report.
+	_, err := js.Publish(ctx,
+		"resystems.renotify.testuser.device.device123.telemetry.crash",
+		[]byte(`{"report_id":"ntf_123","incident_type":"managed_crash"}`))
+	if err != nil {
+		t.Fatalf("telemetry publish failed: %v", err)
+	}
+
+	// Publish standard flow traffic (which should go to RENOTIFY, not telemetry).
+	_, err = js.Publish(ctx,
+		"resystems.renotify.testuser.flow.f001.request",
+		[]byte("operational request"))
+	if err != nil {
+		t.Fatalf("flow request publish failed: %v", err)
+	}
+
+	// Assert operational stream has its message.
+	opStream, _ := js.Stream(ctx, StreamName)
+	opState := opStream.CachedInfo().State
+	if opState.Msgs != 1 {
+		t.Errorf("RENOTIFY msgs = %d, want 1", opState.Msgs)
+	}
+
+	// Assert telemetry stream has its message.
+	telStream, _ := js.Stream(ctx, TelemetryStreamName)
+	telState := telStream.CachedInfo().State
+	if telState.Msgs != 1 {
+		t.Errorf("RENOTIFY_TELEMETRY msgs = %d, want 1", telState.Msgs)
+	}
+}

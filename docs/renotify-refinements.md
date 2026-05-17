@@ -125,10 +125,9 @@ Derived from CONOPS-01:
   combination thereof) and route them back to the source.
 * <a id="n-04"></a>**N-04 [Lifecycle State]:** The system must handle
   non-responses (timeouts) and log interactions locally for auditability.
-* <a id="n-05"></a>**N-05 [Proactive Interjection]:** The system must allow
-  the human receiver to emit asynchronous, unprompted control signals or
-  feedback upstream to terminate, pause, or alter the trajectory of active
-  pipelines.
+* <a id="n-05"></a>**N-05 [Proactive Interjection]:** The system must allow the
+  human receiver to emit asynchronous, unprompted control signals or feedback
+  upstream to terminate, pause, or alter the trajectory of active pipelines.
 
 ### 1.4 Architectural Considerations
 To connect the CLI and the Android app, a reliable transport layer is necessary.
@@ -196,13 +195,13 @@ flowchart TB
     cli -. "QR Code (offline pairing)" .-> app
 ```
 
-The embedded NATS broker and MCP server are independently toggleable ([R-CLI-02][r-cli-02],
-[R-CLI-03][r-cli-03]). The embedded broker is a first-class deployment model suited to solo
-developers working independently or disconnected from enterprise infrastructure.
-When the embedded broker is disabled, the daemon connects to an external shared
-NATS broker instead. Both models use the same protocol, subject namespace, and
-provisioning flow — the mobile app behaves identically regardless of broker
-topology.
+The embedded NATS broker and MCP server are independently toggleable
+([R-CLI-02][r-cli-02], [R-CLI-03][r-cli-03]). The embedded broker is a
+first-class deployment model suited to solo developers working independently or
+disconnected from enterprise infrastructure. When the embedded broker is
+disabled, the daemon connects to an external shared NATS broker instead. Both
+models use the same protocol, subject namespace, and provisioning flow — the
+mobile app behaves identically regardless of broker topology.
 
 ### 1.5 Key Definitions
 
@@ -231,9 +230,9 @@ Crockford Base32 encoding.
   sessions.
 
 The NATS subject hierarchy uses `{username}` and `{flow_id}` for routing (see
-[R-API-07][r-api-07]). Structural context (daemon, workspace) is carried within payloads and
-daemon heartbeats, not encoded in the subject. The Android UI groups
-notifications by workspace using data from heartbeat messages.
+[R-API-07][r-api-07]). Structural context (daemon, workspace) is carried within
+payloads and daemon heartbeats, not encoded in the subject. The Android UI
+groups notifications by workspace using data from heartbeat messages.
 
 ---
 
@@ -461,9 +460,9 @@ SQLite or file-based log.
 * **V&V Method (A2):** Demonstration
 
 #### R-CLI-08: MCP Server Mode
-**Statement:** Implement the Model Context Protocol (MCP), allowing
-autonomous agents to invoke `post`, `ask`, `register_flow`,
-`refresh_flow`, and `terminate_flow` natively.
+**Statement:** Implement the Model Context Protocol (MCP), allowing autonomous
+agents to invoke `post`, `ask`, `register_flow`, `refresh_flow`, and
+`terminate_flow` natively.
 * **Rationale (A1):** Standardises agent integration without relying solely on
   shell execution.
 * **Trace to Parent (A4):** [N-01][n-01], [N-03][n-03]
@@ -492,8 +491,8 @@ dynamic resource containing the result (e.g., boolean, message).
 #### R-CLI-11: Provisioning Orchestrator
 **Statement:** The CLI must mandate a `renotify pair` command that generates
 self-signed TLS certificates (if none exist), discovers/overrides network IPs,
-and yields an ASCII QR code matching the Provisioning Schema ([R-API-08][r-api-08]) to the
-terminal.
+and yields an ASCII QR code matching the Provisioning Schema
+([R-API-08][r-api-08]) to the terminal.
 * **Rationale (A1):** Establishes the bedrock of secure NATS connectivity
   without requiring manual secret distribution.
 * **Trace to Parent (A4):** [N-01][n-01]
@@ -595,60 +594,56 @@ error ensures graceful fallback to the local terminal prompt.
 * **V&V Method (A2):** Test
 
 #### R-CLI-20: State Management Authority
-**Statement:** The daemon must provide a dedicated state management
-subsystem that is the sole authority for all reads from and writes
-to the SQLite ledger. This subsystem must expose its capabilities
-via NATS service subjects (request-reply for queries, JetStream
-consumption for event-driven writes). No other subsystem may hold
-a direct reference to the database.
-* **Rationale (A1):** Without a single state authority, collocated
-  subsystems (e.g. the MCP server) can bypass the broker and access
-  the database directly, creating an implicit in-process coupling
-  that prevents the subsystem from operating in a separate process
-  when a shared broker is in use. Funnelling all state access
-  through NATS ensures that every subsystem is a broker client
+**Statement:** The daemon must provide a dedicated state management subsystem
+that is the sole authority for all reads from and writes to the SQLite ledger.
+This subsystem must expose its capabilities via NATS service subjects
+(request-reply for queries, JetStream consumption for event-driven writes). No
+other subsystem may hold a direct reference to the database.
+* **Rationale (A1):** Without a single state authority, collocated subsystems
+  (e.g. the MCP server) can bypass the broker and access the database directly,
+  creating an implicit in-process coupling that prevents the subsystem from
+  operating in a separate process when a shared broker is in use. Funnelling all
+  state access through NATS ensures that every subsystem is a broker client
   regardless of deployment topology.
-* **Trace to Parent (A4):** [N-04][n-04], [R-CLI-13][r-cli-13], [R-CLI-14][r-cli-14]
+* **Trace to Parent (A4):** [N-04][n-04], [R-CLI-13][r-cli-13],
+  [R-CLI-14][r-cli-14]
 * **Allocation (A8):** Go CLI Application
-* **V&V Method (A2):** Test — verify the MCP server subsystem
-  functions correctly when the ledger subsystem is reachable only
-  via NATS (no shared process memory).
+* **V&V Method (A2):** Test — verify the MCP server subsystem functions
+  correctly when the ledger subsystem is reachable only via NATS (no shared
+  process memory).
 
 #### R-CLI-21: MCP Server as Broker Client
-**Statement:** The MCP server must access all persistent state
-(active flows, notification history, interjection records) and
-submit all state mutations (insert request, insert response, insert
-interjection) exclusively via NATS subjects served by the state
-management subsystem ([R-CLI-20][r-cli-20]). The MCP server must not receive or
-hold a reference to the database or any database accessor.
-* **Rationale (A1):** The CLI and mobile app already interact with
-  the daemon solely through NATS. Applying the same constraint to
-  the MCP server ensures it can be deployed as a separate process
-  connected to a shared broker — a topology that [R-CLI-02][r-cli-02] enables
-  but that direct database access prevents.
+**Statement:** The MCP server must access all persistent state (active flows,
+notification history, interjection records) and submit all state mutations
+(insert request, insert response, insert interjection) exclusively via NATS
+subjects served by the state management subsystem ([R-CLI-20][r-cli-20]). The
+MCP server must not receive or hold a reference to the database or any database
+accessor.
+* **Rationale (A1):** The CLI and mobile app already interact with the daemon
+  solely through NATS. Applying the same constraint to the MCP server ensures it
+  can be deployed as a separate process connected to a shared broker — a
+  topology that [R-CLI-02][r-cli-02] enables but that direct database access
+  prevents.
 * **Trace to Parent (A4):** [R-CLI-08][r-cli-08], [R-CLI-20][r-cli-20]
 * **Allocation (A8):** Go CLI Application
-* **V&V Method (A2):** Test — confirm that the MCP server package
-  has no import dependency on the ledger package.
+* **V&V Method (A2):** Test — confirm that the MCP server package has no import
+  dependency on the ledger package.
 
 #### R-CLI-22: In-Process Broker Transport
-**Statement:** When the embedded NATS broker is enabled and
-subsystems are collocated in the same daemon process, those
-subsystems must connect to the broker via the NATS in-process
-transport (e.g. `nats.InProcessConn`) rather than TCP or WebSocket
-loopback. When the embedded broker is disabled, subsystems must
-connect to the configured shared broker address (TCP, TLS, or
-WSS as determined by the URL scheme).
-* **Rationale (A1):** The in-process transport eliminates
-  serialisation overhead and avoids binding the TCP listener solely
-  for internal daemon traffic. It also makes the collocated topology
-  indistinguishable from the shared-broker topology at the NATS API
-  level, ensuring subsystem code is transport-agnostic.
+**Statement:** When the embedded NATS broker is enabled and subsystems are
+collocated in the same daemon process, those subsystems must connect to the
+broker via the NATS in-process transport (e.g. `nats.InProcessConn`) rather than
+TCP or WebSocket loopback. When the embedded broker is disabled, subsystems must
+connect to the configured shared broker address (TCP, TLS, or WSS as determined
+by the URL scheme).
+* **Rationale (A1):** The in-process transport eliminates serialisation overhead
+  and avoids binding the TCP listener solely for internal daemon traffic. It
+  also makes the collocated topology indistinguishable from the shared-broker
+  topology at the NATS API level, ensuring subsystem code is transport-agnostic.
 * **Trace to Parent (A4):** [R-CLI-02][r-cli-02], [R-CLI-01][r-cli-01]
 * **Allocation (A8):** Go CLI Application
-* **V&V Method (A2):** Test — verify the daemon starts and operates
-  correctly with the in-process transport when the embedded broker
-  is enabled.
+* **V&V Method (A2):** Test — verify the daemon starts and operates correctly
+  with the in-process transport when the embedded broker is enabled.
 
 #### R-CLI-23: Device Presence
 **Statement:** The daemon must track the connectivity state of each paired
@@ -662,19 +657,17 @@ data that is derived from the running daemon must be retrievable through
 separate, clearly delineated interfaces — one file-based and one query-based —
 to avoid mixing static and dynamic data sources.
 
-* **Rationale (A1):** When notifications are not being received, the
-  developer needs to distinguish between "device not connected" and
-  "daemon or routing misconfigured." Without a presence signal the
-  developer must resort to inspecting Android logcat or NATS
-  monitoring to diagnose delivery failures. Separating file-based
-  pairing data from query-based presence data ensures each interface
-  remains independently extensible and testable.
+* **Rationale (A1):** When notifications are not being received, the developer
+  needs to distinguish between "device not connected" and "daemon or routing
+  misconfigured." Without a presence signal the developer must resort to
+  inspecting Android logcat or NATS monitoring to diagnose delivery failures.
+  Separating file-based pairing data from query-based presence data ensures each
+  interface remains independently extensible and testable.
 * **Trace to Parent (A4):** [R-MOB-10][r-mob-10], [R-MOB-11][r-mob-11],
   [R-SEC-02][r-sec-02]
 * **Allocation (A8):** Go CLI Application
-* **V&V Method (A2):** Test — verify presence reports online when
-  a device is connected and offline (with last-seen timestamp) when
-  a device disconnects.
+* **V&V Method (A2):** Test — verify presence reports online when a device is
+  connected and offline (with last-seen timestamp) when a device disconnects.
 
 ### 2.4 Android Application
 
@@ -724,8 +717,8 @@ logo within the application UI.
 
 #### R-MOB-06: Secure Pairing Scanner
 **Statement:** Implement a camera-based QR scanner pipeline to decode the
-pairing payload ([R-API-08][r-api-08]), persisting the target IP, port, token, and
-explicitly pinning the designated TLS certificate.
+pairing payload ([R-API-08][r-api-08]), persisting the target IP, port, token,
+and explicitly pinning the designated TLS certificate.
 * **Rationale (A1):** Translates the complex terminal handshake into a seamless
   mobile configuration.
 * **Trace to Parent (A4):** [N-01][n-01]
@@ -775,10 +768,10 @@ connectivity status indicator at all times.
 * **V&V Method (A2):** Demonstration
 
 #### R-MOB-11: Multi-Device Support
-**Statement:** The system must support multiple mobile devices paired to the same
-daemon simultaneously. Each device receives all notifications independently via
-its own JetStream consumer. Device identity is established at pairing time and
-carried in the provisioning payload.
+**Statement:** The system must support multiple mobile devices paired to the
+same daemon simultaneously. Each device receives all notifications independently
+via its own JetStream consumer. Device identity is established at pairing time
+and carried in the provisioning payload.
 * **Rationale (A1):** Developers may use multiple devices (phone + tablet) or
   share a daemon with a colleague for pair programming.
 * **Trace to Parent (A4):** [N-01][n-01], [N-02][n-02]
@@ -786,50 +779,48 @@ carried in the provisioning payload.
 * **V&V Method (A2):** Test
 
 #### R-MOB-12: Notification Tap Navigation
-**Statement:** Tapping the persistent connection status notification must open the
-Renotify dashboard. If the app is already open, the existing view must be brought
-to the foreground without creating a duplicate window.
+**Statement:** Tapping the persistent connection status notification must open
+the Renotify dashboard. If the app is already open, the existing view must be
+brought to the foreground without creating a duplicate window.
 * **Rationale (A1):** The connection status notification is the most visible
-  persistent entry point for the app. Users expect tapping a service notification
-  to navigate to the associated application, consistent with standard Android
-  platform conventions.
+  persistent entry point for the app. Users expect tapping a service
+  notification to navigate to the associated application, consistent with
+  standard Android platform conventions.
 * **Trace to Parent (A4):** [R-MOB-10][r-mob-10]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Demonstration
 
 #### R-MOB-13: Content Notification Tap Navigation
-**Statement:** Tapping a notification (informational or interactive) must navigate
-the user to the originating flow in the dashboard, showing the flow's notification
-history and any pending response controls. If the flow has already ended, the
-dashboard must still open without error.
-* **Rationale (A1):** Users receiving a notification naturally expect tapping it to
-  reveal more context about the source activity. Without contextual navigation the
-  user must manually locate the flow in the dashboard, which is especially awkward
-  for interactive notifications where the action buttons are small.
+**Statement:** Tapping a notification (informational or interactive) must
+navigate the user to the originating flow in the dashboard, showing the flow's
+notification history and any pending response controls. If the flow has already
+ended, the dashboard must still open without error.
+* **Rationale (A1):** Users receiving a notification naturally expect tapping it
+  to reveal more context about the source activity. Without contextual
+  navigation the user must manually locate the flow in the dashboard, which is
+  especially awkward for interactive notifications where the action buttons are
+  small.
 * **Trace to Parent (A4):** [R-MOB-03][r-mob-03], [R-MOB-09][r-mob-09]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Demonstration
 
 #### R-MOB-14: Device Heartbeat
-**Statement:** The mobile client must publish a periodic
-application-level heartbeat to the daemon while connected. The
-heartbeat must identify the originating device and must be
-publishable over the standard NATS connection without requiring
-broker-internal monitoring features. The heartbeat interval and the
-staleness threshold after which the daemon considers a device
-offline must be configurable on the daemon side.
+**Statement:** The mobile client must publish a periodic application-level
+heartbeat to the daemon while connected. The heartbeat must identify the
+originating device and must be publishable over the standard NATS connection
+without requiring broker-internal monitoring features. The heartbeat interval
+and the staleness threshold after which the daemon considers a device offline
+must be configurable on the daemon side.
 * **Rationale (A1):** The daemon's device presence tracking
-  ([R-CLI-23][r-cli-23]) requires an application-level signal that
-  works identically across embedded and shared broker deployments.
-  Broker-internal mechanisms (e.g. connection monitoring APIs) are
-  only available when the daemon controls the broker process, making
-  them unsuitable as the sole presence source in a shared-broker
-  topology.
+  ([R-CLI-23][r-cli-23]) requires an application-level signal that works
+  identically across embedded and shared broker deployments. Broker-internal
+  mechanisms (e.g. connection monitoring APIs) are only available when the
+  daemon controls the broker process, making them unsuitable as the sole
+  presence source in a shared-broker topology.
 * **Trace to Parent (A4):** [R-CLI-23][r-cli-23], [R-MOB-10][r-mob-10]
 * **Allocation (A8):** Android Application
-* **V&V Method (A2):** Test — verify the daemon detects a device as
-  online while heartbeats are arriving and as offline after the
-  staleness threshold expires.
+* **V&V Method (A2):** Test — verify the daemon detects a device as online while
+  heartbeats are arriving and as offline after the staleness threshold expires.
 
 ### 2.5 Security Lifecycle
 
@@ -845,13 +836,13 @@ implementation: a manual CLI command `renotify revoke`.
 * **V&V Method (A2):** Test
 
 #### R-SEC-02: Per-Device Pairing
-**Statement:** Each `renotify pair` invocation generates a unique device identity
-and per-device auth token, stored in a device registry (`devices.json`). Multiple
-devices may be paired simultaneously ([R-MOB-11][r-mob-11]). Individual devices can be
-revoked via `renotify revoke --device <id>` or all devices via `renotify revoke
---all`.
-* **Rationale (A1):** Supports multi-device workflows while maintaining per-device
-  credential isolation and revocability.
+**Statement:** Each `renotify pair` invocation generates a unique device
+identity and per-device auth token, stored in a device registry
+(`devices.json`). Multiple devices may be paired simultaneously
+([R-MOB-11][r-mob-11]). Individual devices can be revoked via `renotify revoke
+--device <id>` or all devices via `renotify revoke --all`.
+* **Rationale (A1):** Supports multi-device workflows while maintaining
+  per-device credential isolation and revocability.
 * **Trace to Parent (A4):** [R-SEC-01][r-sec-01], [R-MOB-11][r-mob-11]
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
@@ -868,21 +859,19 @@ rotation on a scheduled cadence, and multi-device pairing support.
 * **V&V Method (A2):** Inspection
 
 #### R-SEC-04: Release Keystore Exclusion
-**Statement:** Android release signing keystores and their associated
-passwords must not be stored in the Git repository. Keystores must be
-generated locally by each developer or injected by CI/CD infrastructure.
-The build system must produce a functional (unsigned) APK when no keystore
-is present and must emit a visible warning identifying the missing keystore
-and how to generate one.
+**Statement:** Android release signing keystores and their associated passwords
+must not be stored in the Git repository. Keystores must be generated locally by
+each developer or injected by CI/CD infrastructure. The build system must
+produce a functional (unsigned) APK when no keystore is present and must emit a
+visible warning identifying the missing keystore and how to generate one.
 * **Rationale (A1):** A committed keystore allows any party with repository
-  access to build APKs signed with the same key. Android treats same-key
-  APKs as same-origin updates, enabling impersonation attacks that bypass
-  signature verification. This risk is acute if the project is
-  open-sourced.
+  access to build APKs signed with the same key. Android treats same-key APKs as
+  same-origin updates, enabling impersonation attacks that bypass signature
+  verification. This risk is acute if the project is open-sourced.
 * **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** Android Build System
-* **V&V Method (A2):** Inspection (verify keystore absent from repository
-  and gitignored; verify unsigned APK produced when keystore missing)
+* **V&V Method (A2):** Inspection (verify keystore absent from repository and
+  gitignored; verify unsigned APK produced when keystore missing)
 
 ### 2.6 MVP Performance Envelope
 
@@ -900,36 +889,57 @@ and a maximum individual payload size of 64 KB.
 ### 2.7 Operations & Telemetry
 
 #### R-OPS-01: Incident Telemetry
-**Statement:** The system must be capable of capturing and centralising unhandled exceptions, unmanaged kills (e.g., OOM, ANR), and native crashes occurring on the mobile client.
-* **Rationale (A1):** Without telemetry, intermittent failures in the background service or during transitions remain opaque and difficult to debug remotely.
+**Statement:** The system must be capable of capturing and centralising
+unhandled exceptions, unmanaged kills (e.g., OOM, ANR), and native crashes
+occurring on the mobile client.
+* **Rationale (A1):** Without telemetry, intermittent failures in the background
+  service or during transitions remain opaque and difficult to debug remotely.
 * **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** System-wide
 * **V&V Method (A2):** Demonstration
 
 #### R-OPS-02: Mobile Capture
-**Statement:** The Android client must capture JVM crashes using `UncaughtExceptionHandler` and unmanaged terminations using `ApplicationExitInfo` (API 30+), persisting the payload locally to device storage immediately upon capture.
-* **Rationale (A1):** Android processes are ephemeral; attempting to transmit telemetry during a crash is highly unreliable. Persistence ensures the payload survives until the application recovers.
+**Statement:** The Android client must capture JVM crashes using
+`UncaughtExceptionHandler` and unmanaged terminations using
+`ApplicationExitInfo` (API 30+), persisting the payload locally to device
+storage immediately upon capture.
+* **Rationale (A1):** Android processes are ephemeral; attempting to transmit
+  telemetry during a crash is highly unreliable. Persistence ensures the payload
+  survives until the application recovers.
 * **Trace to Parent (A4):** [R-OPS-01](#r-ops-01-incident-telemetry)
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Test
 
 #### R-OPS-03: Deferred Transmission
-**Statement:** The Android client must upload persisted telemetry payloads to the daemon's dedicated telemetry stream via NATS JetStream upon connection recovery or app restart.
-* **Rationale (A1):** Decouples telemetry transmission from the crash event, ensuring network unavailability does not cause diagnostic data loss.
+**Statement:** The Android client must upload persisted telemetry payloads to
+the daemon's dedicated telemetry stream via NATS JetStream upon connection
+recovery or app restart.
+* **Rationale (A1):** Decouples telemetry transmission from the crash event,
+  ensuring network unavailability does not cause diagnostic data loss.
 * **Trace to Parent (A4):** [R-OPS-02](#r-ops-02-mobile-capture)
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Test
 
 #### R-OPS-04: File-Backed Stream
-**Statement:** The daemon must configure a durable, file-backed JetStream stream (`RENOTIFY_TELEMETRY`) under `$XDG_STATE_HOME/renotify/jetstream` explicitly for diagnostic data. This data must remain isolated in JetStream and not be drained into the operational SQLite database.
-* **Rationale (A1):** Telemetry requires true durability and longer retention than ephemeral operational events. Isolating it from SQLite preserves the boundary between operational flow state and diagnostic logs.
+**Statement:** The daemon must configure a durable, file-backed JetStream stream
+(`RENOTIFY_TELEMETRY`) under `$XDG_STATE_HOME/renotify/jetstream` explicitly for
+diagnostic data. This data must remain isolated in JetStream and not be drained
+into the operational SQLite database.
+* **Rationale (A1):** Telemetry requires true durability and longer retention
+  than ephemeral operational events. Isolating it from SQLite preserves the
+  boundary between operational flow state and diagnostic logs.
 * **Trace to Parent (A4):** [R-OPS-01](#r-ops-01-incident-telemetry)
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Inspection
 
 #### R-OPS-05: CLI Telemetry Tooling
-**Statement:** The CLI must provide tooling (e.g., `renotify telemetry list` and `renotify telemetry fetch`) to query the JetStream telemetry stream directly, outputting a list of reports or dumping the raw JSON payloads into a local folder.
-* **Rationale (A1):** Since telemetry is isolated from the SQLite ledger and history APIs, operators need a dedicated mechanism to extract diagnostic reports.
+**Statement:** The CLI must provide tooling (e.g., `renotify telemetry list` and
+`renotify telemetry fetch`) to query the JetStream telemetry stream directly,
+outputting a list of reports or dumping the raw JSON payloads into a local
+folder.
+* **Rationale (A1):** Since telemetry is isolated from the SQLite ledger and
+  history APIs, operators need a dedicated mechanism to extract diagnostic
+  reports.
 * **Trace to Parent (A4):** [R-OPS-04](#r-ops-04-file-backed-stream)
 * **Allocation (A8):** Go CLI Application
 * **V&V Method (A2):** Test
@@ -954,55 +964,48 @@ and a maximum individual payload size of 64 KB.
   format and the asynchronous interjection command structure.
 - [x] **A-04: Flow State Schemas:** Document the `register_flow` and
   `terminate_flow` payloads.
-- [x] **A-05: SQLite Ledger Schema:** Define the table structure,
-  columns, indices, and record lifecycle for the daemon's persistent
-  SQLite database. Covers the notification history ledger (pairing
-  `NotificationRequest` with `NotificationResponse`), the active
-  flow registry, and flow lifecycle event storage. Must support the
-  `HistoryQueryRequest` filter fields (`workspace_id`, `flow_id`,
-  `since`, `until`, `limit`) and the stale reaping query pattern.
-- [x] **A-06: Configuration Schema:** Define the unified
-  `settings.json` structure under `$XDG_CONFIG_HOME/renotify/`,
-  consolidating all configurable parameters (embedded broker
-  toggles, listener addresses, JetStream limits, rate limits, grace
-  periods, shared broker URL/credentials, heartbeat interval,
-  default timeout, log path). Specify defaults, validation rules,
-  and the Cobra/Viper binding model.
-- [x] **A-07: Notification ID Format:** Specify the `ntf_` identifier
-  format, encoding, entropy, generation algorithm, and generator
-  location. Add to the identifier summary table in the naming
-  analysis.
-- [x] **A-08: CLI Contract (Exit Codes & Output Format):** Define the
-  exit code mapping from error conditions to numeric codes, and the
-  stdout/stderr output format for each CLI command (`post`, `ask`,
-  `history`, `pair`, `revoke`). Specify whether output is JSON,
-  human-readable, or configurable.
-- [x] **A-09: Shared Broker CLI Path:** Document how CLI commands
-  connect and authenticate when the daemon uses a shared broker
-  instead of the embedded broker. Clarify the internal token
-  distribution mechanism for co-located CLI processes.
-- [x] **A-10: MCP `post` and `ask` Tool Schemas:** Define the MCP
-  tool input/output schemas for `post` and `ask`, including the
-  `flow_id` parameter, blocking vs non-blocking semantics for `ask`,
-  and the relationship to `DecisionResource` polling.
-- [x] **A-11: Interjection Delivery Path:** Document how interjection
-  commands reach the originating process (CLI subscription to
-  `.interject` subject, MCP interjection notification, "pause"
-  operational semantics).
-- [x] **A-12: Timeout Enforcement & Delivery:** Clarify the
-  authoritative timeout enforcer (daemon vs CLI), how the CLI learns
-  about server-side timeout expiry, and whether `ErrorResponse` is
-  published on the response subject.
+- [x] **A-05: SQLite Ledger Schema:** Define the table structure, columns,
+  indices, and record lifecycle for the daemon's persistent SQLite database.
+  Covers the notification history ledger (pairing `NotificationRequest` with
+  `NotificationResponse`), the active flow registry, and flow lifecycle event
+  storage. Must support the `HistoryQueryRequest` filter fields (`workspace_id`,
+  `flow_id`, `since`, `until`, `limit`) and the stale reaping query pattern.
+- [x] **A-06: Configuration Schema:** Define the unified `settings.json`
+  structure under `$XDG_CONFIG_HOME/renotify/`, consolidating all configurable
+  parameters (embedded broker toggles, listener addresses, JetStream limits,
+  rate limits, grace periods, shared broker URL/credentials, heartbeat interval,
+  default timeout, log path). Specify defaults, validation rules, and the
+  Cobra/Viper binding model.
+- [x] **A-07: Notification ID Format:** Specify the `ntf_` identifier format,
+  encoding, entropy, generation algorithm, and generator location. Add to the
+  identifier summary table in the naming analysis.
+- [x] **A-08: CLI Contract (Exit Codes & Output Format):** Define the exit code
+  mapping from error conditions to numeric codes, and the stdout/stderr output
+  format for each CLI command (`post`, `ask`, `history`, `pair`, `revoke`).
+  Specify whether output is JSON, human-readable, or configurable.
+- [x] **A-09: Shared Broker CLI Path:** Document how CLI commands connect and
+  authenticate when the daemon uses a shared broker instead of the embedded
+  broker. Clarify the internal token distribution mechanism for co-located CLI
+  processes.
+- [x] **A-10: MCP `post` and `ask` Tool Schemas:** Define the MCP tool
+  input/output schemas for `post` and `ask`, including the `flow_id` parameter,
+  blocking vs non-blocking semantics for `ask`, and the relationship to
+  `DecisionResource` polling.
+- [x] **A-11: Interjection Delivery Path:** Document how interjection commands
+  reach the originating process (CLI subscription to `.interject` subject, MCP
+  interjection notification, "pause" operational semantics).
+- [x] **A-12: Timeout Enforcement & Delivery:** Clarify the authoritative
+  timeout enforcer (daemon vs CLI), how the CLI learns about server-side timeout
+  expiry, and whether `ErrorResponse` is published on the response subject.
 - [x] **A-13: Workspace Discovery:** Document how CLI commands derive
-  `workspace_id` from the current working directory, how the daemon
-  learns about new workspaces, and fallback behaviour when the CLI
-  runs outside a project directory.
-- [x] **A-14: History Pagination:** Add `offset` or cursor-based
-  pagination to `HistoryQueryRequest` and `HistoryQueryResult`
-  schemas.
-- [x] **A-15: Payload Version Field:** Add a `"v": 1` version field
-  to `ProvisioningPayload` and optionally to other payloads for
-  forward-compatible parsing.
+  `workspace_id` from the current working directory, how the daemon learns about
+  new workspaces, and fallback behaviour when the CLI runs outside a project
+  directory.
+- [x] **A-14: History Pagination:** Add `offset` or cursor-based pagination to
+  `HistoryQueryRequest` and `HistoryQueryResult` schemas.
+- [x] **A-15: Payload Version Field:** Add a `"v": 1` version field to
+  `ProvisioningPayload` and optionally to other payloads for forward-compatible
+  parsing.
 
 ### Phase 2: Foundation & Scaffolding
 *(Goal: Establish the repositories and environments so cross-compilation targets
@@ -1010,13 +1013,12 @@ exist.)*
 
 - [x] **P-01: Root Build Orchestration:** Create a top-level `Makefile` with
   targets for `build-android`, `build-cli`, and `build-all`.
-- [x] **C-01: CLI Scaffolding:** Set up Cobra/Viper commands (with
-  XDG-compliant config management) for `daemon`, `post`, `ask`,
-  `history`. Ensure `username` is a configurable property.
-  Workspace identity is derived from the current working directory
-  at runtime (see [Naming &
-  Addressing](analysis-naming-and-addressing.md) Section 2.4),
-  not from configuration.
+- [x] **C-01: CLI Scaffolding:** Set up Cobra/Viper commands (with XDG-compliant
+  config management) for `daemon`, `post`, `ask`, `history`. Ensure `username`
+  is a configurable property. Workspace identity is derived from the current
+  working directory at runtime (see [Naming &
+  Addressing](analysis-naming-and-addressing.md) Section 2.4), not from
+  configuration.
 - [x] **M-01: App Scaffolding:** Initialise the Kotlin-based Android project
   with necessary permissions (Network, Notifications). *(Crucially, this allows
   a skeleton APK build for later Go embedding).*
@@ -1031,17 +1033,16 @@ WebSockets).*
   NATS server, the MCP server, or both based on configuration.
 - [x] **C-07: Pairing Generator:** Implement `renotify pair` logic, IP
   discovery, TLS cert generation, and ASCII QR output. Use
-  [`mdp/qrterminal`][qrterminal] for terminal QR rendering with
-  half-block characters at EC level L. See
-  [Payload Schemas](analysis-payload-schemas.md) QR Encoding
-  Parameters.
+  [`mdp/qrterminal`][qrterminal] for terminal QR rendering with half-block
+  characters at EC level L. See [Payload Schemas](analysis-payload-schemas.md)
+  QR Encoding Parameters.
 - [x] **C-08: JetStream Configuration:** Implement the strict memory-backed and
   TTL setup for embedded NATS.
-- [x] **M-06: Secure Pairing Scanner:** Integrate QR code scanning and TLS
-  cert pinning for secure connection bootstrapping. Use
-  [Google ML Kit Barcode Scanning][mlkit-barcode] for on-device QR
-  decoding. See [NATS Transport Design](analysis-nats-transport-design.md)
-  Section 5.5 for the `X509TrustManager` fingerprint pinning approach.
+- [x] **M-06: Secure Pairing Scanner:** Integrate QR code scanning and TLS cert
+  pinning for secure connection bootstrapping. Use [Google ML Kit Barcode
+  Scanning][mlkit-barcode] for on-device QR decoding. See [NATS Transport
+  Design](analysis-nats-transport-design.md) Section 5.5 for the
+  `X509TrustManager` fingerprint pinning approach.
 - [x] **M-02: NATS Client Service:** Integrate the NATS client into a background
   service to listen for incoming events configured to the pinned user profile.
 - [x] **C-12: Token Revocation:** Implement `renotify revoke` to invalidate the
@@ -1054,8 +1055,8 @@ WebSockets).*
   generate a template `settings.json` at the XDG config path (minimal by
   default, `--full` for all parameters with defaults), and `renotify config
   list` to print a table of all configurable parameters with key path, type,
-  default value, and description. Viper does not provide either capability;
-  both require a custom parameter registry.
+  default value, and description. Viper does not provide either capability; both
+  require a custom parameter registry.
 
 ### Phase 4: Core Operational Workflows
 *(Goal: Scripts can successfully execute blocking prompts and wait for human
@@ -1084,12 +1085,12 @@ workspace monitoring).*
 - [x] **C-10: Active Registry Service:** Implement the SQLite-backed flow
   tracker, stale sweeper, and the Core NATS registry presentation endpoint.
 - [x] **C-06: MCP Server:** Implement the MCP protocol layer with
-  `register_flow`, `refresh_flow`, `terminate_flow`, `post`, and `ask`
-  tools plus `DecisionResource` for async decision delivery ([R-CLI-08][r-cli-08],
+  `register_flow`, `refresh_flow`, `terminate_flow`, `post`, and `ask` tools
+  plus `DecisionResource` for async decision delivery ([R-CLI-08][r-cli-08],
   [R-CLI-10][r-cli-10]).
 - [x] **C-11: MCP Interjections & Timeouts:** Wire up interjection delivery
-  (`InterjectionResource`, daemon-interject consumer) and daemon-side
-  timeout enforcement for MCP `ask` requests (D-26, D-27).
+  (`InterjectionResource`, daemon-interject consumer) and daemon-side timeout
+  enforcement for MCP `ask` requests (D-26, D-27).
 - [x] **C-15: Hook Dispatcher Command:** Implement `renotify dispatch` with
   stdin/stdout JSON protocol, PermissionRequest→ask and Notification→post
   mapping, tool input summarisation, and graceful fallback on error. Reuses
@@ -1113,93 +1114,106 @@ workspace monitoring).*
 - [x] **M-05: UI & Branding:** Apply the resystems.io branding and SVG logo to
   the application assets and UI.
 - [x] **C-16: Remote Silent Mode:** Implement `renotify silent --device <id>
-  on|off` to remotely toggle notification suppression on a paired device. Publishes
-  a control message to `resystems.renotify.{username}.device.{device_id}.control`
-  via Core NATS. The Android app subscribes to its device control subject and
-  updates silent mode state on receipt. No ACL changes needed (daemon publishes,
-  mobile subscribes — both already permitted by existing wildcards).
+  on|off` to remotely toggle notification suppression on a paired device.
+  Publishes a control message to
+  `resystems.renotify.{username}.device.{device_id}.control` via Core NATS. The
+  Android app subscribes to its device control subject and updates silent mode
+  state on receipt. No ACL changes needed (daemon publishes, mobile subscribes —
+  both already permitted by existing wildcards).
 - [x] **M-10: Notification Tap Navigation:** Add a `contentIntent` to the
-  foreground service notification so that tapping the persistent connection status
-  notification opens the Renotify dashboard without creating a duplicate activity
-  instance ([R-MOB-12][r-mob-12]).
+  foreground service notification so that tapping the persistent connection
+  status notification opens the Renotify dashboard without creating a duplicate
+  activity instance ([R-MOB-12][r-mob-12]).
 - [x] **M-11: Content Notification Flow Navigation:** Add a `contentIntent` to
   content notifications (both informational and interactive) so that tapping the
-  notification body navigates to the dashboard with the originating flow expanded,
-  showing its notification history and response controls ([R-MOB-13][r-mob-13]).
+  notification body navigates to the dashboard with the originating flow
+  expanded, showing its notification history and response controls
+  ([R-MOB-13][r-mob-13]).
 
 ### Phase 7: Final Assembly & Verification
 *(Goal: The cohesive single-binary cross-platform distribution).*
 
 - [x] **P-02: Artefact Embedding:** Update the Go CLI tooling to use `go:embed`
   referencing the Android APK via an `internal/embed` package. The `dist/`
-  subdirectory is embedded at build time; a `.gitignore` in `dist/` prevents
-  APK files from being tracked. Default `go build` succeeds without the APK
-  (the embedded FS contains only `.gitignore`); `make` copies the real APK
-  into `dist/` before building. The `app` command group (`renotify app apk`)
-  nests under a future-extensible parent (for `ios` later).
-- [x] **P-03: APK Management Commands:** Implemented as `renotify app apk`
-  with two subcommands: `extract` writes the embedded APK to disk, and `serve`
-  starts a temporary HTTP server hosting the APK with a QR code containing the
-  download URL for easy phone-side installation. Uses `http.ServeContent` for
-  Range request support (required by Firefox). Includes ufw hints on Linux.
-- [x] **V-01: End-to-End Tests:** Full CLI → real Android client → CLI
-  roundtrip demonstrated manually on LG (Android 10) and Samsung (Android 16)
-  during Phases 5-6, covering pairing, notification rendering, response
-  dispatch, interjections, silent mode, and history. Automated test coverage
-  extended with error-path tests, broker subject tests, error discrimination
-  helper extraction, and code quality cleanup. V&V method: demonstration +
-  test (see change log).
-- [x] **V-02: Documentation Updates:** README rewritten with quick start,
-  agent integration configs (Claude Code HTTP, Antigravity stdio, hooks),
-  CLI command table, and links to guides. New `docs/renotify-architecture.md`
-  with system context, design principles, Mermaid block diagram (showing
-  concurrent HTTP MCP, stdio, and terminal connections), and sequence
-  diagrams for post, ask, and interjection flows.
+  subdirectory is embedded at build time; a `.gitignore` in `dist/` prevents APK
+  files from being tracked. Default `go build` succeeds without the APK (the
+  embedded FS contains only `.gitignore`); `make` copies the real APK into
+  `dist/` before building. The `app` command group (`renotify app apk`) nests
+  under a future-extensible parent (for `ios` later).
+- [x] **P-03: APK Management Commands:** Implemented as `renotify app apk` with
+  two subcommands: `extract` writes the embedded APK to disk, and `serve` starts
+  a temporary HTTP server hosting the APK with a QR code containing the download
+  URL for easy phone-side installation. Uses `http.ServeContent` for Range
+  request support (required by Firefox). Includes ufw hints on Linux.
+- [x] **V-01: End-to-End Tests:** Full CLI → real Android client → CLI roundtrip
+  demonstrated manually on LG (Android 10) and Samsung (Android 16) during
+  Phases 5-6, covering pairing, notification rendering, response dispatch,
+  interjections, silent mode, and history. Automated test coverage extended with
+  error-path tests, broker subject tests, error discrimination helper
+  extraction, and code quality cleanup. V&V method: demonstration + test (see
+  change log).
+- [x] **V-02: Documentation Updates:** README rewritten with quick start, agent
+  integration configs (Claude Code HTTP, Antigravity stdio, hooks), CLI command
+  table, and links to guides. New `docs/renotify-architecture.md` with system
+  context, design principles, Mermaid block diagram (showing concurrent HTTP
+  MCP, stdio, and terminal connections), and sequence diagrams for post, ask,
+  and interjection flows.
 
 ### Phase 8: State Management Decoupling
-*(Goal: The MCP server communicates with persistent state
-exclusively via NATS, enabling out-of-process deployment when a
-shared broker is in use.)*
+*(Goal: The MCP server communicates with persistent state exclusively via NATS,
+enabling out-of-process deployment when a shared broker is in use.)*
 
-- [x] **C-17: State Management Subsystem:** Extract a dedicated
-  state management subsystem that is the sole owner of the SQLite
-  ledger. Expose ledger reads (active flow lookups, history queries)
-  via NATS request-reply subjects and ledger writes (insert request,
-  insert response, insert interjection) via NATS request-reply or
-  JetStream consumption. Consolidate the existing `svc.flows` and
-  `svc.history` endpoints (C-09, C-10) into this subsystem
-  alongside new write-path subjects ([R-CLI-20][r-cli-20]).
-- [x] **C-18: MCP Server NATS Migration:** Remove the direct
-  `func() *ledger.DB` accessor from the MCP server. Replace all
-  in-process database calls (`s.db().ListActiveFlows`,
-  `s.db().InsertRequest`, `s.db().InsertResponse`,
-  `s.db().InsertInterjection`) with NATS request-reply calls to the
-  state management subsystem (C-17). Verify the MCP server package
-  has no import dependency on the ledger package ([R-CLI-21][r-cli-21]).
-- [x] **C-19: In-Process NATS Transport:** When the embedded broker
-  is enabled, connect daemon subsystems via `nats.InProcessConn`
-  instead of TCP loopback. When the embedded broker is disabled,
-  connect via NATS TCP to the shared broker address. The TCP
-  listener on port 4222 remains available for external CLI
-  connections ([R-CLI-22][r-cli-22]).
-- [x] **V-04: Decoupling Verification:** Verify that the MCP server
-  operates correctly when the ledger subsystem is reachable only via
-  NATS. Test both the collocated (in-process transport) and
-  separated (TCP transport to shared broker) topologies. Confirm
-  existing integration tests continue to pass.
-- [x] **V-05: Architecture Diagram Update:** Rework the system
-  block diagram in `renotify-architecture.md` to remove the direct
-  `MCP --> Ledger` edge and route state access through the broker
-  via the state management subsystem.
+- [x] **C-17: State Management Subsystem:** Extract a dedicated state management
+  subsystem that is the sole owner of the SQLite ledger. Expose ledger reads
+  (active flow lookups, history queries) via NATS request-reply subjects and
+  ledger writes (insert request, insert response, insert interjection) via NATS
+  request-reply or JetStream consumption. Consolidate the existing `svc.flows`
+  and `svc.history` endpoints (C-09, C-10) into this subsystem alongside new
+  write-path subjects ([R-CLI-20][r-cli-20]).
+- [x] **C-18: MCP Server NATS Migration:** Remove the direct `func() *ledger.DB`
+  accessor from the MCP server. Replace all in-process database calls
+  (`s.db().ListActiveFlows`, `s.db().InsertRequest`, `s.db().InsertResponse`,
+  `s.db().InsertInterjection`) with NATS request-reply calls to the state
+  management subsystem (C-17). Verify the MCP server package has no import
+  dependency on the ledger package ([R-CLI-21][r-cli-21]).
+- [x] **C-19: In-Process NATS Transport:** When the embedded broker is enabled,
+  connect daemon subsystems via `nats.InProcessConn` instead of TCP loopback.
+  When the embedded broker is disabled, connect via NATS TCP to the shared
+  broker address. The TCP listener on port 4222 remains available for external
+  CLI connections ([R-CLI-22][r-cli-22]).
+- [x] **V-04: Decoupling Verification:** Verify that the MCP server operates
+  correctly when the ledger subsystem is reachable only via NATS. Test both the
+  collocated (in-process transport) and separated (TCP transport to shared
+  broker) topologies. Confirm existing integration tests continue to pass.
+- [x] **V-05: Architecture Diagram Update:** Rework the system block diagram in
+  `renotify-architecture.md` to remove the direct `MCP --> Ledger` edge and
+  route state access through the broker via the state management subsystem.
 
 ### Phase 9: Incident Reporting
-*(Goal: Implement end-to-end telemetry capture, transmission, and tooling for mobile incidents.)*
+*(Goal: Implement end-to-end telemetry capture, transmission, and tooling for
+mobile incidents.)*
 
-- [ ] **M-12: Mobile Crash Capture:** Implement `Thread.UncaughtExceptionHandler` and `ApplicationExitInfo` ingestion on the Android client to capture managed exceptions and unmanaged terminations, persisting `IncidentReport` payloads locally ([R-OPS-02][r-ops-02]).
-- [ ] **M-13: Deferred Transmission:** Implement Android `WorkManager` (or `NatsService` startup hooks) to reliably upload persisted `IncidentReport` payloads to the `resystems.renotify.{username}.device.{device_id}.telemetry.crash` NATS JetStream subject upon network recovery ([R-OPS-03][r-ops-03]).
-- [ ] **C-21: File-Backed Telemetry Stream:** Update the daemon's JetStream configuration to provision a dedicated, file-backed `RENOTIFY_TELEMETRY` stream explicitly for diagnostic data, bypassing the SQLite database ([R-OPS-04][r-ops-04]).
-- [ ] **C-22: CLI Telemetry Tooling:** Implement `renotify telemetry list` and `renotify telemetry fetch` commands in the Go CLI to directly query the `RENOTIFY_TELEMETRY` stream and dump JSON payloads to a local directory ([R-OPS-05][r-ops-05]).
-- [ ] **V-06: Telemetry Verification:** Test the end-to-end telemetry pipeline by simulating a managed crash and an unmanaged kill on the Android client, verifying that the payload survives restart, is transmitted to the file-backed JetStream, and can be retrieved via the CLI tools.
+- [x] **M-12: Mobile Crash Capture:** Implement
+  `Thread.UncaughtExceptionHandler` and `ApplicationExitInfo` ingestion on the
+  Android client to capture managed exceptions and unmanaged terminations,
+  persisting `IncidentReport` payloads locally ([R-OPS-02][r-ops-02]).
+- [x] **C-21: File-Backed Telemetry Stream:** Update the daemon's JetStream
+  configuration to provision a dedicated, file-backed `RENOTIFY_TELEMETRY`
+  stream explicitly for diagnostic data, bypassing the SQLite database
+  ([R-OPS-04][r-ops-04]).
+- [ ] **M-13: Deferred Transmission:** Implement Android `WorkManager` (or
+  `NatsService` startup hooks) to reliably upload persisted `IncidentReport`
+  payloads to the
+  `resystems.renotify.{username}.device.{device_id}.telemetry.crash` NATS
+  JetStream subject upon network recovery ([R-OPS-03][r-ops-03]).
+- [ ] **C-22: CLI Telemetry Tooling:** Implement `renotify telemetry list` and
+  `renotify telemetry fetch` commands in the Go CLI to directly query the
+  `RENOTIFY_TELEMETRY` stream and dump JSON payloads to a local directory
+  ([R-OPS-05][r-ops-05]).
+- [ ] **V-06: Telemetry Verification:** Test the end-to-end telemetry pipeline
+  by simulating a managed crash and an unmanaged kill on the Android client,
+  verifying that the payload survives restart, is transmitted to the file-backed
+  JetStream, and can be retrieved via the CLI tools.
 
 ---
 
@@ -1280,13 +1294,12 @@ implemented — implementation detail belongs in the Section 5 change log.
 | D-72 | Release keystores excluded from repository ([R-SEC-04][r-sec-04]). Signing conditional on local keystore presence; passwords overridable via Gradle properties or Makefile variables. Committed key considered burned.                                                                                                                                                                                                                                                                                                                                                                                                  | —                                                                                                        | 2026-04-06 |
 | D-73 | Device presence ([R-CLI-23][r-cli-23], [R-MOB-14][r-mob-14]): application-level heartbeat from mobile to daemon (`device.{device_id}.heartbeat` subject, Core NATS Pub/Sub). Daemon maintains per-device last-seen map, exposes via `svc.device-presence` NATS endpoint. Connz API used as optional startup seed for embedded broker only. File-based pairing data and query-based presence data served through separate interfaces. Shared broker supported — no broker-internal monitoring dependency. Heartbeat interval communicated to mobile app via existing daemon heartbeat payload, not provisioning QR code. | [Device Presence](analysis-device-presence.md)                                                           | 2026-04-08 |
 
-*Note:* IDs D-53, D-55, D-62, D-63, D-64, and D-67 were removed
-during a register cleanup on 2026-04-06. They recorded refactoring
-details, SDK workarounds, or duplicated earlier decisions (D-55
-merged into D-54; D-67 was an implementation detail of D-27). The
-implementation detail is retained in the Section 5 change log. ID
-gaps are intentional to preserve traceability from existing
-references.
+*Note:* IDs D-53, D-55, D-62, D-63, D-64, and D-67 were removed during a
+register cleanup on 2026-04-06. They recorded refactoring details, SDK
+workarounds, or duplicated earlier decisions (D-55 merged into D-54; D-67 was an
+implementation detail of D-27). The implementation detail is retained in the
+Section 5 change log. ID gaps are intentional to preserve traceability from
+existing references.
 
 ---
 
@@ -1367,42 +1380,37 @@ Record completed items here with the date.
 | 2026-04-08 | Review | New requirements [R-CLI-23][r-cli-23] (Device Presence) and [R-MOB-14][r-mob-14] (Device Heartbeat). D-73 records design: application-level heartbeat from mobile, daemon-side last-seen map, separate file-based and query-based interfaces, shared-broker compatible. |
 | 2026-04-08 | C-20 | Device presence tracking implemented (daemon side). New `presence/` package: `Tracker` subsystem subscribes to `device.*.heartbeat` wildcard, maintains per-device last-seen map, exposes `DevicePresence()` for the registry endpoint. New `svc.device-presence` Core NATS Request-Reply endpoint in registry. New `renotify devices` CLI command queries daemon and displays username, device ID, online/offline status, last seen, and paired-at. `DevicePresenceConfig` added to config with `stale_threshold` (default 2m) and `heartbeat_interval` (default 30s). `DaemonHeartbeat` payload extended with `device_heartbeat_interval` field to communicate interval to mobile app. Mobile ACL updated with device-specific heartbeat publish permission. `DeviceStatus` and `DevicePresenceResult` wire types in `statesvc`. SIGHUP handler calls `Tracker.ReloadDevices()` for hot-reload after pair/revoke. Daemon startup order: Ledger → HTTP → MCP → Heartbeat → Presence → Registry. [R-CLI-23][r-cli-23] satisfied (daemon side). 6 presence tests, all existing tests pass including integration. |
 | 2026-04-08 | M-14 | Android device heartbeat publisher implemented. `NatsConnectionManager` launches a coroutine after connect/reconnect that publishes `DeviceHeartbeat` JSON (`device_id`, `timestamp`) to `device.{device_id}.heartbeat` every 30s (compiled default). Interval dynamically adjusted when daemon heartbeat arrives with non-zero `device_heartbeat_interval`. `DaemonHeartbeat.kt` extended with `deviceHeartbeatIntervalMs` field, parsed via existing `parseGoDuration()`. `NatsService.handleHeartbeat()` passes interval to `manager.updateHeartbeatInterval()`. Heartbeat coroutine auto-stops on disconnect, restarts on reconnect. [R-MOB-14][r-mob-14] satisfied. All Android JVM tests pass. |
+| 2026-05-17 | M-12 | Mobile crash capture implemented. Added a custom JVM `UncaughtExceptionHandler` and historical `ApplicationExitInfo` processor on the Android client to capture managed exceptions and unmanaged terminations, persisting `IncidentReport` JSON payloads to the secure local sandbox (`cache/telemetry/crashes/`). Verification playbook added to `device-testing.md`. |
+| 2026-05-17 | C-21 | File-Backed Telemetry Stream implemented. Updated embedded NATS configuration to support persistent StoreDir ($XDG_STATE_HOME/renotify/jetstream) in production. Configured RENOTIFY_TELEMETRY stream under resystems.renotify.*.device.*.telemetry.> with FileStorage, LimitsPolicy, 28-day MaxAge, and 100MB MaxBytes. Added unit tests for telemetry configuration, provisioning, and stream isolation. |
 
 ## 6. References
 
 1. [Model Context Protocol Specification
    (2025-06-18)](https://modelcontextprotocol.io/specification/2025-06-18)
-2. INCOSE Guide for Writing Requirements (INCOSE-TP-2010-006-03,
-   v3, 2019)
-3. [`mdp/qrterminal`][qrterminal] — Go library for terminal QR code
-   rendering with Unicode half-block characters.
-4. [Google ML Kit Barcode Scanning][mlkit-barcode] — Android
-   on-device barcode and QR code scanning SDK.
-5. [NATS Server][nats] — Cloud-native message broker. JetStream
-   provides at-least-once delivery with memory-backed streams.
-6. [Crockford Base32][crockford-base32] — Encoding used for all
-   generated identifiers (`daemon_id`, `workspace_id`, `flow_id`,
-   auth tokens). Case-insensitive, excludes visually ambiguous
-   characters (I, L, O, U).
-7. [XDG Base Directory Specification][xdg-basedir] — Storage
-   convention for configuration (`$XDG_CONFIG_HOME`) and state
-   (`$XDG_STATE_HOME`) paths on Unix-like systems.
-8. [RFC 3339][rfc3339] — Date and time format used for all payload
-   timestamps.
-9. [RFC 9562][rfc9562] — UUID version 7 (time-ordered) used for
-   `flow_id` generation; UUID version 4 (random) used for
-   `daemon_id` and `device_id`.
-10. [ISO 18004][iso18004] — QR code symbology specification. Governs
-    error correction levels, module layout, and quiet zone
-    requirements.
-11. [jnats][jnats] — Official NATS Java client library. Candidate
-    for Android NATS WebSocket connectivity (supports `wss://` and
-    custom `SSLContext`).
-12. [Cobra][cobra] — Go CLI framework for command-line argument
-    parsing and subcommand management.
-13. [Viper][viper] — Go configuration library supporting JSON files,
-    environment variables, and CLI flag binding with layered
-    precedence.
+2. INCOSE Guide for Writing Requirements (INCOSE-TP-2010-006-03, v3, 2019)
+3. [`mdp/qrterminal`][qrterminal] — Go library for terminal QR code rendering
+   with Unicode half-block characters.
+4. [Google ML Kit Barcode Scanning][mlkit-barcode] — Android on-device barcode
+   and QR code scanning SDK.
+5. [NATS Server][nats] — Cloud-native message broker. JetStream provides
+   at-least-once delivery with memory-backed streams.
+6. [Crockford Base32][crockford-base32] — Encoding used for all generated
+   identifiers (`daemon_id`, `workspace_id`, `flow_id`, auth tokens).
+   Case-insensitive, excludes visually ambiguous characters (I, L, O, U).
+7. [XDG Base Directory Specification][xdg-basedir] — Storage convention for
+   configuration (`$XDG_CONFIG_HOME`) and state (`$XDG_STATE_HOME`) paths on
+   Unix-like systems.
+8. [RFC 3339][rfc3339] — Date and time format used for all payload timestamps.
+9. [RFC 9562][rfc9562] — UUID version 7 (time-ordered) used for `flow_id`
+   generation; UUID version 4 (random) used for `daemon_id` and `device_id`.
+10. [ISO 18004][iso18004] — QR code symbology specification. Governs error
+    correction levels, module layout, and quiet zone requirements.
+11. [jnats][jnats] — Official NATS Java client library. Candidate for Android
+    NATS WebSocket connectivity (supports `wss://` and custom `SSLContext`).
+12. [Cobra][cobra] — Go CLI framework for command-line argument parsing and
+    subcommand management.
+13. [Viper][viper] — Go configuration library supporting JSON files, environment
+    variables, and CLI flag binding with layered precedence.
 
 [qrterminal]: https://github.com/mdp/qrterminal
 [mlkit-barcode]: https://developers.google.com/ml-kit/vision/barcode-scanning

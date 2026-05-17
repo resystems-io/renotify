@@ -24,6 +24,13 @@ const StreamName = "RENOTIFY"
 // Captures all flow-scoped traffic for all users.
 const StreamSubjects = "resystems.renotify.*.flow.>"
 
+// TelemetryStreamName is the JetStream stream for diagnostic and incident telemetry.
+const TelemetryStreamName = "RENOTIFY_TELEMETRY"
+
+// TelemetryStreamSubjects is the subject filter for the telemetry stream.
+// Captures all telemetry traffic from paired devices for all users.
+const TelemetryStreamSubjects = "resystems.renotify.*.device.*.telemetry.>"
+
 // MobileConsumerName returns the legacy durable consumer name
 // for the mobile app (pre-multi-device).
 func MobileConsumerName(username string) string {
@@ -86,6 +93,28 @@ func EnsureJetStream(
 		logger.Info("stream ready", "name", StreamName)
 	}
 
+	// Create or update the RENOTIFY_TELEMETRY stream.
+	telemetryCfg := telemetryStreamConfig(cfg)
+	if _, err := js.CreateOrUpdateStream(ctx, telemetryCfg); err != nil {
+		// On shared brokers the daemon may lack creation
+		// permissions. Fall back to verifying the stream exists.
+		if isPermissionError(err) {
+			logger.Info("telemetry stream creation not permitted, "+
+				"verifying existing stream",
+				"name", TelemetryStreamName)
+			if _, verifyErr := js.Stream(ctx, TelemetryStreamName); verifyErr != nil {
+				return fmt.Errorf("stream %s not found and "+
+					"cannot create: %w", TelemetryStreamName, err)
+			}
+			logger.Info("telemetry stream verified", "name", TelemetryStreamName)
+		} else {
+			return fmt.Errorf("create stream %s: %w",
+				TelemetryStreamName, err)
+		}
+	} else {
+		logger.Info("telemetry stream ready", "name", TelemetryStreamName)
+	}
+
 	// Create or update durable consumers.
 	consumers := []natsjs.ConsumerConfig{
 		mobileConsumerConfig(username),
@@ -124,6 +153,26 @@ func streamConfig(cfg config.JetStreamConfig) natsjs.StreamConfig {
 		MaxBytes:          cfg.MaxBytes,
 		MaxMsgSize:        cfg.MaxMsgSize,
 		MaxMsgsPerSubject: cfg.MaxMsgsPerSubj,
+		Duplicates:        cfg.DupWindow.Duration,
+		MaxConsumers:      -1,
+		MaxMsgs:           -1,
+	}
+}
+
+// telemetryStreamConfig builds the RENOTIFY_TELEMETRY stream configuration.
+// Telemetry is isolated from SQLite state and is persisted durably to disk
+// with a 28-day retention period.
+func telemetryStreamConfig(cfg config.JetStreamConfig) natsjs.StreamConfig {
+	return natsjs.StreamConfig{
+		Name:              TelemetryStreamName,
+		Subjects:          []string{TelemetryStreamSubjects},
+		Storage:           natsjs.FileStorage, // Durable, file-backed stream (R-OPS-04)
+		Retention:         natsjs.LimitsPolicy,
+		Discard:           natsjs.DiscardOld,
+		Replicas:          1,
+		MaxAge:            28 * 24 * time.Hour, // 28 Days retention as requested by user
+		MaxBytes:          100 * 1024 * 1024,   // 100 MB limit
+		MaxMsgSize:        cfg.MaxMsgSize,      // Reuses overall max message size limit
 		Duplicates:        cfg.DupWindow.Duration,
 		MaxConsumers:      -1,
 		MaxMsgs:           -1,
