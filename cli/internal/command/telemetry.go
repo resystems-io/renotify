@@ -113,6 +113,20 @@ func runTelemetryList(app *App, cmd *cobra.Command, format string) error {
 		return exitcode.Errorf(exitcode.Error, "failed to get telemetry stream %s: %v", broker.TelemetryStreamName, err)
 	}
 
+	info, err := stream.Info(ctx)
+	if err != nil {
+		return exitcode.Errorf(exitcode.Error, "failed to get stream info: %v", err)
+	}
+
+	if info.State.Msgs == 0 {
+		if format == "json" {
+			fmt.Fprintln(cmd.OutOrStdout(), "[]")
+			return nil
+		}
+		fmt.Fprintln(cmd.ErrOrStderr(), "No incident reports found.")
+		return nil
+	}
+
 	// Create an ephemeral consumer to pull all messages in the stream
 	cons, err := stream.CreateOrUpdateConsumer(ctx, natsjs.ConsumerConfig{
 		DeliverPolicy: natsjs.DeliverAllPolicy,
@@ -122,23 +136,36 @@ func runTelemetryList(app *App, cmd *cobra.Command, format string) error {
 		return exitcode.Errorf(exitcode.Error, "failed to create consumer: %v", err)
 	}
 
-	// Fetch messages from consumer in batches
+	// Fetch matches the exact current stream count (up to 100 limit).
+	// Because request matches broker availability, it returns immediately (0ms).
+	fetchLimit := int(info.State.Msgs)
+	if fetchLimit > 100 {
+		fetchLimit = 100
+	}
+
 	var reports []telemetryReport
+	lastSeq := info.State.LastSeq
+
+	// Fetch loop, breaking instantly when sequence reaches LastSeq to prevent empty NATS timeouts.
 	for {
-		batch, err := cons.Fetch(100, natsjs.FetchMaxWait(500*time.Millisecond))
+		batch, err := cons.Fetch(fetchLimit, natsjs.FetchMaxWait(100*time.Millisecond))
 		if err != nil {
 			break
 		}
 		count := 0
+		reachedEnd := false
 		for msg := range batch.Messages() {
 			count++
 			var report telemetryReport
-			if err := json.Unmarshal(msg.Data(), &report); err != nil {
-				continue
+			if err := json.Unmarshal(msg.Data(), &report); err == nil {
+				reports = append(reports, report)
 			}
-			reports = append(reports, report)
+			meta, err := msg.Metadata()
+			if err == nil && meta.Sequence.Stream >= lastSeq {
+				reachedEnd = true
+			}
 		}
-		if count == 0 {
+		if count == 0 || reachedEnd || len(reports) >= fetchLimit {
 			break
 		}
 	}
@@ -198,6 +225,16 @@ func runTelemetryFetch(app *App, cmd *cobra.Command, dir string) error {
 		return exitcode.Errorf(exitcode.Error, "failed to get telemetry stream %s: %v", broker.TelemetryStreamName, err)
 	}
 
+	info, err := stream.Info(ctx)
+	if err != nil {
+		return exitcode.Errorf(exitcode.Error, "failed to get stream info: %v", err)
+	}
+
+	if info.State.Msgs == 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "Successfully fetched 0 incident report(s) into %s\n", dir)
+		return nil
+	}
+
 	cons, err := stream.CreateOrUpdateConsumer(ctx, natsjs.ConsumerConfig{
 		DeliverPolicy: natsjs.DeliverAllPolicy,
 		AckPolicy:     natsjs.AckNonePolicy,
@@ -206,32 +243,42 @@ func runTelemetryFetch(app *App, cmd *cobra.Command, dir string) error {
 		return exitcode.Errorf(exitcode.Error, "failed to create consumer: %v", err)
 	}
 
+	fetchLimit := int(info.State.Msgs)
+	if fetchLimit > 100 {
+		fetchLimit = 100
+	}
+
 	count := 0
+	lastSeq := info.State.LastSeq
+
 	for {
-		batch, err := cons.Fetch(100, natsjs.FetchMaxWait(500*time.Millisecond))
+		batch, err := cons.Fetch(fetchLimit, natsjs.FetchMaxWait(100*time.Millisecond))
 		if err != nil {
 			break
 		}
 		batchCount := 0
+		reachedEnd := false
 		for msg := range batch.Messages() {
 			batchCount++
 			var report telemetryReport
-			if err := json.Unmarshal(msg.Data(), &report); err != nil {
-				continue
-			}
+			if err := json.Unmarshal(msg.Data(), &report); err == nil {
+				fileName := report.ReportID
+				if fileName == "" {
+					fileName = fmt.Sprintf("report-%d", count)
+				}
+				filePath := filepath.Join(dir, fmt.Sprintf("%s.json", fileName))
 
-			fileName := report.ReportID
-			if fileName == "" {
-				fileName = fmt.Sprintf("report-%d", count)
+				if err := os.WriteFile(filePath, msg.Data(), 0644); err != nil {
+					return exitcode.Errorf(exitcode.Error, "failed to write report to %s: %v", filePath, err)
+				}
+				count++
 			}
-			filePath := filepath.Join(dir, fmt.Sprintf("%s.json", fileName))
-
-			if err := os.WriteFile(filePath, msg.Data(), 0644); err != nil {
-				return exitcode.Errorf(exitcode.Error, "failed to write report to %s: %v", filePath, err)
+			meta, err := msg.Metadata()
+			if err == nil && meta.Sequence.Stream >= lastSeq {
+				reachedEnd = true
 			}
-			count++
 		}
-		if batchCount == 0 {
+		if batchCount == 0 || reachedEnd || count >= fetchLimit {
 			break
 		}
 	}
