@@ -92,10 +92,16 @@ object CrashReporter {
                     ApplicationExitInfo.REASON_CRASH_NATIVE,
                     ApplicationExitInfo.REASON_INITIALIZATION_FAILURE -> {
                         
+                        val traceText = try {
+                            exit.traceInputStream?.bufferedReader()?.use { it.readText() } ?: ""
+                        } catch (e: Exception) {
+                            ""
+                        }
+
                         val details = IncidentDetails(
                             exceptionType = "UnmanagedKill",
                             message = exit.description ?: "Process terminated by system",
-                            stackTrace = "",
+                            stackTrace = traceText,
                             exitReason = exit.reason
                         )
 
