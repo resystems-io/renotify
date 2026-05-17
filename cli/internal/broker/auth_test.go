@@ -57,6 +57,7 @@ func TestBuildAuth_MobilePermissions(t *testing.T) {
 	pub := mobile.Permissions.Publish.Allow
 	assertContains(t, pub, "resystems.renotify.alice.flow.*.response", "mobile publish")
 	assertContains(t, pub, "resystems.renotify.alice.flow.*.interject", "mobile publish")
+	assertContains(t, pub, "resystems.renotify.alice.device.mb_TESTDEV01.telemetry.>", "mobile publish")
 	assertContains(t, pub, "resystems.renotify.alice.svc.*", "mobile publish")
 	assertContains(t, pub, "$JS.ACK.>", "mobile publish")
 	assertContains(t, pub, "$JS.FC.>", "mobile publish")
