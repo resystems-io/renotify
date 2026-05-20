@@ -125,6 +125,10 @@ class MainActivity : ComponentActivity() {
             setImageResource(R.drawable.ic_resystems_logo)
             val size = dp(32)
             layoutParams = LinearLayout.LayoutParams(size, size)
+            isClickable = true
+            setOnLongClickListener {
+                throw RuntimeException("Manual crash triggered from long-press on logo")
+            }
         }
         header.addView(logo)
 

@@ -101,6 +101,11 @@ func DevicesPath() string {
 	return filepath.Join(PairingDir(), "devices.json")
 }
 
+// JetStreamStoreDir returns the path to the durable JetStream store directory.
+func JetStreamStoreDir() string {
+	return filepath.Join(StateHome(), "jetstream")
+}
+
 // EnsureDir creates a directory and all parents with mode 0700 if
 // it does not already exist.
 func EnsureDir(path string) error {

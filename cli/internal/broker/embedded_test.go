@@ -91,3 +91,27 @@ func TestNewEmbeddedServer_JetStreamEnabled(t *testing.T) {
 		t.Error("StoreDir should be a temp dir for JetStream metadata")
 	}
 }
+
+func TestNewEmbeddedServer_PersistentStoreDir(t *testing.T) {
+	dir := t.TempDir()
+	storeDir := filepath.Join(dir, "jetstream")
+
+	srv, err := NewEmbeddedServer(EmbeddedConfig{
+		TCPHost:         "127.0.0.1",
+		TCPPort:         -1,
+		Username:        "testuser",
+		InternalToken:   "tok",
+		JetStreamMaxMem: 64 * 1024 * 1024,
+		StoreDir:        storeDir,
+	}, slog.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if srv.opts.StoreDir != storeDir {
+		t.Errorf("StoreDir = %q, want %q", srv.opts.StoreDir, storeDir)
+	}
+	if srv.isTempDir {
+		t.Error("isTempDir should be false for custom StoreDir")
+	}
+}

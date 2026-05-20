@@ -278,6 +278,11 @@ func (c *Controller) startEmbedded(_ context.Context) (*nats.Conn, *broker.Embed
 	}
 
 	// Configure and start embedded NATS.
+	jsStoreDir := xdg.StateHome()
+	if err := xdg.EnsureDir(jsStoreDir); err != nil {
+		return nil, nil, fmt.Errorf("jetstream store dir: %w", err)
+	}
+
 	srv, err := broker.NewEmbeddedServer(broker.EmbeddedConfig{
 		TCPHost:         c.cfg.Broker.TCPHost,
 		TCPPort:         c.cfg.Broker.TCPPort,
@@ -289,6 +294,7 @@ func (c *Controller) startEmbedded(_ context.Context) (*nats.Conn, *broker.Embed
 		InternalToken:   internalToken,
 		Devices:         devices,
 		JetStreamMaxMem: c.cfg.JetStream.MaxBytes,
+		StoreDir:        jsStoreDir,
 	}, c.logger)
 	if err != nil {
 		return nil, nil, err

@@ -79,6 +79,17 @@ class NatsService : Service() {
                 updateNotification(state)
                 // Also update companion for non-bound observers.
                 _state.value = state
+                if (state == ConnectionState.Connected) {
+                    val provisioning = store.load()
+                    if (provisioning != null) {
+                        io.resystems.renotify.telemetry.TelemetryUploader.transmitDeferredCrashes(
+                            this@NatsService,
+                            serviceScope,
+                            manager.connection ?: return@collect,
+                            provisioning
+                        )
+                    }
+                }
             }
         }
     }
@@ -492,6 +503,7 @@ class NatsService : Service() {
             }
         }
     }
+
 
     // --- Notification management ---
 

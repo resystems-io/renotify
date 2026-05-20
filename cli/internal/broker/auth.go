@@ -61,6 +61,7 @@ func BuildAuthConfig(
 						prefix + ".flow.*.response",
 						prefix + ".flow.*.interject",
 						prefix + ".device." + d.DeviceID + ".heartbeat",
+						prefix + ".device." + d.DeviceID + ".telemetry.>",
 						prefix + ".svc.*",
 						"$JS.ACK.>",
 						"$JS.FC.>",
