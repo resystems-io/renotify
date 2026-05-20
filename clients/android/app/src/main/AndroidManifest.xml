@@ -14,7 +14,7 @@
 
     <!-- Foreground service for persistent NATS connection (M-02) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
         android:name=".RenotifyApplication"
@@ -38,8 +38,12 @@
 
         <service
             android:name=".nats.NatsService"
-            android:foregroundServiceType="dataSync"
-            android:exported="false" />
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="developer_notification_relay" />
+        </service>
 
         <receiver
             android:name=".notification.NotificationActionReceiver"
