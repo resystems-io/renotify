@@ -240,6 +240,46 @@ func (d *DB) ListActiveFlows(q ActiveFlowsQuery) ([]ActiveFlow, error) {
 	return flows, rows.Err()
 }
 
+// SearchActiveFlows returns all active flows matching the broad
+// search filters. Used to resolve human-friendly queries into flow IDs (C-14).
+func (d *DB) SearchActiveFlows(q SearchFlowsQuery) ([]ActiveFlow, error) {
+	rows, err := d.db.Query(`
+		SELECT flow_id, daemon_id, workspace_id,
+		       display_name, abs_path, label, metadata,
+		       registered_at, last_activity_timestamp
+		FROM active_flows
+		WHERE (? = '' OR display_name LIKE '%' || ? || '%' OR abs_path LIKE '%' || ? || '%')
+		ORDER BY registered_at DESC`,
+		q.Query, q.Query, q.Query,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("ledger: search active flows: %w", err)
+	}
+	defer rows.Close()
+
+	var flows []ActiveFlow
+	for rows.Next() {
+		var f ActiveFlow
+		var displayName, absPath, label, metadata sql.NullString
+		var regAt, lastAct string
+		if err := rows.Scan(
+			&f.FlowID, &f.DaemonID, &f.WorkspaceID,
+			&displayName, &absPath, &label, &metadata,
+			&regAt, &lastAct,
+		); err != nil {
+			return nil, fmt.Errorf("ledger: scan active flow: %w", err)
+		}
+		f.DisplayName = displayName.String
+		f.AbsPath = absPath.String
+		f.Label = label.String
+		f.Metadata = unmarshalMetadata(metadata)
+		f.RegisteredAt, _ = time.Parse(time.RFC3339, regAt)
+		f.LastActivityTimestamp, _ = time.Parse(time.RFC3339, lastAct)
+		flows = append(flows, f)
+	}
+	return flows, rows.Err()
+}
+
 // ReapStaleFlows returns active flows whose last activity is
 // older than the grace period (Section 4.3). The caller is
 // responsible for terminating each flow (publishing the NATS

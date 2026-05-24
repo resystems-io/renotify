@@ -83,3 +83,9 @@ type ActiveFlowsQuery struct {
 	DaemonID    string
 	WorkspaceID string
 }
+
+// SearchFlowsQuery holds the filter parameters for
+// SearchActiveFlows to support broad, mix-and-match queries.
+type SearchFlowsQuery struct {
+	Query string
+}

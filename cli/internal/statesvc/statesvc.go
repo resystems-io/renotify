@@ -45,6 +45,22 @@ type FlowsResult struct {
 	Flows []FlowEntry `json:"flows"`
 }
 
+// --- Flow search query ---
+
+// SearchFlowsQuery holds broad filter parameters for the
+// svc.flows.search endpoint.
+type SearchFlowsQuery struct {
+	// Workspace can be a workspace display name or an absolute path.
+	Workspace string `json:"workspace"`
+}
+
+// SearchFlowsResult is the response payload for the
+// svc.flows.search endpoint. It returns a list of matching
+// flow IDs to be hydrated by subsequent strict queries.
+type SearchFlowsResult struct {
+	FlowIDs []string `json:"flow_ids"`
+}
+
 // --- History query (existing svc.history) ---
 
 // HistoryQueryRequest holds optional filters for the svc.history

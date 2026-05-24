@@ -47,8 +47,8 @@ func TestFlow_NotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for nonexistent flow")
 	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("error = %q, want 'not found'", err)
+	if !strings.Contains(err.Error(), "no active flows found") {
+		t.Errorf("error = %q, want 'no active flows found'", err)
 	}
 }
 
@@ -225,5 +225,168 @@ func TestFlow_NoMetadata(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "fl_NOMETA01") {
 		t.Error("missing flow ID in output")
+	}
+}
+
+func TestFlow_SearchName(t *testing.T) {
+	srv, stateDir := startTestNATS(t)
+	defer srv.Shutdown()
+	setupPostEnv(t, srv, stateDir)
+
+	nc, err := nats.Connect(srv.ClientURL())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nc.Close()
+
+	entry := statesvc.FlowEntry{
+		FlowID:      "fl_SRCH01",
+		DaemonID:    "dn_TEST1234",
+		WorkspaceID: "ws_TESTWS01",
+		DisplayName: "mysearchproj",
+		AbsPath:     "/home/test/mysearchproj",
+	}
+
+	// Mock search endpoint
+	subSearch, err := nc.Subscribe(
+		"resystems.renotify.testuser.svc.flows.search",
+		func(msg *nats.Msg) {
+			res := statesvc.SearchFlowsResult{FlowIDs: []string{"fl_SRCH01"}}
+			data, _ := json.Marshal(res)
+			msg.Respond(data)
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subSearch.Unsubscribe()
+
+	// Mock strict endpoint
+	subStrict, err := nc.Subscribe(
+		"resystems.renotify.testuser.svc.flows",
+		func(msg *nats.Msg) {
+			result := statesvc.FlowsResult{Flows: []statesvc.FlowEntry{entry}}
+			data, _ := json.Marshal(result)
+			msg.Respond(data)
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subStrict.Unsubscribe()
+
+	stdout, _, err := executeCommand("flow", "mysearchproj")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(stdout, "fl_SRCH01") {
+		t.Errorf("output missing flow ID\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "mysearchproj") {
+		t.Errorf("output missing workspace name\n%s", stdout)
+	}
+}
+
+func TestFlow_SearchPath(t *testing.T) {
+	srv, stateDir := startTestNATS(t)
+	defer srv.Shutdown()
+	setupPostEnv(t, srv, stateDir)
+
+	nc, err := nats.Connect(srv.ClientURL())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nc.Close()
+
+	entry := statesvc.FlowEntry{FlowID: "fl_SRCH02", AbsPath: "/absolute/path"}
+
+	subSearch, err := nc.Subscribe(
+		"resystems.renotify.testuser.svc.flows.search",
+		func(msg *nats.Msg) {
+			res := statesvc.SearchFlowsResult{FlowIDs: []string{"fl_SRCH02"}}
+			data, _ := json.Marshal(res)
+			msg.Respond(data)
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subSearch.Unsubscribe()
+
+	subStrict, err := nc.Subscribe(
+		"resystems.renotify.testuser.svc.flows",
+		func(msg *nats.Msg) {
+			result := statesvc.FlowsResult{Flows: []statesvc.FlowEntry{entry}}
+			data, _ := json.Marshal(result)
+			msg.Respond(data)
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subStrict.Unsubscribe()
+
+	stdout, _, err := executeCommand("flow", "/absolute/path")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(stdout, "fl_SRCH02") {
+		t.Errorf("output missing flow ID\n%s", stdout)
+	}
+}
+
+func TestFlow_MultipleFlowsSeparator(t *testing.T) {
+	srv, stateDir := startTestNATS(t)
+	defer srv.Shutdown()
+	setupPostEnv(t, srv, stateDir)
+
+	nc, err := nats.Connect(srv.ClientURL())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nc.Close()
+
+	e1 := statesvc.FlowEntry{FlowID: "fl_M1"}
+	e2 := statesvc.FlowEntry{FlowID: "fl_M2"}
+
+	subSearch, err := nc.Subscribe(
+		"resystems.renotify.testuser.svc.flows.search",
+		func(msg *nats.Msg) {
+			res := statesvc.SearchFlowsResult{FlowIDs: []string{"fl_M1", "fl_M2"}}
+			data, _ := json.Marshal(res)
+			msg.Respond(data)
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subSearch.Unsubscribe()
+
+	subStrict, err := nc.Subscribe(
+		"resystems.renotify.testuser.svc.flows",
+		func(msg *nats.Msg) {
+			var query statesvc.FlowsQuery
+			json.Unmarshal(msg.Data, &query)
+			var result statesvc.FlowsResult
+			if query.FlowID == "fl_M1" {
+				result = statesvc.FlowsResult{Flows: []statesvc.FlowEntry{e1}}
+			} else {
+				result = statesvc.FlowsResult{Flows: []statesvc.FlowEntry{e2}}
+			}
+			data, _ := json.Marshal(result)
+			msg.Respond(data)
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subStrict.Unsubscribe()
+
+	stdout, _, err := executeCommand("flow", "someproj")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(stdout, "---") {
+		t.Errorf("output missing separator '---' between flows\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "fl_M1") || !strings.Contains(stdout, "fl_M2") {
+		t.Errorf("output missing one of the flows\n%s", stdout)
 	}
 }

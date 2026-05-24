@@ -42,6 +42,12 @@ func ServiceFlowsSubject(username string) string {
 	return fmt.Sprintf("resystems.renotify.%s.svc.flows", username)
 }
 
+// ServiceSearchFlowsSubject returns the Core NATS Request-Reply subject
+// for the active flows broad search endpoint.
+func ServiceSearchFlowsSubject(username string) string {
+	return fmt.Sprintf("resystems.renotify.%s.svc.flows.search", username)
+}
+
 // ServiceHistorySubject returns the Core NATS Request-Reply
 // subject for the notification history query endpoint (C-09).
 func ServiceHistorySubject(username string) string {
