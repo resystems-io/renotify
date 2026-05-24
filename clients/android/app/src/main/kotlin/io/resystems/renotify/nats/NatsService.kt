@@ -44,6 +44,9 @@ import org.json.JSONObject
  */
 class NatsService : Service() {
 
+    // Visible for testing to override Android SDK version checks on JVM unit tests
+    internal var sdkVersionProvider: () -> Int = { Build.VERSION.SDK_INT }
+
     private val serviceScope = CoroutineScope(
         SupervisorJob() + Dispatchers.Main
     )
@@ -128,20 +131,42 @@ class NatsService : Service() {
         }
 
         // Start as foreground immediately to avoid ANR.
-        // The 3-arg overload with foregroundServiceType requires
-        // API 29; use the 2-arg version on older devices.
+        // Design Decision D-74: We use the 'specialUse' foreground service type on API 34+ (Android 14+)
+        // instead of 'dataSync'. This choice is critical because Android 15+ imposes a strict 6-hour
+        // runtime timeout on 'dataSync' services, which would terminate our persistent NATS connection.
+        // Since NatsService must maintain a continuous WebSocket connection (R-MOB-02), 'specialUse'
+        // is required to avoid system-enforced terminations.
+        // On API levels below 34, we fall back to the 2-argument startForeground.
+        // We catch ForegroundServiceStartNotAllowedException on Android 12+ (API 31+)
+        // to handle background start restrictions gracefully and prevent crash loops.
         val notification = buildNotification(ConnectionState.Connecting)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID, notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        val sdkVersion = sdkVersionProvider()
+        try {
+            if (sdkVersion >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(
+                    NOTIFICATION_ID, notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            if (sdkVersion >= Build.VERSION_CODES.S && e is android.app.ForegroundServiceStartNotAllowedException) {
+                Log.e(TAG, "Foreground service start not allowed due to background restrictions", e)
+                stopSelf()
+                return START_NOT_STICKY
+            } else {
+                throw e
+            }
         }
 
         manager.connect(payload)
         return START_STICKY
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        Log.w(TAG, "Foreground service timeout reached for startId $startId, type $fgsType")
+        stopSelf(startId)
     }
 
     override fun onDestroy() {
@@ -526,7 +551,7 @@ class NatsService : Service() {
         NotificationRenderer.createChannels(this)
     }
 
-    private fun buildNotification(
+    internal fun buildNotification(
         state: ConnectionState
     ): Notification {
         val text = when (state) {

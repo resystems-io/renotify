@@ -686,6 +686,14 @@ WebSocket connection to receive messages.
 * **Trace to Parent (A4):** [N-01][n-01]
 * **Allocation (A8):** Android Application
 * **V&V Method (A2):** Test
+* **Design Note (D-74):** The background service is implemented as an Android
+  Foreground Service. On API 34+ (Android 14+), it uses the `specialUse`
+  foreground service type rather than `dataSync`. This prevents the 6-hour
+  runtime timeout limit enforced on `dataSync` services in Android 15+. The
+  service declares the required `<property>` metadata for Google Play store review
+  with subtype `"developer_notification_relay"`. It is also hardened to catch
+  `ForegroundServiceStartNotAllowedException` on API 31+ to prevent background start
+  crash loops.
 
 #### R-MOB-03: Presentation & Prioritisation
 **Statement:** Handle incoming payloads and display native Android
@@ -1293,6 +1301,7 @@ implemented — implementation detail belongs in the Section 5 change log.
 | D-71 | Embedded broker uses in-process NATS transport (`net.Pipe`) instead of TCP loopback. Eliminates local TCP round-trip for daemon internals. External TCP listener retained for CLI connections.                                                                                                                                                                                                                                                                                                                                                                                                                          | —                                                                                                        | 2026-04-04 |
 | D-72 | Release keystores excluded from repository ([R-SEC-04][r-sec-04]). Signing conditional on local keystore presence; passwords overridable via Gradle properties or Makefile variables. Committed key considered burned.                                                                                                                                                                                                                                                                                                                                                                                                  | —                                                                                                        | 2026-04-06 |
 | D-73 | Device presence ([R-CLI-23][r-cli-23], [R-MOB-14][r-mob-14]): application-level heartbeat from mobile to daemon (`device.{device_id}.heartbeat` subject, Core NATS Pub/Sub). Daemon maintains per-device last-seen map, exposes via `svc.device-presence` NATS endpoint. Connz API used as optional startup seed for embedded broker only. File-based pairing data and query-based presence data served through separate interfaces. Shared broker supported — no broker-internal monitoring dependency. Heartbeat interval communicated to mobile app via existing daemon heartbeat payload, not provisioning QR code. | [Device Presence](analysis-device-presence.md)                                                           | 2026-04-08 |
+| D-74 | Migrate NATS background service from `dataSync` to `specialUse` foreground service type to prevent Android 15+ 6-hour runtime timeout crashes and catch background start exceptions gracefully to prevent crash loops. | [Background Service](#r-mob-02-background-service) | 2026-05-20 |
 
 *Note:* IDs D-53, D-55, D-62, D-63, D-64, and D-67 were removed during a
 register cleanup on 2026-04-06. They recorded refactoring details, SDK
@@ -1384,6 +1393,8 @@ Record completed items here with the date.
 | 2026-05-17 | C-21 | File-Backed Telemetry Stream implemented. Updated embedded NATS configuration to support persistent StoreDir ($XDG_STATE_HOME/renotify/jetstream) in production. Configured RENOTIFY_TELEMETRY stream under resystems.renotify.*.device.*.telemetry.> with FileStorage, LimitsPolicy, 28-day MaxAge, and 100MB MaxBytes. Added unit tests for telemetry configuration, provisioning, and stream isolation. |
 | 2026-05-17 | C-22 | CLI Telemetry Tooling implemented. Added `telemetry` command group and `list` / `fetch` subcommands to the Cobra CLI. `list` connects to NATS and outputs a tabwriter-formatted summary (Timestamp, Device ID, Type, Exception) or JSON array of all captured incident reports. `fetch` downloads all JSON payloads from the stream sequentially to a designated local directory. Added automated unit tests using mock NATS brokers for list (text and JSON formats) and fetch commands. All tests pass successfully. |
 | 2026-05-17 | M-13, V-06 | Deferred Transmission and Telemetry Verification implemented. Added telemetry uploader on Android client (`TelemetryUploader.kt`), integrated into `NatsService` startup flow, uploading deferred crash reports from local sandbox to NATS JetStream upon connection recovery. Configured Go daemon authentication rules with telemetry publish permissions. Verified end-to-end deferred crash reporting, cache purging, and CLI listing (`renotify telemetry list`) on physical test device, successfully completing telemetry verification. |
+| 2026-05-20 | M-15, V-07 | Foreground Service Migration to specialUse implemented. Migrated `NatsService` from `dataSync` to `specialUse` foreground service type, including required manifest permissions and properties, to prevent Android 15+ 6-hour timeout crashes. Implemented try-catch block for `ForegroundServiceStartNotAllowedException` on Android 12+ returning `START_NOT_STICKY` to prevent crash loops, and added `onTimeout` callback for graceful shutdown. Created `NatsServiceFgsTest` unit test suite to verify start command and timeout behaviour across API levels. |
+
 
 ## 6. References
 
