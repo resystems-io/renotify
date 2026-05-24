@@ -224,6 +224,62 @@ func TestListActiveFlows_ByDaemon(t *testing.T) {
 	}
 }
 
+func TestDB_SearchActiveFlows(t *testing.T) {
+	db := openTestDB(t)
+
+	ts := time.Date(2026, 3, 31, 10, 0, 0, 0, time.UTC)
+
+	f1 := &ActiveFlow{
+		FlowID:       "flow_srch_001",
+		Username:     "testuser",
+		DaemonID:     "dmn_001",
+		WorkspaceID:  "ws_001",
+		DisplayName:  "myproj",
+		AbsPath:      "/home/test/myproj",
+		RegisteredAt: ts,
+	}
+	if err := db.RegisterFlow(f1); err != nil {
+		t.Fatal(err)
+	}
+
+	f2 := &ActiveFlow{
+		FlowID:       "flow_srch_002",
+		Username:     "testuser",
+		DaemonID:     "dmn_001",
+		WorkspaceID:  "ws_002",
+		DisplayName:  "otherproj",
+		AbsPath:      "/home/test/otherproj",
+		RegisteredAt: ts.Add(time.Minute),
+	}
+	if err := db.RegisterFlow(f2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Search by WorkspaceName (display_name)
+	flows, err := db.SearchActiveFlows(SearchFlowsQuery{Query: "myproj"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(flows) != 1 {
+		t.Fatalf("len = %d, want 1", len(flows))
+	}
+	if flows[0].FlowID != "flow_srch_001" {
+		t.Errorf("flow_id = %q, want %q", flows[0].FlowID, "flow_srch_001")
+	}
+
+	// Search by WorkspacePath (abs_path)
+	flows, err = db.SearchActiveFlows(SearchFlowsQuery{Query: "/home/test/otherproj"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(flows) != 1 {
+		t.Fatalf("len = %d, want 1", len(flows))
+	}
+	if flows[0].FlowID != "flow_srch_002" {
+		t.Errorf("flow_id = %q, want %q", flows[0].FlowID, "flow_srch_002")
+	}
+}
+
 func TestReapStaleFlows(t *testing.T) {
 	db := openTestDB(t)
 

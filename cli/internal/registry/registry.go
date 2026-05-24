@@ -92,6 +92,7 @@ func (s *Service) Start(
 	// Subscribe to all Core NATS service endpoints.
 	endpoints := []func() (*nats.Subscription, error){
 		s.subscribeFlowsEndpoint,
+		s.subscribeSearchFlowsEndpoint,
 		s.subscribeHistoryEndpoint,
 		s.subscribeInsertRequestEndpoint,
 		s.subscribeInsertResponseEndpoint,

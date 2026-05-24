@@ -73,6 +73,60 @@ func (s *Service) handleFlowsQuery(msg *nats.Msg) {
 	msg.Respond(data)
 }
 
+// --- Search endpoint ---
+
+// subscribeSearchFlowsEndpoint subscribes to the svc.flows.search subject
+// and handles incoming SearchFlowsQuery requests.
+func (s *Service) subscribeSearchFlowsEndpoint() (*nats.Subscription, error) {
+	subject := broker.ServiceSearchFlowsSubject(s.username)
+	sub, err := s.nc.Subscribe(subject, s.handleSearchFlowsQuery)
+	if err != nil {
+		return nil, err
+	}
+	s.logger.Info("svc.flows.search endpoint ready", "subject", subject)
+	return sub, nil
+}
+
+// handleSearchFlowsQuery processes a single svc.flows.search request.
+func (s *Service) handleSearchFlowsQuery(msg *nats.Msg) {
+	var query statesvc.SearchFlowsQuery
+	if len(msg.Data) > 0 {
+		if err := json.Unmarshal(msg.Data, &query); err != nil {
+			s.logger.Error("svc.flows.search unmarshal", "err", err)
+			msg.Respond([]byte(`{"flow_ids":[]}`))
+			return
+		}
+	}
+
+	flows, err := s.dbFunc().SearchActiveFlows(ledger.SearchFlowsQuery{
+		Query: query.Workspace,
+	})
+	if err != nil {
+		s.logger.Error("svc.flows.search query", "err", err)
+		msg.Respond([]byte(`{"flow_ids":[]}`))
+		return
+	}
+
+	flowIDs := make([]string, len(flows))
+	for i, f := range flows {
+		flowIDs[i] = f.FlowID
+	}
+	if len(flowIDs) == 0 {
+		// Ensure JSON marshals as [] rather than null
+		flowIDs = []string{}
+	}
+
+	result := statesvc.SearchFlowsResult{FlowIDs: flowIDs}
+	data, err := json.Marshal(result)
+	if err != nil {
+		s.logger.Error("svc.flows.search marshal", "err", err)
+		msg.Respond([]byte(`{"flow_ids":[]}`))
+		return
+	}
+
+	msg.Respond(data)
+}
+
 // --- History endpoint (C-09) ---
 
 // subscribeHistoryEndpoint subscribes to the svc.history subject
